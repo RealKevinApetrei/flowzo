@@ -1,0 +1,25 @@
+{
+  "name": "flowzo",
+  "private": true,
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "clean": "turbo clean",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "turbo test",
+    "test:e2e": "turbo test:e2e"
+  },
+  "devDependencies": {
+    "turbo": "^2",
+    "prettier": "^3",
+    "typescript": "^5.7",
+    "@types/node": "^22"
+  },
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,3 @@
+-- Seed data is populated from TrueLayer Open Banking sync
+-- No manual seed needed for hackathon demo
+-- Test users are created via the auth UI
