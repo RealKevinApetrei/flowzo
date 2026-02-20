@@ -1,0 +1,187 @@
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { createTrade, submitTrade } from "@/lib/actions/trades";
+import { SuggestionCard } from "@/components/borrower/suggestion-card";
+
+interface Proposal {
+  id: string;
+  type: string;
+  status: string;
+  payload: {
+    obligation_name: string;
+    original_date: string;
+    shifted_date: string;
+    amount_pence: number;
+    fee_pence: number;
+    shift_days: number;
+  };
+  explanation_text: string | null;
+}
+
+interface SuggestionFeedProps {
+  userId: string;
+}
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-2xl bg-white shadow-sm p-5 animate-pulse">
+      <div className="flex items-start gap-3">
+        <div className="w-10 h-10 rounded-full bg-warm-grey" />
+        <div className="flex-1 space-y-2">
+          <div className="h-4 bg-warm-grey rounded-full w-3/4" />
+          <div className="h-5 bg-warm-grey rounded-full w-1/3" />
+        </div>
+      </div>
+      <div className="mt-4 h-16 bg-warm-grey rounded-xl" />
+      <div className="mt-3 flex gap-2">
+        <div className="h-9 bg-warm-grey rounded-full flex-1" />
+        <div className="h-9 bg-warm-grey rounded-full flex-1" />
+        <div className="h-9 bg-warm-grey rounded-full w-16" />
+      </div>
+    </div>
+  );
+}
+
+export function SuggestionFeed({ userId }: SuggestionFeedProps) {
+  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const supabase = createClient();
+
+  const fetchProposals = useCallback(async () => {
+    const { data, error } = await supabase
+      .from("agent_proposals")
+      .select("id, type, status, payload, explanation_text")
+      .eq("user_id", userId)
+      .eq("status", "PENDING")
+      .order("created_at", { ascending: false });
+
+    if (!error && data) {
+      // Map the database payload shape to our component shape
+      const mapped: Proposal[] = data.map((row) => ({
+        id: row.id,
+        type: row.type,
+        status: row.status,
+        payload: {
+          obligation_name: row.payload.obligation_name,
+          original_date: row.payload.original_date,
+          shifted_date: row.payload.suggested_date,
+          amount_pence: row.payload.amount,
+          fee_pence: row.payload.estimated_fee,
+          shift_days: row.payload.shift_days,
+        },
+        explanation_text: row.explanation_text,
+      }));
+      setProposals(mapped);
+    }
+    setLoading(false);
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    fetchProposals();
+  }, [fetchProposals]);
+
+  async function handleAccept(proposalId: string) {
+    const proposal = proposals.find((p) => p.id === proposalId);
+    if (!proposal) return;
+
+    try {
+      // Create a trade from the proposal
+      const formData = new FormData();
+      formData.set("obligation_id", proposalId);
+      formData.set("original_due_date", proposal.payload.original_date);
+      formData.set("shifted_due_date", proposal.payload.shifted_date);
+      formData.set("amount_pence", String(proposal.payload.amount_pence));
+      formData.set("fee_pence", String(proposal.payload.fee_pence));
+
+      const trade = await createTrade(formData);
+
+      // Submit the trade (DRAFT -> PENDING_MATCH)
+      await submitTrade(trade.id);
+
+      // Update proposal status to ACCEPTED
+      await supabase
+        .from("agent_proposals")
+        .update({ status: "ACCEPTED", trade_id: trade.id, responded_at: new Date().toISOString() })
+        .eq("id", proposalId);
+
+      // Remove from local state
+      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to accept proposal:", err);
+    }
+  }
+
+  async function handleDismiss(proposalId: string) {
+    try {
+      await supabase
+        .from("agent_proposals")
+        .update({ status: "DISMISSED", responded_at: new Date().toISOString() })
+        .eq("id", proposalId);
+
+      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+    } catch (err) {
+      console.error("Failed to dismiss proposal:", err);
+    }
+  }
+
+  function handleCustomise(proposalId: string) {
+    const proposal = proposals.find((p) => p.id === proposalId);
+    if (!proposal) return;
+    // Navigate to a customisation flow (trade creation page)
+    router.push(`/borrower/trades/new?proposal=${proposalId}`);
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-3">
+        <SkeletonCard />
+        <SkeletonCard />
+      </div>
+    );
+  }
+
+  if (proposals.length === 0) {
+    return (
+      <div className="rounded-2xl bg-white shadow-sm p-8 text-center">
+        <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.5}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-7 h-7 text-success"
+          >
+            <path d="M20 6L9 17l-5-5" />
+          </svg>
+        </div>
+        <h3 className="text-base font-bold text-navy">You&apos;re all clear!</h3>
+        <p className="text-sm text-text-secondary mt-1">
+          No bill shifts needed right now. We&apos;ll let you know if anything comes up.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {proposals.map((proposal) => (
+        <SuggestionCard
+          key={proposal.id}
+          proposal={proposal}
+          onAccept={handleAccept}
+          onDismiss={handleDismiss}
+          onCustomise={handleCustomise}
+        />
+      ))}
+    </div>
+  );
+}

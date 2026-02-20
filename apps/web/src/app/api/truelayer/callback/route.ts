@@ -1,13 +1,67 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { exchangeCode } from "@/lib/truelayer/auth";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const state = searchParams.get("state");
 
   if (!code) {
-    return NextResponse.redirect(new URL("/onboarding?error=no_code", request.url));
+    return NextResponse.redirect(`${origin}/onboarding?error=no_code`);
   }
 
-  // TODO: Exchange code for TrueLayer tokens, store in bank_connections
-  return NextResponse.redirect(new URL("/onboarding?success=true", request.url));
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.redirect(`${origin}/login`);
+  }
+
+  // Verify state matches what we stored
+  const storedState = user.user_metadata?.truelayer_state;
+  if (state && storedState && state !== storedState) {
+    return NextResponse.redirect(`${origin}/onboarding?error=invalid_state`);
+  }
+
+  try {
+    // Exchange code for tokens
+    const tokens = await exchangeCode(code);
+
+    // Store bank connection in database
+    const { error } = await supabase.from("bank_connections").insert({
+      user_id: user.id,
+      provider: "truelayer",
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      token_expires_at: new Date(
+        Date.now() + tokens.expires_in * 1000,
+      ).toISOString(),
+      status: "active",
+    });
+
+    if (error) {
+      console.error("Failed to store bank connection:", error);
+      return NextResponse.redirect(`${origin}/onboarding?error=storage_failed`);
+    }
+
+    // Mark onboarding as completed
+    await supabase
+      .from("profiles")
+      .update({ onboarding_completed: true })
+      .eq("id", user.id);
+
+    // Clear the state token
+    await supabase.auth.updateUser({
+      data: { truelayer_state: null },
+    });
+
+    return NextResponse.redirect(`${origin}/onboarding?success=true`);
+  } catch (error) {
+    console.error("TrueLayer token exchange failed:", error);
+    return NextResponse.redirect(`${origin}/onboarding?error=token_exchange_failed`);
+  }
 }

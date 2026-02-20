@@ -1,52 +1,95 @@
-export default function LenderHomePage() {
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { TopBar } from "@/components/layout/top-bar";
+import { LenderPageClient } from "@/components/lender/lender-page-client";
+
+export default async function LenderHomePage() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/login");
+  }
+
+  // Fetch lending pot data
+  const { data: pot } = await supabase
+    .from("lending_pots")
+    .select("available_pence, locked_pence, total_deployed_pence, realized_yield_pence")
+    .eq("user_id", user.id)
+    .single();
+
+  // Fetch lender preferences (auto-match flag)
+  const { data: prefs } = await supabase
+    .from("lender_preferences")
+    .select("auto_match_enabled")
+    .eq("user_id", user.id)
+    .single();
+
+  // Fetch yield stats (aggregated from completed trades where this user was lender)
+  const { data: completedTrades } = await supabase
+    .from("trades")
+    .select("fee_pence, shift_days, amount_pence, status")
+    .eq("lender_id", user.id);
+
+  const allTrades = completedTrades ?? [];
+  const activeTrades = allTrades.filter((t) =>
+    ["MATCHED", "LIVE"].includes(t.status),
+  );
+  const settledTrades = allTrades.filter((t) => t.status === "REPAID");
+
+  const totalYieldPence = settledTrades.reduce(
+    (sum, t) => sum + (t.fee_pence ?? 0),
+    0,
+  );
+
+  const avgTermDays =
+    allTrades.length > 0
+      ? Math.round(
+          allTrades.reduce((sum, t) => sum + (t.shift_days ?? 0), 0) /
+            allTrades.length,
+        )
+      : 0;
+
+  const avgAprBps =
+    allTrades.length > 0
+      ? Math.round(
+          allTrades.reduce((sum, t) => {
+            if (!t.amount_pence || !t.shift_days) return sum;
+            const annualRate =
+              (t.fee_pence / t.amount_pence) * (365 / t.shift_days);
+            return sum + annualRate * 10000; // convert to bps
+          }, 0) / allTrades.length,
+        )
+      : 0;
+
+  const yieldStats = {
+    totalYieldPence,
+    avgTermDays,
+    avgAprBps,
+    tradeCount: allTrades.length,
+    activeTrades: activeTrades.length,
+  };
+
   return (
-    <div className="px-4 py-6 space-y-6">
-      {/* Top Bar */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-extrabold text-navy">Lending</h1>
-        <p className="text-sm text-text-secondary">Your pot</p>
-      </div>
-
-      {/* TODO: Lending Pot card component */}
-      <section>
-        <h2 className="text-lg font-bold text-navy mb-3">Lending Pot</h2>
-        <div className="card-monzo p-6">
-          <p className="text-3xl font-extrabold text-navy">£0.00</p>
-          <p className="text-sm text-text-secondary mt-1">Available to lend</p>
-          <button className="mt-4 w-full bg-coral text-white font-semibold py-3 rounded-full hover:bg-coral-dark transition-colors">
-            Top Up Pot
-          </button>
-        </div>
-      </section>
-
-      {/* TODO: Auto-pop toggle component */}
-      <section>
-        <div className="card-monzo p-4 flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-navy">Auto-pop</h3>
-            <p className="text-sm text-text-secondary">Automatically lend to matching trades</p>
-          </div>
-          <div className="w-12 h-7 bg-cool-grey rounded-full flex items-center px-1">
-            <div className="w-5 h-5 bg-white rounded-full shadow-sm" />
-          </div>
-        </div>
-      </section>
-
-      {/* TODO: Bubble Board component */}
-      <section>
-        <h2 className="text-lg font-bold text-navy mb-3">Bubble Board</h2>
-        <div className="bg-warm-grey rounded-2xl min-h-[400px] flex items-center justify-center text-text-muted">
-          Bubble Board — Active trade requests
-        </div>
-      </section>
-
-      {/* TODO: Yield dashboard component */}
-      <section>
-        <h2 className="text-lg font-bold text-navy mb-3">Yield Dashboard</h2>
-        <div className="card-monzo p-6 text-center text-text-muted">
-          Yield stats and history will appear here
-        </div>
-      </section>
-    </div>
+    <>
+      <TopBar title="Lending" />
+      <LenderPageClient
+        initialPot={
+          pot
+            ? {
+                available_pence: pot.available_pence,
+                locked_pence: pot.locked_pence,
+                total_deployed_pence: pot.total_deployed_pence,
+                realized_yield_pence: pot.realized_yield_pence,
+              }
+            : null
+        }
+        initialAutoMatch={prefs?.auto_match_enabled ?? false}
+        initialYieldStats={yieldStats}
+      />
+    </>
   );
 }
