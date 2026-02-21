@@ -20,9 +20,9 @@ interface FilterBarProps {
 const RISK_GRADES = ["A", "B", "C"] as const;
 
 const GRADE_COLORS: Record<string, string> = {
-  A: "bg-[#14B8A6]",
-  B: "bg-coral",
-  C: "bg-[#8B5CF6]",
+  A: "bg-blue-500",
+  B: "bg-rose-400",
+  C: "bg-amber-500",
 };
 
 function summarize(filters: FilterState): string {

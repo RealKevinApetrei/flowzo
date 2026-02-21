@@ -12,6 +12,7 @@ export interface BubbleTrade {
   shift_days: number;
   risk_grade: string;
   status: string;
+  borrower_name?: string;
 }
 
 interface BubbleBoardProps {
@@ -22,11 +23,14 @@ interface BubbleBoardProps {
   hudPosition: HudPosition;
 }
 
-// Monzo-branded risk colors — gradient pairs (inner highlight, outer base)
-const RISK_GRADIENTS: Record<string, { inner: string; outer: string; glow: string }> = {
-  A: { inner: "#99F6E4", outer: "#14B8A6", glow: "rgba(20,184,166,0.25)" },
-  B: { inner: "#FFB4B8", outer: "#FF5A5F", glow: "rgba(255,90,95,0.25)" },
-  C: { inner: "#C4B5FD", outer: "#8B5CF6", glow: "rgba(139,92,246,0.25)" },
+// Premium 3D sphere palette — blue / rose / amber (matches demo board)
+const RISK_PALETTE: Record<
+  string,
+  { highlight: string; base: string; deep: string }
+> = {
+  A: { highlight: "#BFDBFE", base: "#3B82F6", deep: "#1D4ED8" },
+  B: { highlight: "#FECDD3", base: "#FB7185", deep: "#E11D48" },
+  C: { highlight: "#FDE68A", base: "#F59E0B", deep: "#B45309" },
 };
 
 const CHARGE_DURATION = 500;
@@ -40,6 +44,7 @@ interface SimNode extends d3.SimulationNodeDatum {
   shift_days: number;
   risk_grade: string;
   status: string;
+  borrower_name?: string;
   radius: number;
 }
 
@@ -100,28 +105,56 @@ export function BubbleBoard({
 
     const d3Svg = d3.select(svg);
 
-    // Define gradient defs + glow filters
+    // Define sphere gradients, specular highlight, shadow filter
     let defs = d3Svg.select<SVGDefsElement>("defs");
     if (defs.empty()) {
       defs = d3Svg.append("defs");
+
       (["A", "B", "C"] as const).forEach((grade) => {
-        const g = RISK_GRADIENTS[grade];
+        const p = RISK_PALETTE[grade];
+        // 3D sphere gradient
         const grad = defs
           .append("radialGradient")
-          .attr("id", `grad-${grade}`)
+          .attr("id", `sphere-${grade}`)
           .attr("cx", "35%")
-          .attr("cy", "35%");
-        grad.append("stop").attr("offset", "0%").attr("stop-color", g.inner).attr("stop-opacity", "1");
-        grad.append("stop").attr("offset", "100%").attr("stop-color", g.outer).attr("stop-opacity", "0.9");
+          .attr("cy", "30%")
+          .attr("r", "65%");
+        grad.append("stop").attr("offset", "0%").attr("stop-color", p.highlight).attr("stop-opacity", "0.95");
+        grad.append("stop").attr("offset", "50%").attr("stop-color", p.base).attr("stop-opacity", "1");
+        grad.append("stop").attr("offset", "100%").attr("stop-color", p.deep).attr("stop-opacity", "1");
 
-        const filter = defs.append("filter").attr("id", `bubble-glow-${grade}`).attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
-        filter.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "5").attr("result", "blur");
-        filter.append("feFlood").attr("flood-color", g.glow).attr("result", "color");
-        filter.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "glow");
-        const merge = filter.append("feMerge");
-        merge.append("feMergeNode").attr("in", "glow");
-        merge.append("feMergeNode").attr("in", "SourceGraphic");
+        // Stroke gradient
+        const sg = defs
+          .append("radialGradient")
+          .attr("id", `stroke-${grade}`)
+          .attr("cx", "35%")
+          .attr("cy", "30%");
+        sg.append("stop").attr("offset", "0%").attr("stop-color", p.base).attr("stop-opacity", "0.2");
+        sg.append("stop").attr("offset", "100%").attr("stop-color", p.deep).attr("stop-opacity", "0.5");
       });
+
+      // Specular highlight
+      const spec = defs
+        .append("radialGradient")
+        .attr("id", "specular")
+        .attr("cx", "50%")
+        .attr("cy", "50%");
+      spec.append("stop").attr("offset", "0%").attr("stop-color", "white").attr("stop-opacity", "0.75");
+      spec.append("stop").attr("offset", "100%").attr("stop-color", "white").attr("stop-opacity", "0");
+
+      // Drop shadow
+      const shadow = defs
+        .append("filter")
+        .attr("id", "bubble-shadow")
+        .attr("x", "-30%")
+        .attr("y", "-30%")
+        .attr("width", "160%")
+        .attr("height", "160%");
+      shadow.append("feDropShadow")
+        .attr("dx", "0")
+        .attr("dy", "3")
+        .attr("stdDeviation", "5")
+        .attr("flood-color", "rgba(0,0,0,0.1)");
     }
 
     const filtered = applyFilters(trades, filters);
@@ -174,7 +207,7 @@ export function BubbleBoard({
       .attr("class", "bubble")
       .style("cursor", "pointer");
 
-    // Pointer events
+    // Pointer events for tap / long-press
     enter.each(function () {
       const group = d3.select(this);
       group
@@ -232,17 +265,30 @@ export function BubbleBoard({
         });
     });
 
-    // Main circle with gradient + glow
+    // Main sphere with 3D gradient + shadow
     enter
       .append("circle")
       .attr("class", "main-circle")
       .attr("r", 0)
-      .attr("fill", (d) => `url(#grad-${d.risk_grade})`)
-      .attr("filter", (d) => `url(#bubble-glow-${d.risk_grade})`)
+      .attr("fill", (d) => `url(#sphere-${d.risk_grade})`)
+      .attr("stroke", (d) => `url(#stroke-${d.risk_grade})`)
+      .attr("stroke-width", 1.5)
+      .attr("filter", "url(#bubble-shadow)")
       .transition()
       .duration(addedIds.size > 0 ? 600 : 0)
       .ease(d3.easeElasticOut.amplitude(1).period(0.4))
       .attr("r", (d) => d.radius);
+
+    // Specular highlight ellipse
+    enter
+      .append("ellipse")
+      .attr("class", "specular-hl")
+      .attr("cx", (d) => -d.radius * 0.2)
+      .attr("cy", (d) => -d.radius * 0.25)
+      .attr("rx", (d) => d.radius * 0.38)
+      .attr("ry", (d) => d.radius * 0.22)
+      .attr("fill", "url(#specular)")
+      .attr("pointer-events", "none");
 
     // Highlight ring
     enter
@@ -268,37 +314,39 @@ export function BubbleBoard({
       .attr("pointer-events", "none")
       .attr("transform", "rotate(-90)");
 
+    // Borrower name label (top line) — only if available
+    enter
+      .append("text")
+      .attr("class", "bubble-name")
+      .attr("text-anchor", "middle")
+      .attr("dy", (d) => (d.borrower_name ? "-0.4em" : "0"))
+      .attr("fill", "white")
+      .attr("font-weight", "600")
+      .attr("font-size", (d) => `${Math.max(8, d.radius / 4.5)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 3px rgba(0,0,0,0.35)")
+      .style("opacity", 0)
+      .text((d) => d.borrower_name ?? "")
+      .transition()
+      .delay(300)
+      .duration(300)
+      .style("opacity", (d) => (d.borrower_name ? "1" : "0"));
+
     // Amount label
     enter
       .append("text")
       .attr("class", "bubble-amount")
       .attr("text-anchor", "middle")
-      .attr("dy", "-0.15em")
-      .attr("fill", "white")
+      .attr("dy", (d) => (d.borrower_name ? "1em" : "0.1em"))
+      .attr("fill", "rgba(255,255,255,0.9)")
       .attr("font-weight", "700")
       .attr("font-size", (d) => `${Math.max(10, d.radius / 3.2)}px`)
       .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.25)")
       .style("opacity", 0)
       .text((d) => formatPounds(d.amount_pence))
       .transition()
-      .delay(300)
-      .duration(300)
-      .style("opacity", "1");
-
-    // Shift days sub-label
-    enter
-      .append("text")
-      .attr("class", "bubble-days")
-      .attr("text-anchor", "middle")
-      .attr("dy", "1.1em")
-      .attr("fill", "rgba(255,255,255,0.7)")
-      .attr("font-weight", "500")
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 5)}px`)
-      .attr("pointer-events", "none")
-      .style("opacity", 0)
-      .text((d) => `${d.shift_days}d`)
-      .transition()
-      .delay(400)
+      .delay(350)
       .duration(300)
       .style("opacity", "1");
 
@@ -310,22 +358,28 @@ export function BubbleBoard({
       .transition()
       .duration(300)
       .attr("r", (d) => d.radius)
-      .attr("fill", (d) => `url(#grad-${d.risk_grade})`)
-      .attr("filter", (d) => `url(#bubble-glow-${d.risk_grade})`);
+      .attr("fill", (d) => `url(#sphere-${d.risk_grade})`)
+      .attr("stroke", (d) => `url(#stroke-${d.risk_grade})`);
+
+    merged.select(".specular-hl")
+      .attr("cx", (d) => -d.radius * 0.2)
+      .attr("cy", (d) => -d.radius * 0.25)
+      .attr("rx", (d) => d.radius * 0.38)
+      .attr("ry", (d) => d.radius * 0.22);
 
     merged.select(".highlight-ring").attr("r", (d) => d.radius + 2);
+
+    merged
+      .select(".bubble-name")
+      .text((d) => d.borrower_name ?? "")
+      .attr("font-size", (d) => `${Math.max(8, d.radius / 4.5)}px`);
 
     merged
       .select(".bubble-amount")
       .text((d) => formatPounds(d.amount_pence))
       .attr("font-size", (d) => `${Math.max(10, d.radius / 3.2)}px`);
 
-    merged
-      .select(".bubble-days")
-      .text((d) => `${d.shift_days}d`)
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 5)}px`);
-
-    // Force simulation
+    // Force simulation — active movement
     if (simulationRef.current) simulationRef.current.stop();
 
     const centerX = hudPosition === "side" ? width / 2 - 40 : width / 2;
@@ -333,8 +387,8 @@ export function BubbleBoard({
 
     const simulation = d3
       .forceSimulation<SimNode>(nodes)
-      .force("center", d3.forceCenter(centerX, centerY).strength(0.05))
-      .force("charge", d3.forceManyBody<SimNode>().strength(-15))
+      .force("center", d3.forceCenter(centerX, centerY).strength(0.02))
+      .force("charge", d3.forceManyBody<SimNode>().strength(-20))
       .force(
         "collide",
         d3
@@ -343,10 +397,10 @@ export function BubbleBoard({
           .strength(0.8)
           .iterations(3),
       )
-      .force("x", d3.forceX(centerX).strength(0.03))
-      .force("y", d3.forceY(centerY).strength(0.03))
-      .alphaDecay(0.01)
-      .velocityDecay(0.3)
+      .force("x", d3.forceX(centerX).strength(0.01))
+      .force("y", d3.forceY(centerY).strength(0.01))
+      .alphaDecay(0.003)
+      .velocityDecay(0.12)
       .on("tick", () => {
         merged.attr("transform", (d) => {
           const r = d.radius;
@@ -358,13 +412,14 @@ export function BubbleBoard({
 
     simulationRef.current = simulation;
 
+    // Frequent jiggle for active floating
     const jiggleInterval = setInterval(() => {
-      simulation.alpha(0.15).restart();
+      simulation.alpha(0.4).restart();
       nodes.forEach((node) => {
-        node.vx = (node.vx ?? 0) + (Math.random() - 0.5) * 2;
-        node.vy = (node.vy ?? 0) + (Math.random() - 0.5) * 2;
+        node.vx = (node.vx ?? 0) + (Math.random() - 0.5) * 6;
+        node.vy = (node.vy ?? 0) + (Math.random() - 0.5) * 6;
       });
-    }, 4000);
+    }, 1800);
 
     return () => {
       clearInterval(jiggleInterval);

@@ -19,9 +19,9 @@ interface BubbleTooltipProps {
 const fmt = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
 const RISK_BADGE: Record<string, { bg: string; text: string }> = {
-  A: { bg: "bg-[#14B8A6]/15", text: "text-[#14B8A6]" },
-  B: { bg: "bg-coral/15", text: "text-coral" },
-  C: { bg: "bg-[#8B5CF6]/15", text: "text-[#8B5CF6]" },
+  A: { bg: "bg-blue-500/15", text: "text-blue-500" },
+  B: { bg: "bg-rose-400/15", text: "text-rose-400" },
+  C: { bg: "bg-amber-500/15", text: "text-amber-500" },
 };
 
 export function BubbleTooltip({ trade, position, onDismiss }: BubbleTooltipProps) {

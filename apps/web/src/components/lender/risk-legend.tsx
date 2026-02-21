@@ -6,24 +6,24 @@ const RISK_INFO = [
   {
     grade: "A",
     label: "Low Risk",
-    color: "#14B8A6",
-    glow: "#99F6E4",
+    color: "#3B82F6",
+    highlight: "#BFDBFE",
     description:
       "Strong repayment history, low default probability. Typically shorter terms with reliable borrowers.",
   },
   {
     grade: "B",
     label: "Medium Risk",
-    color: "#FF5A5F",
-    glow: "#FFB4B8",
+    color: "#FB7185",
+    highlight: "#FECDD3",
     description:
       "Moderate risk profile. Balanced return potential with some uncertainty. Most common trade grade.",
   },
   {
     grade: "C",
     label: "Higher Risk",
-    color: "#8B5CF6",
-    glow: "#C4B5FD",
+    color: "#F59E0B",
+    highlight: "#FDE68A",
     description:
       "Higher yield potential but increased default risk. Longer terms or newer borrowers.",
   },
@@ -67,7 +67,7 @@ export function RiskLegend() {
               <div
                 className="w-4 h-4 rounded-full shrink-0 mt-0.5 shadow-sm"
                 style={{
-                  background: `radial-gradient(circle at 30% 30%, ${r.glow}, ${r.color})`,
+                  background: `radial-gradient(circle at 30% 30%, ${r.highlight}, ${r.color})`,
                 }}
               />
               <div>
