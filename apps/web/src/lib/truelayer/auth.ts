@@ -34,8 +34,18 @@ export async function exchangeCode(
   });
 
   if (!res.ok) {
-    const error = await res.text();
-    throw new Error(`TrueLayer token exchange failed: ${error}`);
+    const body = await res.text();
+    const redirectUri = getRedirectUri(origin);
+    console.error(
+      `[TrueLayer] Token exchange failed (${res.status})`,
+      `\n  redirect_uri: ${redirectUri}`,
+      `\n  client_id: ${TRUELAYER_CONFIG.clientId.slice(0, 8)}...`,
+      `\n  env: ${TRUELAYER_CONFIG.env}`,
+      `\n  response: ${body}`,
+    );
+    throw new Error(
+      `TrueLayer token exchange failed (${res.status}): ${body} [redirect_uri=${redirectUri}]`,
+    );
   }
 
   return res.json();

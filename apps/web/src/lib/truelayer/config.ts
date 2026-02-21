@@ -21,3 +21,13 @@ export const TRUELAYER_CONFIG = {
 export function getRedirectUri(origin: string): string {
   return `${origin}/api/truelayer/callback`;
 }
+
+// Startup validation — warn if TrueLayer is misconfigured
+if (typeof process !== "undefined" && process.env) {
+  if (!TRUELAYER_CONFIG.clientId) {
+    console.warn("[TrueLayer] TRUELAYER_CLIENT_ID is not set — bank connections will fail");
+  }
+  if (!TRUELAYER_CONFIG.clientSecret) {
+    console.warn("[TrueLayer] TRUELAYER_CLIENT_SECRET is not set — token exchange will fail");
+  }
+}

@@ -51,6 +51,7 @@ Flowzo is a Monzo-native "Bills + Pots" fintech webapp with a pooled P2P micro-l
 ### Git Workflow
 - **Never push directly to `main`** — always use feature branches + PRs
 - Multiple Claude Code instances run in parallel — **always use worktrees** (`/worktree` or `EnterWorktree`) to avoid conflicts
+- **Worktree convention**: Use `EnterWorktree` at the start of every task. This creates an isolated copy under `.claude/worktrees/<name>` on a new branch. On session exit, you'll be prompted to keep or remove it. Worktrees prevent merge conflicts between parallel Claude Code sessions and keep the main working tree clean.
 - Commit messages: conventional commits style
 - Claude code review runs automatically on PRs via `anthropics/claude-code-action@v1`
 
