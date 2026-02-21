@@ -20,9 +20,13 @@ export async function createTrade(formData: FormData) {
     fee_pence: Number(formData.get("fee_pence")),
   });
 
+  // Use admin client to bypass RLS — auth verified above
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
   // Verify obligation ownership if provided
   if (input.obligation_id) {
-    const { data: obl, error: oblErr } = await supabase
+    const { data: obl, error: oblErr } = await admin
       .from("obligations")
       .select("user_id")
       .eq("id", input.obligation_id)
@@ -34,7 +38,7 @@ export async function createTrade(formData: FormData) {
   }
 
   // DB stores GBP decimal, frontend sends pence — convert at boundary
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from("trades")
     .insert({
       borrower_id: user.id,
