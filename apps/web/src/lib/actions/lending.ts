@@ -107,3 +107,43 @@ export async function fundTrade(tradeId: string) {
 
   if (updateErr) throw new Error(`Failed to update trade: ${updateErr.message}`);
 }
+
+export async function topUpPot(amountPence: number) {
+  if (!amountPence || amountPence <= 0) throw new Error("Invalid amount");
+
+  const res = await fetch("/api/payments/topup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount_pence: amountPence }),
+  });
+
+  if (!res.ok) {
+    const { error } = await res.json();
+    throw new Error(error ?? "Top-up failed");
+  }
+
+  return res.json();
+}
+
+export async function withdrawFromPot(amountPence: number) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  if (!amountPence || amountPence <= 0) throw new Error("Invalid amount");
+
+  const amountGBP = amountPence / 100;
+  const { error } = await supabase.rpc("update_lending_pot", {
+    p_user_id: user.id,
+    p_entry_type: "WITHDRAW",
+    p_amount: amountGBP,
+    p_trade_id: null,
+    p_allocation_id: null,
+    p_description: `Withdraw £${amountGBP.toFixed(2)}`,
+  });
+
+  if (error) throw new Error(`Withdrawal failed: ${error.message}`);
+}

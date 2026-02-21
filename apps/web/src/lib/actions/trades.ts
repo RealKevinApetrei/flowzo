@@ -11,8 +11,9 @@ export async function createTrade(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  const rawObligationId = formData.get("obligation_id");
   const input = createTradeSchema.parse({
-    obligation_id: formData.get("obligation_id"),
+    obligation_id: rawObligationId && rawObligationId !== "" ? rawObligationId : undefined,
     original_due_date: formData.get("original_due_date"),
     new_due_date: formData.get("new_due_date") ?? formData.get("shifted_due_date"),
     amount_pence: Number(formData.get("amount_pence")),
@@ -24,7 +25,7 @@ export async function createTrade(formData: FormData) {
     .from("trades")
     .insert({
       borrower_id: user.id,
-      obligation_id: input.obligation_id,
+      obligation_id: input.obligation_id ?? null,
       original_due_date: input.original_due_date,
       new_due_date: input.new_due_date,
       amount: input.amount_pence / 100,
