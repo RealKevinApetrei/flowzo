@@ -74,7 +74,7 @@ export default async function LenderHomePage() {
   const { data: currentApy } = await supabase.rpc("get_lender_current_apy", {
     p_user_id: user.id,
   });
-  const currentApyBps = Math.round(Number(currentApy ?? 0));
+  const currentApyBps = Math.round(Number(currentApy ?? 0)) || avgAprBps;
 
   // Fetch recent FEE_CREDIT entries for yield sparkline
   const { data: recentYields } = await supabase
@@ -92,7 +92,7 @@ export default async function LenderHomePage() {
   const yieldStats = {
     totalYieldPence,
     avgTermDays,
-    avgAprBps,
+    avgAprBps: currentApyBps,
     tradeCount: allTrades.length,
     activeTrades: activeTrades.length,
   };

@@ -3,17 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 
 const SECTIONS = [
-  { id: "overview", label: "Overview" },
+  { id: "pool-summary", label: "Pool" },
+  { id: "trade-summary", label: "Trades" },
   { id: "order-book", label: "Order Book" },
   { id: "performance", label: "Performance" },
-  { id: "yield", label: "Yield" },
+  { id: "yield-curve", label: "Yield Curve" },
   { id: "lenders", label: "Lenders" },
-  { id: "backtest", label: "Backtest" },
-  { id: "returns", label: "Returns" },
-  { id: "risk-score", label: "Risk Score" },
-  { id: "stress-test", label: "Stress Test" },
-  { id: "eda", label: "EDA" },
-  { id: "forecast", label: "Forecast" },
+  { id: "trade-analytics", label: "By Grade" },
+  { id: "risk-distribution", label: "Risk" },
+  { id: "ml-scoring", label: "ML" },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
