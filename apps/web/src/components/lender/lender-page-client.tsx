@@ -1,11 +1,7 @@
 "use client";
 
-import { useState, useCallback, useTransition } from "react";
-import { toast } from "sonner";
-import { toggleAutoMatch } from "@/lib/actions/lending";
 import { TopBar } from "@/components/layout/top-bar";
 import { LendingPotCard } from "./lending-pot-card";
-import { AutoPopToggle } from "./auto-pop-toggle";
 import { YieldDashboard } from "./yield-dashboard";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
@@ -26,45 +22,15 @@ interface YieldStats {
 
 interface LenderPageClientProps {
   initialPot: LendingPot | null;
-  initialAutoMatch: boolean;
   initialYieldStats: YieldStats;
-  initialWithdrawalQueued: boolean;
   sparklineData: number[];
 }
 
 export function LenderPageClient({
   initialPot,
-  initialAutoMatch,
   initialYieldStats,
-  initialWithdrawalQueued,
   sparklineData,
 }: LenderPageClientProps) {
-  const [autoMatch, setAutoMatch] = useState(initialAutoMatch);
-  const [, startTransition] = useTransition();
-
-  // Compute projected yield for passive income display
-  const totalPotPence =
-    (initialPot?.available_pence ?? 0) + (initialPot?.locked_pence ?? 0);
-  const aprDecimal = initialYieldStats.avgAprBps / 10000;
-  const monthlyYieldPence = Math.round((totalPotPence * aprDecimal) / 12);
-
-  const handleAutoMatchToggle = useCallback(
-    (enabled: boolean) => {
-      setAutoMatch(enabled);
-      startTransition(async () => {
-        try {
-          await toggleAutoMatch(enabled);
-          toast.success(
-            enabled ? "Auto-match enabled" : "Auto-match disabled",
-          );
-        } catch {
-          setAutoMatch(!enabled);
-          toast.error("Failed to update auto-match setting");
-        }
-      });
-    },
-    [],
-  );
 
   return (
     <div>
@@ -77,9 +43,6 @@ export function LenderPageClient({
 
         {/* Lending Pot Card */}
         <LendingPotCard pot={initialPot} currentApyBps={initialYieldStats.avgAprBps} />
-
-        {/* Auto-Match Toggle */}
-        <AutoPopToggle enabled={autoMatch} onToggle={handleAutoMatchToggle} />
 
         {/* Yield Dashboard */}
         <YieldDashboard

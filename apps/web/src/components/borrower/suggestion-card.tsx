@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { formatCurrency, formatDate } from "@flowzo/shared";
 import { Button } from "@/components/ui/button";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -24,8 +24,6 @@ interface SuggestionCardProps {
   onDismiss: (id: string) => void | Promise<void>;
 }
 
-const SWIPE_THRESHOLD = 80;
-
 export function SuggestionCard({
   proposal,
   onAccept,
@@ -33,10 +31,7 @@ export function SuggestionCard({
 }: SuggestionCardProps) {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
-  const [swipeX, setSwipeX] = useState(0);
-  const [swiping, setSwiping] = useState(false);
-  const startXRef = useRef(0);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const [editingFee, setEditingFee] = useState(false);
 
   const { payload } = proposal;
 
@@ -48,7 +43,6 @@ export function SuggestionCard({
     return { min, max };
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
-
   // Build a specific explanation fallback
   const explanation =
     proposal.explanation_text ??
@@ -72,64 +66,8 @@ export function SuggestionCard({
     }
   }
 
-  // Swipe handlers
-  function onPointerDown(e: React.PointerEvent) {
-    startXRef.current = e.clientX;
-    setSwiping(true);
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-  }
-
-  function onPointerMove(e: React.PointerEvent) {
-    if (!swiping) return;
-    const delta = e.clientX - startXRef.current;
-    setSwipeX(delta);
-  }
-
-  function onPointerUp() {
-    if (!swiping) return;
-    setSwiping(false);
-
-    if (swipeX > SWIPE_THRESHOLD) {
-      handleAccept();
-    } else if (swipeX < -SWIPE_THRESHOLD) {
-      handleDismiss();
-    }
-    setSwipeX(0);
-  }
-
-  const swipeOpacity = Math.max(0, 1 - Math.abs(swipeX) / 200);
-  const swipeHint =
-    swipeX > 40
-      ? "text-success"
-      : swipeX < -40
-        ? "text-danger"
-        : "text-transparent";
-
   return (
-    <div className="relative overflow-hidden rounded-2xl">
-      {/* Swipe background hints */}
-      <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none">
-        <span className={`text-sm font-bold ${swipeX < -40 ? "text-danger" : "text-transparent"} transition-colors`}>
-          Not now
-        </span>
-        <span className={`text-sm font-bold ${swipeHint} transition-colors`}>
-          {swipeX > 40 ? "Shift it" : ""}
-        </span>
-      </div>
-
-      <div
-        ref={cardRef}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        style={{
-          transform: swiping ? `translateX(${swipeX}px)` : undefined,
-          opacity: swiping ? swipeOpacity : 1,
-          transition: swiping ? "none" : "transform 0.2s ease, opacity 0.2s ease",
-        }}
-        className="rounded-2xl bg-[var(--card-surface)] shadow-sm overflow-hidden touch-pan-y"
-      >
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm overflow-hidden">
         <div className="p-5">
           {/* Header row */}
           <div className="flex items-start gap-3">
@@ -191,32 +129,45 @@ export function SuggestionCard({
             </p>
           </div>
 
-          {/* Fee slider */}
+          {/* Fee */}
           <div className="mt-3 rounded-xl bg-soft-white p-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-text-secondary">Adjust fee</span>
-              <span className="text-sm font-bold text-navy">{formatCurrency(adjustedFee)}</span>
-            </div>
-            <RangeSlider
-              value={[adjustedFee]}
-              min={feeRange.min}
-              max={feeRange.max}
-              step={1}
-              onValueChange={([v]) => setAdjustedFee(v)}
-            />
-            <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.min)}</span>
-              {adjustedFee !== suggestedFee && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-text-secondary">Fee</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-navy">{formatCurrency(adjustedFee)}</span>
                 <button
                   type="button"
-                  onClick={() => setAdjustedFee(suggestedFee)}
-                  className="text-[10px] text-coral font-medium"
+                  onClick={() => setEditingFee(!editingFee)}
+                  className="text-[10px] font-medium text-coral"
                 >
-                  Reset to suggested
+                  {editingFee ? "Done" : "Edit fee"}
                 </button>
-              )}
-              <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.max)}</span>
+              </div>
             </div>
+            {editingFee && (
+              <div className="mt-2">
+                <RangeSlider
+                  value={[adjustedFee]}
+                  min={feeRange.min}
+                  max={feeRange.max}
+                  step={1}
+                  onValueChange={([v]) => setAdjustedFee(v)}
+                />
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.min)}</span>
+                  {adjustedFee !== suggestedFee && (
+                    <button
+                      type="button"
+                      onClick={() => setAdjustedFee(suggestedFee)}
+                      className="text-[10px] text-coral font-medium"
+                    >
+                      Reset
+                    </button>
+                  )}
+                  <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.max)}</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Explanation -- always visible */}
@@ -225,7 +176,7 @@ export function SuggestionCard({
           </p>
         </div>
 
-        {/* Action buttons -- 2 only */}
+        {/* Action buttons */}
         <div className="flex items-center gap-2 px-5 pb-5">
           <Button
             onClick={handleAccept}
@@ -245,7 +196,6 @@ export function SuggestionCard({
             {isDismissing ? "..." : "Not now"}
           </Button>
         </div>
-      </div>
     </div>
   );
 }

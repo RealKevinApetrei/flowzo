@@ -22,13 +22,6 @@ export default async function LenderHomePage() {
     .eq("user_id", user.id)
     .single();
 
-  // Fetch lender preferences (auto-match flag)
-  const { data: prefs } = await supabase
-    .from("lender_preferences")
-    .select("auto_match_enabled")
-    .eq("user_id", user.id)
-    .single();
-
   // Fetch trades where this user has allocations (lenders don't have lender_id on trades)
   const { data: allocations } = await supabase
     .from("allocations")
@@ -115,9 +108,7 @@ export default async function LenderHomePage() {
               }
             : null
         }
-        initialAutoMatch={prefs?.auto_match_enabled ?? false}
         initialYieldStats={yieldStats}
-        initialWithdrawalQueued={pot?.withdrawal_queued ?? false}
         sparklineData={sparklineData}
       />
     </>

@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from "react";
 import { formatCurrency } from "@flowzo/shared";
-import { Switch } from "@/components/ui/switch";
 
 interface ForecastDay {
   forecast_date: string;
@@ -79,7 +78,6 @@ export function CalendarHeatmap({
   obligations = [],
 }: CalendarHeatmapProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
-  const [showWorstCase, setShowWorstCase] = useState(false);
 
   const forecastMap = useMemo(() => {
     const map = new Map<string, ForecastDay>();
@@ -139,10 +137,7 @@ export function CalendarHeatmap({
           <h2 className="text-lg font-bold text-navy">Cash Calendar</h2>
           <p className="text-sm text-text-secondary">{monthLabel}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-text-secondary">Worst case</span>
-          <Switch checked={showWorstCase} onCheckedChange={setShowWorstCase} />
-        </div>
+        <span className="text-xs text-text-muted">Next 30 days</span>
       </div>
 
       {/* Day labels */}
@@ -169,9 +164,7 @@ export function CalendarHeatmap({
 
         {days.map((day, index) => {
           const balancePence = day.forecast
-            ? showWorstCase
-              ? day.forecast.confidence_low_pence
-              : day.forecast.projected_balance_pence
+            ? day.forecast.projected_balance_pence
             : null;
 
           const colors =
@@ -252,17 +245,8 @@ export function CalendarHeatmap({
                 }).format(selectedForecast.date)}
               </p>
               <p className="text-lg font-bold text-navy mt-0.5">
-                {formatCurrency(
-                  showWorstCase
-                    ? selectedForecast.forecast.confidence_low_pence
-                    : selectedForecast.forecast.projected_balance_pence,
-                )}
+                {formatCurrency(selectedForecast.forecast.projected_balance_pence)}
               </p>
-              {showWorstCase && (
-                <p className="text-xs text-text-muted mt-0.5">
-                  Worst-case balance
-                </p>
-              )}
             </div>
             <div className="flex flex-col items-end gap-1">
               {selectedForecast.forecast.is_danger && (
