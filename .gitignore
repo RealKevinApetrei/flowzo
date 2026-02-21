@@ -40,3 +40,6 @@ test-results/
 # Vercel
 .vercel/
 .vercel
+
+# Claude Code
+CLAUDE.md

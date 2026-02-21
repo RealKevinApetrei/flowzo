@@ -32,20 +32,24 @@ export async function GET(request: Request) {
     const tokens = await exchangeCode(code);
 
     // Store bank connection in database (truelayer_token is a jsonb column)
-    const { error } = await supabase.from("bank_connections").insert({
-      user_id: user.id,
-      provider: "truelayer",
-      truelayer_token: {
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: new Date(
-          Date.now() + tokens.expires_in * 1000,
-        ).toISOString(),
-      },
-      status: "active",
-    });
+    const { data: connection, error } = await supabase
+      .from("bank_connections")
+      .insert({
+        user_id: user.id,
+        provider: "truelayer",
+        truelayer_token: {
+          access_token: tokens.access_token,
+          refresh_token: tokens.refresh_token,
+          expires_at: new Date(
+            Date.now() + tokens.expires_in * 1000,
+          ).toISOString(),
+        },
+        status: "active",
+      })
+      .select("id")
+      .single();
 
-    if (error) {
+    if (error || !connection) {
       console.error("Failed to store bank connection:", error);
       return NextResponse.redirect(`${origin}/onboarding?error=storage_failed`);
     }
@@ -61,7 +65,19 @@ export async function GET(request: Request) {
       data: { truelayer_state: null },
     });
 
-    return NextResponse.redirect(`${origin}/onboarding?success=true`);
+    // Fire pipeline async — user doesn't wait for it to complete
+    fetch(`${origin}/api/pipeline/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        user_id: user.id,
+        connection_id: connection.id,
+      }),
+    }).catch((err) => {
+      console.error("Pipeline fire-and-forget failed:", err);
+    });
+
+    return NextResponse.redirect(`${origin}/borrower`);
   } catch (error) {
     console.error("TrueLayer token exchange failed:", error);
     return NextResponse.redirect(`${origin}/onboarding?error=token_exchange_failed`);
