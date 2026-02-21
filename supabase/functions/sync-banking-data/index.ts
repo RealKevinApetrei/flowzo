@@ -2,7 +2,13 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 
-const TRUELAYER_BASE = "https://api.truelayer-sandbox.com";
+const TRUELAYER_ENV = Deno.env.get("TRUELAYER_ENV") ?? "sandbox";
+const TRUELAYER_BASE = TRUELAYER_ENV === "production"
+  ? "https://api.truelayer.com"
+  : "https://api.truelayer-sandbox.com";
+const TRUELAYER_AUTH_BASE = TRUELAYER_ENV === "production"
+  ? "https://auth.truelayer.com"
+  : "https://auth.truelayer-sandbox.com";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -43,15 +49,69 @@ function classifyFrequency(
 // TrueLayer fetchers
 // ---------------------------------------------------------------------------
 
-async function tlFetch(path: string, accessToken: string) {
-  const res = await fetch(`${TRUELAYER_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
+/** Refresh an expired TrueLayer access token. */
+async function refreshAccessToken(
+  refreshTokenValue: string,
+): Promise<{ access_token: string; refresh_token: string; expires_in: number }> {
+  const clientId = Deno.env.get("TRUELAYER_CLIENT_ID");
+  const clientSecret = Deno.env.get("TRUELAYER_CLIENT_SECRET");
+  if (!clientId || !clientSecret) {
+    throw new Error("TRUELAYER_CLIENT_ID/SECRET required for token refresh");
+  }
+  const res = await fetch(`${TRUELAYER_AUTH_BASE}/connect/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "refresh_token",
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshTokenValue,
+    }),
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(
-      `TrueLayer ${path} returned ${res.status}: ${body}`,
-    );
+    throw new Error(`Token refresh failed (${res.status}): ${body}`);
+  }
+  return res.json();
+}
+
+async function tlFetch(
+  path: string,
+  accessToken: string,
+  retryCtx?: {
+    refreshTokenValue: string;
+    supabase: ReturnType<typeof createAdminClient>;
+    connectionId: string;
+  },
+) {
+  let res = await fetch(`${TRUELAYER_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  // On 401, try refreshing the token once
+  if (res.status === 401 && retryCtx) {
+    console.log(`TrueLayer 401 on ${path}, refreshing token...`);
+    const newTokens = await refreshAccessToken(retryCtx.refreshTokenValue);
+    await retryCtx.supabase
+      .from("bank_connections")
+      .update({
+        truelayer_token: {
+          access_token: newTokens.access_token,
+          refresh_token: newTokens.refresh_token,
+          expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", retryCtx.connectionId);
+
+    res = await fetch(`${TRUELAYER_BASE}${path}`, {
+      headers: { Authorization: `Bearer ${newTokens.access_token}` },
+    });
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`TrueLayer ${path} returned ${res.status}: ${body}`);
   }
   const json = await res.json();
   return json.results ?? json;
@@ -95,6 +155,11 @@ serve(async (req: Request) => {
 
     const accessToken: string =
       conn.truelayer_token?.access_token ?? conn.truelayer_token;
+    const refreshTokenValue: string | undefined =
+      conn.truelayer_token?.refresh_token;
+    const retryCtx = refreshTokenValue
+      ? { refreshTokenValue, supabase, connectionId: connection_id }
+      : undefined;
 
     if (!accessToken) {
       return new Response(
@@ -104,7 +169,7 @@ serve(async (req: Request) => {
     }
 
     // 2. Fetch accounts from TrueLayer -----------------------------------
-    const tlAccounts = await tlFetch("/data/v1/accounts", accessToken);
+    const tlAccounts = await tlFetch("/data/v1/accounts", accessToken, retryCtx);
 
     const now = new Date();
     const ninetyDaysAgo = new Date(now);
@@ -145,6 +210,7 @@ serve(async (req: Request) => {
         const balances = await tlFetch(
           `/data/v1/accounts/${tlAcct.account_id}/balance`,
           accessToken,
+          retryCtx,
         );
         const bal = balances[0];
         if (bal) {
@@ -166,6 +232,7 @@ serve(async (req: Request) => {
         const txns = await tlFetch(
           `/data/v1/accounts/${tlAcct.account_id}/transactions?from=${isoDate(ninetyDaysAgo)}&to=${isoDate(now)}`,
           accessToken,
+          retryCtx,
         );
 
         const txnRows = txns.map((t: Record<string, unknown>) => ({

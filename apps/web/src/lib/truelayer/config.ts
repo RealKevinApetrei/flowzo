@@ -11,6 +11,9 @@ export const TRUELAYER_CONFIG = {
   clientId: process.env.TRUELAYER_CLIENT_ID ?? "",
   clientSecret: process.env.TRUELAYER_CLIENT_SECRET ?? "",
   scopes: ["info", "accounts", "balance", "transactions", "offline_access"],
+  providers: isSandbox
+    ? "uk-cs-mock"
+    : "uk-ob-all uk-oauth-all",
 } as const;
 
 /** Build the redirect URI from the request origin so it always matches
