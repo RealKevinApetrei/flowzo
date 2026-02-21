@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
 import { TopBar } from "@/components/layout/top-bar";
+import { updateDisplayName } from "@/lib/actions/profile";
+import { Button } from "@/components/ui/button";
 
 interface SettingsClientProps {
   email: string;
@@ -36,6 +38,30 @@ export function SettingsClient({
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [signingOut, setSigningOut] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(displayName ?? "");
+  const [saving, setSaving] = useState(false);
+
+  async function handleSaveName() {
+    const trimmed = nameValue.trim();
+    if (!trimmed || trimmed.length > 50) {
+      toast.error("Name must be 1–50 characters");
+      return;
+    }
+    setSaving(true);
+    try {
+      const fd = new FormData();
+      fd.set("displayName", trimmed);
+      await updateDisplayName(fd);
+      toast.success("Display name updated");
+      setEditingName(false);
+      router.refresh();
+    } catch {
+      toast.error("Failed to update display name");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -67,12 +93,56 @@ export function SettingsClient({
               Verified
             </span>
           </div>
-          {displayName && (
-            <div>
-              <p className="font-medium text-navy">Display Name</p>
-              <p className="text-sm text-text-secondary">{displayName}</p>
-            </div>
-          )}
+          <div>
+            <p className="font-medium text-navy">Display Name</p>
+            {editingName ? (
+              <div className="flex items-center gap-2 mt-1">
+                <input
+                  type="text"
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  maxLength={50}
+                  autoFocus
+                  className="flex-1 rounded-xl border border-cool-grey px-3 py-1.5 text-sm text-navy focus:outline-none focus:ring-2 focus:ring-coral/50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveName();
+                    if (e.key === "Escape") { setEditingName(false); setNameValue(displayName ?? ""); }
+                  }}
+                />
+                <Button
+                  size="sm"
+                  onClick={handleSaveName}
+                  disabled={saving}
+                  className="rounded-full"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setEditingName(false); setNameValue(displayName ?? ""); }}
+                  disabled={saving}
+                  className="rounded-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-text-secondary">{displayName || "Not set"}</p>
+                <button
+                  onClick={() => setEditingName(true)}
+                  className="text-text-muted hover:text-navy transition-colors"
+                  aria-label="Edit display name"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Bank Connections */}

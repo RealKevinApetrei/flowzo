@@ -109,32 +109,36 @@ export async function cancelTrade(tradeId: string) {
   if (!trade) throw new Error("Trade not found or cannot be cancelled");
 
   // Release any RESERVED allocations back to lenders
-  const { data: reservedAllocs } = await admin
-    .from("allocations")
-    .select("id, lender_id, amount_slice")
-    .eq("trade_id", tradeId)
-    .eq("status", "RESERVED");
+  const { releaseTradeAllocations } = await import("@/lib/allocations");
+  const { released, errors } = await releaseTradeAllocations(
+    admin,
+    tradeId,
+    "cancel-release",
+  );
 
-  if (reservedAllocs && reservedAllocs.length > 0) {
-    for (const alloc of reservedAllocs) {
-      await admin.rpc("update_lending_pot", {
-        p_user_id: alloc.lender_id,
-        p_entry_type: "RELEASE",
-        p_amount: Number(alloc.amount_slice),
-        p_trade_id: tradeId,
-        p_allocation_id: alloc.id,
-        p_description: `Release funds — trade ${tradeId} cancelled`,
-        p_idempotency_key: `cancel-release-${tradeId}-${alloc.id}`,
-      });
-
-      await admin
-        .from("allocations")
-        .update({ status: "RELEASED" })
-        .eq("id", alloc.id);
-    }
+  if (errors.length > 0) {
+    console.error(`cancelTrade ${tradeId}: allocation release errors:`, errors);
+    throw new Error(
+      `Failed to release allocations: ${errors[0]}`,
+    );
   }
 
-  // Log cancellation event for audit trail
+  // Cancel the trade with status guard to prevent race with match-trade
+  const { error, count } = await admin
+    .from("trades")
+    .update({ status: "CANCELLED" })
+    .eq("id", tradeId)
+    .in("status", ["DRAFT", "PENDING_MATCH"])
+    .select("id");
+
+  if (error) throw new Error(`Failed to cancel trade: ${error.message}`);
+
+  // If count is 0, the trade status changed between our check and update (race)
+  if (count === 0) {
+    console.warn(`cancelTrade ${tradeId}: trade status changed during cancel (possible race with match-trade)`);
+  }
+
+  // Log cancellation event AFTER trade is actually cancelled
   await admin.from("flowzo_events").insert({
     event_type: "trade.cancelled",
     entity_type: "trade",
@@ -142,14 +146,7 @@ export async function cancelTrade(tradeId: string) {
     actor: user.id,
     payload: {
       cancelled_by: "borrower",
-      allocations_released: reservedAllocs?.length ?? 0,
+      allocations_released: released,
     },
   });
-
-  const { error } = await admin
-    .from("trades")
-    .update({ status: "CANCELLED" })
-    .eq("id", tradeId);
-
-  if (error) throw new Error(`Failed to cancel trade: ${error.message}`);
 }
