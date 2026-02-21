@@ -70,7 +70,7 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
         {/* Bottom sheet content */}
         <Dialog.Content
           ref={contentRef}
-          className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg bg-white rounded-t-3xl shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom duration-300"
+          className="fixed bottom-0 left-0 right-0 z-50 mx-auto max-w-lg bg-[var(--card-surface)] rounded-t-3xl shadow-2xl outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-bottom data-[state=closed]:slide-out-to-bottom duration-300"
         >
           {/* Drag handle */}
           <div className="flex justify-center pt-3 pb-1">

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { toast } from "sonner";
 
 export default function OnboardingCallbackPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function OnboardingCallbackPage() {
     if (success === "true") {
       setStatus("success");
       setMessage("Bank connected successfully!");
+      toast.success("Bank connected!");
       setTimeout(() => router.push("/borrower"), 2000);
     } else if (error) {
       setStatus("error");
@@ -26,6 +28,7 @@ export default function OnboardingCallbackPage() {
             ? "Security check failed. Please try again."
             : "Something went wrong. Please try again.",
       );
+      toast.error("Bank connection failed");
       setTimeout(() => router.push("/onboarding"), 3000);
     } else {
       // Still processing - wait then redirect

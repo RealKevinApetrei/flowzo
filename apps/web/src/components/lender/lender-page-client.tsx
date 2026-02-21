@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
+import { toast } from "sonner";
 import { useBubbleBoard } from "@/lib/hooks/use-bubble-board";
 import { toggleAutoMatch, fundTrade } from "@/lib/actions/lending";
 import { AutoPopToggle } from "./auto-pop-toggle";
@@ -50,9 +51,10 @@ export function LenderPageClient({
       startTransition(async () => {
         try {
           await toggleAutoMatch(enabled);
+          toast.success(enabled ? "Auto-match enabled" : "Auto-match disabled");
         } catch {
-          // Revert on failure
           setAutoMatch(!enabled);
+          toast.error("Failed to update auto-match setting");
         }
       });
     },
@@ -73,8 +75,10 @@ export function LenderPageClient({
         try {
           await fundTrade(tradeId);
           setSelectedTradeId(null);
+          toast.success("Trade funded successfully!");
         } catch (err) {
           console.error("Failed to fund trade:", err);
+          toast.error("Failed to fund trade. Please try again.");
         }
       });
     },

@@ -2,6 +2,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingClient } from "@/components/onboarding/onboarding-client";
 
+const steps = [
+  { label: "Connect Bank", key: "connect" },
+  { label: "Sync Data", key: "sync" },
+  { label: "Ready", key: "ready" },
+] as const;
+
 export default async function OnboardingPage({
   searchParams,
 }: {
@@ -22,6 +28,10 @@ export default async function OnboardingPage({
     .eq("status", "active");
 
   const hasConnection = (connections?.length ?? 0) > 0;
+  const justConnected = params.success === "true";
+
+  // Determine current step
+  const currentStep = hasConnection ? 2 : justConnected ? 1 : 0;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 py-12">
@@ -34,6 +44,55 @@ export default async function OnboardingPage({
               ? "Your bank is connected! You're all set."
               : "Let's get you set up. Connect your bank to start forecasting your cash flow."}
           </p>
+        </div>
+
+        {/* Progress Stepper */}
+        <div className="flex items-center justify-between px-2">
+          {steps.map((step, i) => {
+            const isCompleted = i < currentStep;
+            const isCurrent = i === currentStep;
+            return (
+              <div key={step.key} className="flex items-center flex-1 last:flex-initial">
+                <div className="flex flex-col items-center gap-1.5">
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500 ${
+                      isCompleted
+                        ? "bg-success text-white"
+                        : isCurrent
+                          ? "bg-coral text-white ring-4 ring-coral/20"
+                          : "bg-warm-grey text-text-muted"
+                    }`}
+                  >
+                    {isCompleted ? (
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      i + 1
+                    )}
+                  </div>
+                  <span
+                    className={`text-[11px] font-medium ${
+                      isCompleted
+                        ? "text-success"
+                        : isCurrent
+                          ? "text-coral"
+                          : "text-text-muted"
+                    }`}
+                  >
+                    {step.label}
+                  </span>
+                </div>
+                {i < steps.length - 1 && (
+                  <div
+                    className={`flex-1 h-0.5 mx-2 mb-5 rounded-full transition-colors duration-500 ${
+                      i < currentStep ? "bg-success" : "bg-cool-grey"
+                    }`}
+                  />
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Status messages */}
@@ -52,20 +111,35 @@ export default async function OnboardingPage({
         )}
 
         {hasConnection ? (
-          /* Already connected - go to app */
-          <div className="card-monzo p-6 space-y-4">
-            <div className="w-12 h-12 bg-success/10 rounded-2xl flex items-center justify-center">
-              <svg className="w-6 h-6 text-success" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
+          /* Already connected - success state with animation */
+          <div className="card-monzo p-6 space-y-4 text-center">
+            <div className="relative mx-auto w-16 h-16">
+              {/* Animated success ring */}
+              <div className="absolute inset-0 rounded-full bg-success/10 animate-ping" style={{ animationDuration: "1.5s", animationIterationCount: "2" }} />
+              <div className="relative w-16 h-16 bg-success/10 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-8 h-8 text-success"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2.5}
+                  style={{
+                    strokeDasharray: 30,
+                    strokeDashoffset: 0,
+                    animation: "checkmark-draw 0.6s ease-out forwards",
+                  }}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-navy">Bank connected</h2>
+            <h2 className="text-xl font-bold text-navy">All set!</h2>
             <p className="text-sm text-text-secondary">
               Your bank account is linked. Flowzo will analyse your transactions and forecast your cash flow.
             </p>
             <Link
               href="/borrower"
-              className="block w-full text-center bg-coral text-white font-semibold py-3 rounded-full hover:bg-coral-dark transition-colors"
+              className="block w-full text-center bg-coral text-white font-semibold py-3 rounded-full hover:bg-coral-dark transition-colors active:scale-95 transition-transform"
             >
               Go to Dashboard
             </Link>

@@ -19,11 +19,32 @@
 
   --background: var(--soft-white);
   --foreground: var(--text-primary);
+  --card-surface: white;
 
   --radius-pill: 9999px;
   --radius-card: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
+}
+
+.dark {
+  --coral: #ff6b70;
+  --coral-light: #ff9a9e;
+  --coral-dark: #e04449;
+  --navy: #e8e8f0;
+  --navy-light: #c8c8e0;
+  --soft-white: #0f0f1a;
+  --warm-grey: #1a1a2e;
+  --cool-grey: #2a2a3e;
+  --text-primary: #e8e8f0;
+  --text-secondary: #9ca3af;
+  --text-muted: #6b7280;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --background: #0f0f1a;
+  --foreground: #e8e8f0;
+  --card-surface: #1a1a2e;
 }
 
 @theme inline {
@@ -62,7 +83,7 @@ body {
 
 /* Monzo-style card */
 .card-monzo {
-  background: white;
+  background: var(--card-surface);
   border-radius: var(--radius-card);
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -74,4 +95,52 @@ body {
   font-weight: 600;
   padding: 0.5rem 1.25rem;
   transition: all 150ms ease;
+}
+
+/* Card entrance animation */
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-monzo {
+  animation: card-enter 0.3s ease-out both;
+}
+
+/* Stagger card animations */
+.card-monzo:nth-child(2) { animation-delay: 50ms; }
+.card-monzo:nth-child(3) { animation-delay: 100ms; }
+.card-monzo:nth-child(4) { animation-delay: 150ms; }
+.card-monzo:nth-child(5) { animation-delay: 200ms; }
+
+/* Checkmark draw animation for onboarding success */
+@keyframes checkmark-draw {
+  from { stroke-dashoffset: 30; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* Mobile touch improvements */
+@media (max-width: 640px) {
+  /* Ensure touch targets are at least 44px */
+  button, a[href], [role="switch"] {
+    min-height: 44px;
+  }
+
+  /* Prevent text selection on interactive elements */
+  button, [role="switch"] {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Bottom sheet modal full width on mobile */
+  [data-radix-dialog-content] {
+    max-width: 100% !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
 }

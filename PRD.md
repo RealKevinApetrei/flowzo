@@ -211,19 +211,36 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 
 **Branch prefix:** `feat/ui-*`
 
-| Task | Priority | Est. |
-|---|---|---|
-| Polish landing page -- hero section, value proposition, demo CTA, screenshots | P0 | 2h |
-| Add loading states, error boundaries, and empty states across all pages | P0 | 2h |
-| Write real compliance page content (Terms of Service, Privacy Policy, FCA disclaimer) | P1 | 1.5h |
-| Mobile responsiveness polish (all pages, bottom nav, modals) | P1 | 1.5h |
-| Improve onboarding flow -- progress stepper, success animation after bank connect | P1 | 1.5h |
-| Add toast notifications for actions (trade created, bid placed, trade funded) | P1 | 1h |
-| Animate bubble board pop effect when auto-match triggers | P1 | 1h |
-| Add "Why?" tap target on suggestion cards -> Claude explanation modal | P1 | 1h |
-| Dark mode support (Monzo has dark mode) | P2 | 2h |
-| Add settings page content -- notification preferences, connected accounts management | P2 | 1h |
-| Micro-interactions -- button press feedback, card swipe dismiss, transition animations | P2 | 1.5h |
+| Task | Priority | Est. | Status |
+|---|---|---|---|
+| Polish landing page -- hero section, value proposition, demo CTA, screenshots | P0 | 2h | DONE |
+| Add loading states, error boundaries, and empty states across all pages | P0 | 2h | DONE |
+| Write real compliance page content (Terms of Service, Privacy Policy, FCA disclaimer) | P1 | 1.5h | DONE |
+| Mobile responsiveness polish (all pages, bottom nav, modals) | P1 | 1.5h | DONE |
+| Improve onboarding flow -- progress stepper, success animation after bank connect | P1 | 1.5h | DONE |
+| Add toast notifications for actions (trade created, bid placed, trade funded) | P1 | 1h | DONE |
+| Animate bubble board pop effect when auto-match triggers | P1 | 1h | DONE |
+| Add "Why?" tap target on suggestion cards -> Claude explanation modal | P1 | 1h | DONE |
+| Dark mode support (Monzo has dark mode) | P2 | 2h | DONE |
+| Add settings page content -- notification preferences, connected accounts management | P2 | 1h | DONE |
+| Micro-interactions -- button press feedback, card swipe dismiss, transition animations | P2 | 1.5h | DONE |
+| Auth-aware landing page header (Dashboard when logged in) | P0 | 30m | DONE |
+| Add sonner toast library + Toaster to root layout | P0 | 15m | DONE |
+| Add ThemeProvider with system/light/dark toggle | P1 | 1h | DONE |
+| Dark mode CSS variables for all design tokens | P1 | 30m | DONE |
+| Dark mode toggle in settings (segmented Light/System/Dark control) | P1 | 30m | DONE |
+| Fix hardcoded bg-white for dark mode compat (cards, modals, skeletons) | P1 | 30m | DONE |
+| Card entrance animations (fade-in + slide-up with stagger) | P2 | 30m | DONE |
+| Mobile touch targets (44px minimum) + touch UX improvements | P1 | 30m | DONE |
+| 3-step onboarding progress stepper with animated checkmark on success | P1 | 1h | DONE |
+| Notification toggle switches in settings (trade updates, forecast alerts, email digest) | P2 | 30m | DONE |
+| Add app preview stats section to landing page (30-day forecast, <10s pipeline, risk grades) | P0 | 30m | DONE |
+| Add active:scale-95 press feedback to all buttons | P2 | 15m | DONE |
+| End-to-end visual QA pass for dark mode across all pages | P1 | 1h | SUGGESTED |
+| Add page transition animations between routes (ViewTransitions API or framer-motion) | P2 | 2h | SUGGESTED |
+| A/B landing page variants for demo vs investor pitch | P2 | 2h | SUGGESTED |
+| Accessibility audit (ARIA labels, keyboard nav, contrast ratios) | P1 | 2h | SUGGESTED |
+| PWA manifest + install prompt for mobile | P2 | 1h | SUGGESTED |
 
 **Deliverable:** A demo-ready, pixel-polished UI with Monzo-feel UX, smooth animations, proper loading/error/empty states, and a landing page that sells the product at first glance.
 

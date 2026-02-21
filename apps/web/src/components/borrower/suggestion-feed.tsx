@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createTrade, submitTrade } from "@/lib/actions/trades";
+import { toast } from "sonner";
 import { SuggestionCard } from "@/components/borrower/suggestion-card";
 
 interface Proposal {
@@ -27,7 +28,7 @@ interface SuggestionFeedProps {
 
 function SkeletonCard() {
   return (
-    <div className="rounded-2xl bg-white shadow-sm p-5 animate-pulse">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 animate-pulse">
       <div className="flex items-start gap-3">
         <div className="w-10 h-10 rounded-full bg-warm-grey" />
         <div className="flex-1 space-y-2">
@@ -111,10 +112,12 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
 
       // Remove from local state
       setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+      toast.success("Proposal accepted — trade created!");
 
       router.refresh();
     } catch (err) {
       console.error("Failed to accept proposal:", err);
+      toast.error("Failed to accept proposal. Please try again.");
     }
   }
 
@@ -126,8 +129,10 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         .eq("id", proposalId);
 
       setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+      toast("Suggestion dismissed");
     } catch (err) {
       console.error("Failed to dismiss proposal:", err);
+      toast.error("Failed to dismiss. Please try again.");
     }
   }
 
@@ -149,7 +154,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
 
   if (proposals.length === 0) {
     return (
-      <div className="rounded-2xl bg-white shadow-sm p-8 text-center">
+      <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-8 text-center">
         <div className="w-14 h-14 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-4">
           <svg
             xmlns="http://www.w3.org/2000/svg"

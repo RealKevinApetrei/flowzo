@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
+import { useTheme } from "@/components/providers/theme-provider";
 import { TopBar } from "@/components/layout/top-bar";
 
 interface SettingsClientProps {
@@ -27,11 +29,18 @@ export function SettingsClient({
 }: SettingsClientProps) {
   const supabase = useSupabase();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   const [signingOut, setSigningOut] = useState(false);
+
+  // Notification preferences (UI only — no backend wiring)
+  const [notifTradeUpdates, setNotifTradeUpdates] = useState(true);
+  const [notifForecastAlerts, setNotifForecastAlerts] = useState(true);
+  const [notifEmailDigest, setNotifEmailDigest] = useState(false);
 
   async function handleSignOut() {
     setSigningOut(true);
     await supabase.auth.signOut();
+    toast("Signed out successfully");
     router.push("/login");
     router.refresh();
   }
@@ -108,10 +117,117 @@ export function SettingsClient({
           )}
           <button
             onClick={handleConnectBank}
-            className="w-full bg-coral text-white font-semibold py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm"
+            className="w-full bg-coral text-white font-semibold py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm active:scale-95 transition-transform"
           >
             {connections.length > 0 ? "Connect Another Bank" : "Connect Bank"}
           </button>
+        </section>
+
+        {/* Notifications */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Notifications
+          </h2>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-navy">Trade updates</p>
+              <p className="text-xs text-text-secondary">
+                Get notified when trades are matched or settled
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={notifTradeUpdates}
+              onClick={() => {
+                setNotifTradeUpdates(!notifTradeUpdates);
+                toast(notifTradeUpdates ? "Trade updates disabled" : "Trade updates enabled");
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                notifTradeUpdates ? "bg-coral" : "bg-cool-grey"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                  notifTradeUpdates ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-navy">Forecast alerts</p>
+              <p className="text-xs text-text-secondary">
+                Warn when upcoming bills may cause a shortfall
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={notifForecastAlerts}
+              onClick={() => {
+                setNotifForecastAlerts(!notifForecastAlerts);
+                toast(notifForecastAlerts ? "Forecast alerts disabled" : "Forecast alerts enabled");
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                notifForecastAlerts ? "bg-coral" : "bg-cool-grey"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                  notifForecastAlerts ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-navy">Weekly email digest</p>
+              <p className="text-xs text-text-secondary">
+                Summary of your activity and upcoming bills
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={notifEmailDigest}
+              onClick={() => {
+                setNotifEmailDigest(!notifEmailDigest);
+                toast(notifEmailDigest ? "Email digest disabled" : "Email digest enabled");
+              }}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                notifEmailDigest ? "bg-coral" : "bg-cool-grey"
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                  notifEmailDigest ? "translate-x-6" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+
+        {/* Appearance */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Appearance
+          </h2>
+          <div className="flex items-center gap-2">
+            {(["light", "system", "dark"] as const).map((option) => (
+              <button
+                key={option}
+                onClick={() => {
+                  setTheme(option);
+                  toast(`Theme set to ${option}`);
+                }}
+                className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                  theme === option
+                    ? "bg-coral text-white"
+                    : "bg-warm-grey text-text-secondary hover:bg-cool-grey"
+                }`}
+              >
+                {option === "light" ? "Light" : option === "dark" ? "Dark" : "System"}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Preferences */}
@@ -171,7 +287,7 @@ export function SettingsClient({
           <button
             onClick={handleSignOut}
             disabled={signingOut}
-            className="w-full border border-danger text-danger font-semibold py-2.5 rounded-full hover:bg-danger hover:text-white transition-colors text-sm disabled:opacity-50"
+            className="w-full border border-danger text-danger font-semibold py-2.5 rounded-full hover:bg-danger hover:text-white transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
           >
             {signingOut ? "Signing out..." : "Sign Out"}
           </button>

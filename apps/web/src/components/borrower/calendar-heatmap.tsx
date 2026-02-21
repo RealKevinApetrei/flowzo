@@ -93,7 +93,7 @@ export function CalendarHeatmap({ forecasts }: CalendarHeatmapProps) {
   const selectedForecast = selectedDay !== null ? days[selectedDay] : null;
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm p-5">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>

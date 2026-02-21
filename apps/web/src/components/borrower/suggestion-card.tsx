@@ -56,7 +56,7 @@ export function SuggestionCard({
   }
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm overflow-hidden transition-all duration-200 hover:shadow-md">
       <div className="p-5">
         {/* Header row */}
         <div className="flex items-start gap-3">
