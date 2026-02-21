@@ -51,6 +51,18 @@ export async function POST(request: Request) {
     }
     results.sync = syncData;
 
+    // Step 1.5: Compute borrower features + ML risk scoring
+    // Non-blocking: if this fails, pipeline continues with heuristic risk grade
+    const { data: featuresData, error: featuresError } =
+      await supabase.functions.invoke("compute-borrower-features", {
+        body: { user_id },
+      });
+
+    if (featuresError) {
+      console.warn("Feature computation failed (continuing with heuristic):", featuresError.message);
+    }
+    results.features = featuresData ?? { skipped: true, reason: featuresError?.message };
+
     // Step 2: Run forecast
     const { data: forecastData, error: forecastError } =
       await supabase.functions.invoke("run-forecast", {
@@ -89,7 +101,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      pipeline: "sync → forecast → proposals",
+      pipeline: "sync → features/scoring → forecast → proposals",
       results,
     });
   } catch (err) {

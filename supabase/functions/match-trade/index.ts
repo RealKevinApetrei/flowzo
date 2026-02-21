@@ -130,8 +130,49 @@ serve(async (req: Request) => {
 
     const tradeAmount = Number(trade.amount);
     const tradeFee = Number(trade.fee);
-    const tradeRiskGrade = trade.risk_grade as string;
+    let tradeRiskGrade = trade.risk_grade as string;
     const tradeShiftDays = Number(trade.shift_days);
+
+    // Real-time ML scoring: re-score borrower via Quant API if available
+    if (QUANT_API_URL) {
+      try {
+        // Fetch pre-computed features (from compute-borrower-features)
+        const { data: latestScoring } = await supabase
+          .from("flowzo_events")
+          .select("payload")
+          .eq("entity_id", trade.borrower_id)
+          .eq("event_type", "borrower.scored")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (latestScoring?.payload?.features) {
+          const scoreRes = await fetch(`${QUANT_API_URL}/api/score`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(latestScoring.payload.features),
+          });
+
+          if (scoreRes.ok) {
+            const mlResult = await scoreRes.json();
+            if (mlResult.risk_grade && mlResult.risk_grade !== tradeRiskGrade) {
+              console.log(
+                `ML re-scored borrower ${trade.borrower_id}: ${tradeRiskGrade} → ${mlResult.risk_grade} (score: ${mlResult.credit_score})`,
+              );
+              tradeRiskGrade = mlResult.risk_grade;
+
+              // Update the trade with the ML-derived risk grade
+              await supabase
+                .from("trades")
+                .update({ risk_grade: mlResult.risk_grade })
+                .eq("id", trade_id);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Quant API scoring failed, using existing risk_grade:", err);
+      }
+    }
 
     if (tradeAmount <= 0) {
       return new Response(
