@@ -7,7 +7,7 @@ export function buildAuthUrl(state: string, origin: string): string {
     redirect_uri: getRedirectUri(origin),
     scope: TRUELAYER_CONFIG.scopes.join(" "),
     state,
-    providers: "uk-ob-all uk-oauth-all",
+    providers: TRUELAYER_CONFIG.providers,
   });
 
   return `${TRUELAYER_CONFIG.authUrl}/?${params.toString()}`;
