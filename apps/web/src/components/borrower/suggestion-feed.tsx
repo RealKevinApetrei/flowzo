@@ -12,6 +12,7 @@ interface Proposal {
   type: string;
   status: string;
   payload: {
+    obligation_id?: string;
     obligation_name: string;
     original_date: string;
     shifted_date: string;
@@ -49,6 +50,7 @@ function SkeletonCard() {
 export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -60,7 +62,10 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
       .eq("status", "PENDING")
       .order("created_at", { ascending: false });
 
-    if (!error && data) {
+    if (error) {
+      console.error("Failed to fetch proposals:", error);
+      setError("Failed to load suggestions");
+    } else if (data) {
       // Map the database payload shape to our component shape
       // Edge Function writes: shifted_date, amount_pence, fee_pence
       const mapped: Proposal[] = data.map((row) => ({
@@ -68,6 +73,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         type: row.type,
         status: row.status,
         payload: {
+          obligation_id: row.payload.obligation_id,
           obligation_name: row.payload.obligation_name,
           original_date: row.payload.original_date,
           shifted_date: row.payload.shifted_date,
@@ -93,7 +99,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     try {
       // Create a trade from the proposal
       const formData = new FormData();
-      formData.set("obligation_id", proposalId);
+      formData.set("obligation_id", proposal.payload.obligation_id ?? "");
       formData.set("original_due_date", proposal.payload.original_date);
       formData.set("new_due_date", proposal.payload.shifted_date);
       formData.set("amount_pence", String(proposal.payload.amount_pence));
@@ -148,6 +154,17 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
       <div className="space-y-3">
         <SkeletonCard />
         <SkeletonCard />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-8 text-center">
+        <h3 className="text-base font-bold text-navy">Unable to load suggestions</h3>
+        <p className="text-sm text-text-secondary mt-1">
+          Please try refreshing the page.
+        </p>
       </div>
     );
   }

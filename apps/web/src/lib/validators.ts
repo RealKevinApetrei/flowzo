@@ -17,7 +17,7 @@ export const signupSchema = z
   });
 
 export const createTradeSchema = z.object({
-  obligation_id: z.string().uuid(),
+  obligation_id: z.string().uuid().optional(),
   original_due_date: z.string().date(),
   new_due_date: z.string().date(),
   amount_pence: z.number().int().positive(),

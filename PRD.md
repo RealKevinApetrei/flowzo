@@ -88,6 +88,90 @@ All 8 critical bugs have been resolved in commit `ffec26b`:
 
 ---
 
+## 3.5 Advanced Features (Implemented)
+
+### Advanced Matching Algorithm (scored_v2)
+
+The match-trade Edge Function uses a scored ranking system to optimally allocate lender funds to trades.
+
+**Composite Score (0-1):**
+- **APR Compatibility (40%):** How well the trade's implied APR meets the lender's `min_apr`. Implied APR = `(fee / amount) * (365 / shift_days) * 100`. Lenders whose `min_apr` exceeds the implied APR are filtered out.
+- **Available Headroom (30%):** Larger available pots score higher, normalized against 10x trade amount.
+- **Diversification Bonus (30%):** Lenders with less total exposure (across all active allocations) score higher.
+
+**Constraints enforced:**
+- `min_apr` enforcement: lenders below the trade's yield are excluded
+- `max_total_exposure`: lenders at their exposure ceiling are skipped
+- **50% diversification cap**: no single lender can fund more than 50% of a trade
+- Lenders sorted by score descending (best match first)
+
+**Event logging:** Every match attempt logs to `flowzo_events` with algorithm version, lender counts, APR, and allocation details.
+
+### ML Credit Scoring Integration (Member B -- Quant API)
+
+Member B built a standalone XGBoost ML pipeline (`quant_analysis/`) with FastAPI endpoints:
+
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/api/score` | POST | Returns credit_score (300-850), PD, risk_grade |
+| `/api/explain` | POST | SHAP waterfall: top-3 positive/negative feature drivers |
+| `/api/backtest` | GET | Historical default rates by grade (A/B/C) |
+| `/api/stress-test` | POST | Score delta under income shock multipliers |
+| `/api/returns` | GET | Portfolio yield, Sharpe ratio, excess return |
+| `/api/eda` | GET | EDA summary + correlation matrix |
+| `/api/forecast-accuracy` | GET | Mock MAPE time-series |
+| `/api/lenders` | GET | Simulated 1000-lender pool |
+
+**Model:** XGBoost binary classifier trained on Home Credit dataset (50k samples). Features mapped to Open Banking proxies: `annual_inflow`, `avg_monthly_balance`, `days_since_account_open`, `primary_bank_health_score`, `secondary_bank_health_score`, `failed_payment_cluster_risk`.
+
+**Scorecard:** PD -> 300-850 credit score. Grade A: >700, Grade B: 600-700, Grade C: <600.
+
+**Integration:** match-trade optionally calls the Quant API for real-time PD scoring. Graceful degradation -- falls back to DB-level `risk_grade` if the API is unavailable.
+
+### Lending Pot Top-Up
+
+Lending pot top-up is now fully functional:
+- **API:** `POST /api/payments/topup` accepts `amount_pence`, authenticates user, ensures lending pot exists (upsert), and calls `update_lending_pot(DEPOSIT)` RPC
+- **Lender HUD:** "TOP UP" button triggers a prompt for custom amount
+- **Lending Pot Card:** Preset amount buttons (£10, £50, £100, £500)
+- **Server actions:** `topUpPot()` and `withdrawFromPot()` in `lib/actions/lending.ts`
+
+For production, the top-up would integrate with Stripe or GoCardless for real bank transfers. Currently simulated for hackathon.
+
+### Settlement: DEFAULT Path
+
+The settle-trade Edge Function now handles the full trade lifecycle:
+
+| Phase | Transition | Trigger |
+|---|---|---|
+| Phase 1 | MATCHED -> LIVE | `original_due_date` reached (disburse funds) |
+| Phase 2 | LIVE -> REPAID | `new_due_date` reached (repay principal + fee) |
+| Phase 3 | LIVE -> DEFAULTED | `new_due_date + 3 days` grace period exceeded |
+
+On default: locked funds are released back to lenders via `RELEASE` entry type (principal returned, fee lost). Both trade and allocations marked as `DEFAULTED`.
+
+### Lender Preferences UI
+
+Full preferences form in Settings page:
+- **Auto-match toggle** (Switch)
+- **Min APR slider** (0-20%, 0.5% steps)
+- **Max shift days slider** (1-90 days)
+- **Risk band selection** (A/B/C toggles, at least one required)
+- Persisted via `updateLenderPreferences()` server action -> `lender_preferences` table
+
+### Data & Analytics Page
+
+`/data` route with aggregate analytics views:
+- **Pool Summary:** total pool size, available, locked, lender count
+- **Trade Summary:** total trades, volume, fees
+- **Trade Analytics by Grade:** table with count, avg amount, avg fee, default rate per risk grade/status
+- **Risk Distribution:** user count per risk grade (A/B/C)
+- **ML Integration placeholder:** ready for Member B's FastAPI endpoints (backtest, EDA, SHAP, stress testing)
+
+Powered by three Postgres views: `trade_analytics`, `risk_distribution`, `pool_overview` (migration 014).
+
+---
+
 ## 4. API Keys Status
 
 ### Have

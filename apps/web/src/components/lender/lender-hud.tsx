@@ -14,6 +14,7 @@ interface LenderHudProps {
   pot: LendingPot | null;
   autoMatch: boolean;
   onAutoMatchToggle: (enabled: boolean) => void;
+  onTopUp?: () => void;
   position: HudPosition;
 }
 
@@ -43,6 +44,7 @@ export function LenderHud({
   pot,
   autoMatch,
   onAutoMatchToggle,
+  onTopUp,
   position,
 }: LenderHudProps) {
   if (position === "hidden") return null;
@@ -70,7 +72,10 @@ export function LenderHud({
           />
         </div>
         {showTopUp && (
-          <button className="w-full text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md py-1.5 hover:bg-blue-500/10 transition-colors">
+          <button
+            onClick={onTopUp}
+            className="w-full text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md py-1.5 hover:bg-blue-500/10 transition-colors"
+          >
             TOP UP
           </button>
         )}
@@ -99,7 +104,10 @@ export function LenderHud({
 
         <div className="flex items-center gap-2.5 shrink-0">
           {showTopUp && (
-            <button className="text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md px-2.5 py-1 hover:bg-blue-500/10 transition-colors">
+            <button
+              onClick={onTopUp}
+              className="text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md px-2.5 py-1 hover:bg-blue-500/10 transition-colors"
+            >
               TOP UP
             </button>
           )}
