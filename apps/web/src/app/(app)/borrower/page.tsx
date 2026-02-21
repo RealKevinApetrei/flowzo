@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
 import { SuggestionFeed } from "@/components/borrower/suggestion-feed";
 import { DangerSummary } from "@/components/borrower/danger-summary";
+import { UpcomingTransactions } from "@/components/borrower/upcoming-transactions";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
 function getGreeting(): string {
@@ -66,6 +67,30 @@ export default async function BorrowerHomePage() {
     ),
   }));
 
+  // Fetch upcoming obligations (next 14 days)
+  const fourteenDaysLater = new Date(today);
+  fourteenDaysLater.setDate(today.getDate() + 14);
+
+  const { data: obligations } = await supabase
+    .from("obligations")
+    .select("id, name, amount, frequency, next_expected, confidence, is_essential, category, merchant_name")
+    .eq("user_id", user.id)
+    .eq("active", true)
+    .gte("next_expected", today.toISOString().split("T")[0])
+    .lte("next_expected", fourteenDaysLater.toISOString().split("T")[0])
+    .order("next_expected", { ascending: true });
+
+  const upcomingObligations = (obligations ?? []).map((o) => ({
+    id: o.id,
+    name: o.name ?? o.merchant_name ?? "Bill",
+    amount_pence: Math.round(Number(o.amount) * 100),
+    frequency: o.frequency ?? "MONTHLY",
+    next_expected: o.next_expected,
+    confidence: Number(o.confidence ?? 0.5),
+    is_essential: o.is_essential ?? true,
+    category: o.category,
+  }));
+
   const dangerCount = forecasts.filter((f) => f.is_danger).length;
   const hasData = forecasts.length > 0;
 
@@ -114,6 +139,13 @@ export default async function BorrowerHomePage() {
         {hasData && (
           <section>
             <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
+          </section>
+        )}
+
+        {/* Upcoming Transactions */}
+        {upcomingObligations.length > 0 && (
+          <section>
+            <UpcomingTransactions obligations={upcomingObligations} />
           </section>
         )}
 

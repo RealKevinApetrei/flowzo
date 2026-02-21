@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 const tabs = [
   { label: "Bills", href: "/borrower" as const },
   { label: "Lending", href: "/lender" as const },
-  { label: "Data", href: "/data" as const },
   { label: "Settings", href: "/settings" as const },
 ] as const;
 
@@ -29,16 +28,6 @@ function CoinsIcon({ className }: { className?: string }) {
   );
 }
 
-function ChartIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M18 20V10" />
-      <path d="M12 20V4" />
-      <path d="M6 20v-6" />
-    </svg>
-  );
-}
-
 function GearIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -51,7 +40,6 @@ function GearIcon({ className }: { className?: string }) {
 const iconMap: Record<string, React.FC<{ className?: string }>> = {
   "/borrower": HomeIcon,
   "/lender": CoinsIcon,
-  "/data": ChartIcon,
   "/settings": GearIcon,
 };
 

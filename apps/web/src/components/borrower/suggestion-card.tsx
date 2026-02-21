@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { formatCurrency, formatDate } from "@flowzo/shared";
 import { Button } from "@/components/ui/button";
+import { RangeSlider } from "@/components/ui/range-slider";
 
 interface SuggestionCardProps {
   proposal: {
@@ -19,8 +20,7 @@ interface SuggestionCardProps {
     };
     explanation_text: string | null;
   };
-  dangerDayBalance?: number;
-  onAccept: (id: string) => void | Promise<void>;
+  onAccept: (id: string, adjustedFeePence: number) => void | Promise<void>;
   onDismiss: (id: string) => void | Promise<void>;
 }
 
@@ -28,7 +28,6 @@ const SWIPE_THRESHOLD = 80;
 
 export function SuggestionCard({
   proposal,
-  dangerDayBalance,
   onAccept,
   onDismiss,
 }: SuggestionCardProps) {
@@ -41,6 +40,15 @@ export function SuggestionCard({
 
   const { payload } = proposal;
 
+  // Fee slider: allow 0.5x to 2x of the suggested fee, min 1p
+  const suggestedFee = payload.fee_pence;
+  const feeRange = useMemo(() => {
+    const min = Math.max(1, Math.round(suggestedFee * 0.5));
+    const max = Math.max(min + 1, Math.round(suggestedFee * 2));
+    return { min, max };
+  }, [suggestedFee]);
+  const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
+
   // Build a specific explanation fallback
   const explanation =
     proposal.explanation_text ??
@@ -49,7 +57,7 @@ export function SuggestionCard({
   async function handleAccept() {
     setIsAccepting(true);
     try {
-      await onAccept(proposal.id);
+      await onAccept(proposal.id, adjustedFee);
     } finally {
       setIsAccepting(false);
     }
@@ -178,13 +186,36 @@ export function SuggestionCard({
               </svg>
               <span className="font-semibold text-navy">{formatDate(payload.shifted_date)}</span>
             </div>
+            <p className="text-xs text-text-muted mt-1.5">
+              {payload.shift_days} day shift
+            </p>
+          </div>
+
+          {/* Fee slider */}
+          <div className="mt-3 rounded-xl bg-soft-white p-3.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-text-secondary">Adjust fee</span>
+              <span className="text-sm font-bold text-navy">{formatCurrency(adjustedFee)}</span>
+            </div>
+            <RangeSlider
+              value={[adjustedFee]}
+              min={feeRange.min}
+              max={feeRange.max}
+              step={1}
+              onValueChange={([v]) => setAdjustedFee(v)}
+            />
             <div className="flex items-center justify-between mt-1.5">
-              <p className="text-xs text-text-muted">
-                {payload.shift_days} day shift
-              </p>
-              <p className="text-xs text-text-muted">
-                Fee: <span className="font-semibold text-navy">{formatCurrency(payload.fee_pence)}</span>
-              </p>
+              <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.min)}</span>
+              {adjustedFee !== suggestedFee && (
+                <button
+                  type="button"
+                  onClick={() => setAdjustedFee(suggestedFee)}
+                  className="text-[10px] text-coral font-medium"
+                >
+                  Reset to suggested
+                </button>
+              )}
+              <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.max)}</span>
             </div>
           </div>
 

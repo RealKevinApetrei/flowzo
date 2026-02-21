@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createTrade, submitTrade } from "@/lib/actions/trades";
@@ -48,9 +48,10 @@ function SkeletonCard() {
 
 export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
-  const [forecastMap, setForecastMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const supabase = createClient();
 
@@ -66,7 +67,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
       console.error("Failed to fetch proposals:", error);
       setError("Failed to load suggestions");
     } else if (data) {
-      // Map the database payload shape to our component shape
       const mapped: Proposal[] = data.map((row) => ({
         id: row.id,
         type: row.type,
@@ -83,22 +83,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         explanation_text: row.explanation_text,
       }));
       setProposals(mapped);
-
-      // Fetch forecast data for each proposal's danger date
-      const proposalDates = mapped.map((p) => p.payload.original_date);
-      if (proposalDates.length > 0) {
-        const { data: forecastsForDates } = await supabase
-          .from("forecasts")
-          .select("forecast_date, projected_balance")
-          .eq("user_id", userId)
-          .in("forecast_date", proposalDates);
-
-        const map = new Map<string, number>();
-        for (const f of forecastsForDates ?? []) {
-          map.set(f.forecast_date, Math.round(Number(f.projected_balance) * 100));
-        }
-        setForecastMap(map);
-      }
     }
     setLoading(false);
   }, [supabase, userId]);
@@ -107,34 +91,59 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     fetchProposals();
   }, [fetchProposals]);
 
-  async function handleAccept(proposalId: string) {
+  // Scroll to active card when activeIndex changes
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const container = scrollRef.current;
+    const card = container.children[activeIndex] as HTMLElement | undefined;
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    }
+  }, [activeIndex]);
+
+  // Track scroll position to update active dot
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    function onScroll() {
+      if (!container) return;
+      const scrollLeft = container.scrollLeft;
+      const cardWidth = container.offsetWidth;
+      const index = Math.round(scrollLeft / cardWidth);
+      setActiveIndex(Math.max(0, Math.min(index, proposals.length - 1)));
+    }
+    container.addEventListener("scroll", onScroll, { passive: true });
+    return () => container.removeEventListener("scroll", onScroll);
+  }, [proposals.length]);
+
+  async function handleAccept(proposalId: string, adjustedFeePence?: number) {
     const proposal = proposals.find((p) => p.id === proposalId);
     if (!proposal) return;
 
     try {
-      // Create a trade from the proposal
+      const feePence = adjustedFeePence ?? proposal.payload.fee_pence;
       const formData = new FormData();
       formData.set("obligation_id", proposal.payload.obligation_id ?? "");
       formData.set("original_due_date", proposal.payload.original_date);
       formData.set("new_due_date", proposal.payload.shifted_date);
       formData.set("amount_pence", String(proposal.payload.amount_pence));
-      formData.set("fee_pence", String(proposal.payload.fee_pence));
+      formData.set("fee_pence", String(feePence));
 
       const trade = await createTrade(formData);
-
-      // Submit the trade (DRAFT -> PENDING_MATCH)
       await submitTrade(trade.id);
 
-      // Update proposal status to ACCEPTED
       await supabase
         .from("agent_proposals")
         .update({ status: "ACCEPTED", trade_id: trade.id, responded_at: new Date().toISOString() })
         .eq("id", proposalId);
 
-      // Remove from local state
-      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+      setProposals((prev) => {
+        const next = prev.filter((p) => p.id !== proposalId);
+        // Keep activeIndex in bounds
+        setActiveIndex((i) => Math.min(i, Math.max(0, next.length - 1)));
+        return next;
+      });
       toast.success("Proposal accepted -- trade created!");
-
       router.refresh();
     } catch (err) {
       console.error("Failed to accept proposal:", err);
@@ -149,7 +158,11 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         .update({ status: "DISMISSED", responded_at: new Date().toISOString() })
         .eq("id", proposalId);
 
-      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+      setProposals((prev) => {
+        const next = prev.filter((p) => p.id !== proposalId);
+        setActiveIndex((i) => Math.min(i, Math.max(0, next.length - 1)));
+        return next;
+      });
       toast("Suggestion dismissed");
     } catch (err) {
       console.error("Failed to dismiss proposal:", err);
@@ -158,12 +171,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   }
 
   if (loading) {
-    return (
-      <div className="space-y-3">
-        <SkeletonCard />
-        <SkeletonCard />
-      </div>
-    );
+    return <SkeletonCard />;
   }
 
   if (error) {
@@ -194,25 +202,59 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
             <path d="M20 6L9 17l-5-5" />
           </svg>
         </div>
-        <h3 className="text-base font-bold text-navy">You&apos;re all clear!</h3>
+        <h3 className="text-base font-bold text-navy">All caught up!</h3>
         <p className="text-sm text-text-secondary mt-1">
-          No bill shifts needed right now. We&apos;ll let you know if anything comes up.
+          No suggestions right now. We&apos;ll let you know if anything comes up.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {proposals.map((proposal) => (
-        <SuggestionCard
-          key={proposal.id}
-          proposal={proposal}
-          dangerDayBalance={forecastMap.get(proposal.payload.original_date)}
-          onAccept={handleAccept}
-          onDismiss={handleDismiss}
-        />
-      ))}
+    <div className="relative">
+      {/* Card count */}
+      <p className="text-xs text-text-muted mb-2">
+        {activeIndex + 1} of {proposals.length} suggestion{proposals.length !== 1 ? "s" : ""}
+      </p>
+
+      {/* Carousel scroll container */}
+      <div
+        ref={scrollRef}
+        className="flex overflow-x-auto snap-x snap-mandatory gap-4 scrollbar-hide"
+      >
+        {proposals.map((proposal) => (
+          <div key={proposal.id} className="min-w-full snap-center">
+            <SuggestionCard
+              proposal={proposal}
+              onAccept={handleAccept}
+              onDismiss={handleDismiss}
+            />
+          </div>
+        ))}
+      </div>
+
+      {/* Dot indicators */}
+      {proposals.length > 1 && (
+        <div className="flex justify-center gap-1.5 mt-3">
+          {proposals.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => {
+                setActiveIndex(i);
+                const container = scrollRef.current;
+                if (container) {
+                  const card = container.children[i] as HTMLElement;
+                  card?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+                }
+              }}
+              className={`w-2 h-2 rounded-full transition-all duration-200 ${
+                i === activeIndex ? "bg-coral w-4" : "bg-warm-grey"
+              }`}
+              aria-label={`Go to suggestion ${i + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

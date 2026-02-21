@@ -75,8 +75,8 @@ export function LenderPageClient({
           message="Lend spare cash and earn returns on idle money."
         />
 
-        {/* Lending Pot Card -- with APY preference slider */}
-        <LendingPotCard pot={initialPot} />
+        {/* Lending Pot Card */}
+        <LendingPotCard pot={initialPot} currentApyBps={initialYieldStats.avgAprBps} />
 
         {/* Auto-Match Toggle */}
         <AutoPopToggle enabled={autoMatch} onToggle={handleAutoMatchToggle} />

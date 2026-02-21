@@ -75,9 +75,14 @@ export async function GET(request: Request) {
     // but don't block the redirect on the full pipeline completing.
     // The pipeline route itself handles the 3-step orchestration.
     try {
+      // Forward cookies so the pipeline route can authenticate the user
+      const cookieHeader = request.headers.get("cookie") ?? "";
       const pipelineRes = await fetch(`${origin}/api/pipeline/run`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          cookie: cookieHeader,
+        },
         body: JSON.stringify({
           user_id: user.id,
           connection_id: connection.id,
