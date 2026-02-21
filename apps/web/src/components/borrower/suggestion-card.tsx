@@ -39,7 +39,7 @@ export function SuggestionCard({
   const suggestedFee = payload.fee_pence;
   const feeRange = useMemo(() => {
     const min = Math.max(1, Math.round(suggestedFee * 0.5));
-    const max = suggestedFee;
+    const max = Math.max(suggestedFee, min);
     return { min, max };
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);

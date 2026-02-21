@@ -1,5 +1,3 @@
-"use client";
-
 /** Static demo data for the mini heatmap — no server fetch needed */
 const DEMO_DAYS = [
   1, 1, 1, 0, 1, 1, 1, // week 1: mostly safe
@@ -16,9 +14,9 @@ function getDemoColor(val: number) {
 }
 
 const DEMO_SHIFTS = [
-  { name: "Netflix", from: "Feb 15", to: "Feb 27", amount: "£15.99", saved: "£34", status: "shifted" as const },
-  { name: "Council Tax", from: "Feb 18", to: "Feb 28", amount: "£142.00", saved: "£89", status: "shifted" as const },
-  { name: "Car Insurance", from: "Feb 19", to: "Mar 1", amount: "£67.50", saved: "£52", status: "pending" as const },
+  { name: "Netflix", from: "Feb 15", to: "Feb 27", amount: "£15.99", status: "shifted" as const },
+  { name: "Council Tax", from: "Feb 18", to: "Feb 28", amount: "£142.00", status: "shifted" as const },
+  { name: "Car Insurance", from: "Feb 19", to: "Mar 1", amount: "£67.50", status: "pending" as const },
 ];
 
 export function LandingPreviews() {
