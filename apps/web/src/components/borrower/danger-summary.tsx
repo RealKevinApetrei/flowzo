@@ -8,6 +8,9 @@ interface ForecastDay {
   projected_balance_pence: number;
   is_danger: boolean;
   confidence_low_pence: number;
+  confidence_high_pence: number;
+  income_expected_pence: number;
+  outgoings_expected_pence: number;
 }
 
 interface DangerSummaryProps {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -20,10 +20,36 @@ interface LendingPotCardProps {
 const TOP_UP_AMOUNTS = [1000, 5000, 10000, 50000]; // pence
 const APY_STORAGE_KEY = "flowzo-preferred-apy";
 
+// Risk grade definitions for the match probability breakdown
+const RISK_GRADES = [
+  { grade: "A", label: "Grade A", description: "Low risk, reliable borrowers", baseApyRange: [3, 8] },
+  { grade: "B", label: "Grade B", description: "Moderate risk, steady history", baseApyRange: [7, 15] },
+  { grade: "C", label: "Grade C", description: "Higher risk, higher returns", baseApyRange: [12, 25] },
+] as const;
+
+/** Estimate match probability for a risk grade at a given target APY */
+function estimateMatchProbability(targetApy: number, gradeMin: number, gradeMax: number): number {
+  // If target APY is below the grade's range, very high probability (lender is offering cheap money)
+  if (targetApy <= gradeMin) return 95;
+  // If target APY is above the grade's range, very low probability (too expensive for this grade)
+  if (targetApy > gradeMax + 3) return 2;
+  // Within range: probability drops as APY gets higher within the grade's sweet spot
+  const midpoint = (gradeMin + gradeMax) / 2;
+  if (targetApy <= midpoint) {
+    // Below midpoint: high probability, scales 95 -> 70
+    const t = (targetApy - gradeMin) / (midpoint - gradeMin);
+    return Math.round(95 - t * 25);
+  }
+  // Above midpoint: probability drops off, scales 70 -> 15
+  const t = (targetApy - midpoint) / (gradeMax + 3 - midpoint);
+  return Math.max(5, Math.round(70 - t * 55));
+}
+
 export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
   const [loading, setLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
   const [preferredApy, setPreferredApy] = useState(8);
+  const [showBreakdown, setShowBreakdown] = useState(false);
 
   // Load saved APY preference from localStorage
   useEffect(() => {
@@ -76,6 +102,24 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
         : preferredApy <= 18
           ? "text-warning"
           : "text-danger";
+
+  // Compute match probabilities for each risk grade
+  const gradeBreakdown = useMemo(
+    () =>
+      RISK_GRADES.map((g) => ({
+        ...g,
+        probability: estimateMatchProbability(preferredApy, g.baseApyRange[0], g.baseApyRange[1]),
+      })),
+    [preferredApy],
+  );
+
+  // Overall match probability (weighted average, A has more volume)
+  const overallProbability = useMemo(() => {
+    const weights = [0.5, 0.35, 0.15]; // A trades are more common
+    return Math.round(
+      gradeBreakdown.reduce((sum, g, i) => sum + g.probability * weights[i], 0),
+    );
+  }, [gradeBreakdown]);
 
   async function handleTopUp(amountPence: number) {
     setLoading(true);
@@ -160,10 +204,11 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
           </div>
         </div>
 
-        {/* APY Preference Slider */}
+        {/* Yield Preference — slider + collapsible breakdown */}
         <div className="rounded-xl bg-soft-white p-4 space-y-3">
+          {/* Slider header */}
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-navy">Preferred APY</p>
+            <p className="text-sm font-medium text-navy">Target Yield</p>
             <div className="flex items-center gap-2">
               <span className={`text-lg font-extrabold ${apyColor}`}>
                 {preferredApy}%
@@ -174,24 +219,114 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
             </div>
           </div>
 
+          {/* APY slider */}
           <RangeSlider
             value={[preferredApy]}
             onValueChange={handleApyChange}
             min={1}
             max={25}
             step={1}
-            aria-label="Preferred APY"
+            aria-label="Target yield APY"
           />
 
           <div className="flex items-center justify-between text-[10px] text-text-muted">
-            <span>1% -- Lower risk</span>
-            <span>25% -- Higher risk</span>
+            <span>1% — Lower risk</span>
+            <span>25% — Higher risk</span>
           </div>
 
-          <p className="text-xs text-text-secondary leading-relaxed">
-            Trades matching your target APY will be auto-funded when auto-match is on.
-            Higher APY = higher risk borrowers.
-          </p>
+          {/* Overall match probability */}
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-text-secondary">Match probability</p>
+            <span className={`text-sm font-bold ${
+              overallProbability >= 60
+                ? "text-success"
+                : overallProbability >= 30
+                  ? "text-warning"
+                  : "text-danger"
+            }`}>
+              {overallProbability}%
+            </span>
+          </div>
+          <div className="h-2 rounded-full bg-warm-grey overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-300 ease-out ${
+                overallProbability >= 60
+                  ? "bg-success"
+                  : overallProbability >= 30
+                    ? "bg-warning"
+                    : "bg-danger"
+              }`}
+              style={{ width: `${overallProbability}%` }}
+            />
+          </div>
+
+          {/* Collapsible breakdown by risk grade */}
+          <button
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            className="flex items-center gap-1.5 text-xs font-medium text-coral hover:text-coral-dark transition-colors w-full"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className={`w-4 h-4 transition-transform duration-200 ${showBreakdown ? "rotate-90" : ""}`}
+            >
+              <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
+            </svg>
+            Breakdown by risk grade
+          </button>
+
+          {showBreakdown && (
+            <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+              {gradeBreakdown.map((g) => (
+                <div key={g.grade} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold text-white ${
+                        g.grade === "A"
+                          ? "bg-success"
+                          : g.grade === "B"
+                            ? "bg-warning"
+                            : "bg-danger"
+                      }`}>
+                        {g.grade}
+                      </span>
+                      <div>
+                        <p className="text-xs font-semibold text-navy">{g.label}</p>
+                        <p className="text-[10px] text-text-muted">{g.description}</p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold ${
+                      g.probability >= 60
+                        ? "text-success"
+                        : g.probability >= 30
+                          ? "text-warning"
+                          : "text-danger"
+                    }`}>
+                      {g.probability}%
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-warm-grey overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ease-out ${
+                        g.grade === "A"
+                          ? "bg-success"
+                          : g.grade === "B"
+                            ? "bg-warning"
+                            : "bg-danger"
+                      }`}
+                      style={{ width: `${g.probability}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+
+              <p className="text-[10px] text-text-muted leading-relaxed pt-1">
+                Match probability is estimated based on current market demand.
+                Lower APY targets match more Grade A borrowers.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Stat rows */}
