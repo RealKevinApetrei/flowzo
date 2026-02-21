@@ -170,7 +170,7 @@ export function LenderPageClient({
                 />
               ) : tradesLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-text-secondary">
-                  <span className="text-3xl animate-pulse">🫧</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 animate-pulse text-text-muted"><circle cx="12" cy="10" r="6"/><circle cx="19" cy="16" r="3"/><circle cx="6" cy="18" r="2"/></svg>
                   <p className="text-sm font-medium mt-2">Loading bubbles...</p>
                 </div>
               ) : (

@@ -160,7 +160,10 @@ export function SettingsClient({
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-coral/10 rounded-full flex items-center justify-center">
-                      <span className="text-coral text-sm">🏦</span>
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 text-coral">
+                        <path d="M3 21h18" /><path d="M3 10h18" /><path d="M12 3l9 7H3l9-7z" />
+                        <path d="M5 10v11" /><path d="M19 10v11" /><path d="M9 10v11" /><path d="M14 10v11" />
+                      </svg>
                     </div>
                     <div>
                       <p className="font-medium text-navy capitalize">{conn.provider}</p>
@@ -268,7 +271,22 @@ export function SettingsClient({
                     : "text-text-secondary hover:text-navy"
                 }`}
               >
-                {option === "light" ? "☀️ Light" : option === "dark" ? "🌙 Dark" : "💻 System"}
+                {option === "light" ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+                    Light
+                  </span>
+                ) : option === "dark" ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+                    Dark
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                    System
+                  </span>
+                )}
               </button>
             ))}
           </div>

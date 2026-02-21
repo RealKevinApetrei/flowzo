@@ -67,9 +67,10 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
       <CardHeader>
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-full bg-coral/10">
-            <span className="text-xl" role="img" aria-label="Lending pot">
-              🐷
-            </span>
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-coral" aria-label="Lending pot">
+              <path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2" />
+              <path d="M2 9.5a2.5 2.5 0 010-5" />
+            </svg>
           </div>
           <CardTitle>Lending Pot</CardTitle>
         </div>
