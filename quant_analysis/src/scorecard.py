@@ -46,13 +46,21 @@ def pd_to_score(pd_value: float) -> float:
 def get_risk_grade(score: float) -> str:
     """Return risk grade A (best), B (mid), or C (worst) for a credit score.
 
-    Thresholds calibrated against the Home Credit training distribution:
-      A >= 720  — low risk (PD roughly < 3.5%)
-      B >= 620  — medium risk
-      C <  620  — high risk
+    Thresholds are calibrated against the actual score distribution produced by
+    the XGBoost model on the Home Credit sample (run scripts/calibrate_thresholds.py
+    to recompute after any model or data change).
+
+    The model uses scale_pos_weight to up-weight defaulters, so predicted PDs are
+    higher than the raw 8% base rate — scores cluster in the 460–540 range rather
+    than the full 300–850 scale. Thresholds are set at the 80th / 45th percentile
+    of the training sample to give an intentional 20% / 35% / 45% A / B / C split.
+
+      A >= 521  — low risk   (~top 20%, observed default rate ~2.3%)
+      B >= 495  — medium risk (~mid 35%, observed default rate ~5.3%)
+      C <  495  — high risk  (~bottom 45%, observed default rate ~12.4%)
     """
-    if score >= 720:
+    if score >= 521:
         return "A"
-    if score >= 620:
+    if score >= 495:
         return "B"
     return "C"
