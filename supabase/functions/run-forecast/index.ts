@@ -238,11 +238,16 @@ serve(async (req: Request) => {
 
     // 6. Store forecast rows --------------------------------------------
     // Delete previous forecasts for this user first
-    await supabase
+    const { error: deleteErr } = await supabase
       .from("forecasts")
       .delete()
       .eq("user_id", user_id)
       .neq("run_id", runId);
+
+    if (deleteErr) {
+      console.error("Failed to delete old forecasts:", deleteErr);
+      // Continue — stale forecasts are better than no forecasts
+    }
 
     if (forecastRows.length > 0) {
       const { error: fcErr } = await supabase

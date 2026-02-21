@@ -91,11 +91,22 @@ export async function fundTrade(tradeId: string) {
     p_trade_id: tradeId,
     p_allocation_id: allocation.id,
     p_description: `Fund trade ${tradeId}`,
+    p_idempotency_key: `fund-${tradeId}-${allocation.id}`,
   });
 
   if (potErr) {
-    // Rollback allocation if pot update fails
-    await supabase.from("allocations").delete().eq("id", allocation.id);
+    // Rollback allocation if pot update fails — retry delete to prevent orphans
+    const { error: deleteErr } = await supabase
+      .from("allocations")
+      .delete()
+      .eq("id", allocation.id);
+
+    if (deleteErr) {
+      console.error(
+        `ORPHAN ALLOCATION: Failed to rollback allocation ${allocation.id}:`,
+        deleteErr,
+      );
+    }
     throw new Error(`Insufficient funds or pot error: ${potErr.message}`);
   }
 
@@ -111,18 +122,32 @@ export async function fundTrade(tradeId: string) {
 export async function topUpPot(amountPence: number) {
   if (!amountPence || amountPence <= 0) throw new Error("Invalid amount");
 
-  const res = await fetch("/api/payments/topup", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount_pence: amountPence }),
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // Ensure lending pot exists
+  await supabase.from("lending_pots").upsert(
+    { user_id: user.id, available: 0, locked: 0, total_deployed: 0, realized_yield: 0 },
+    { onConflict: "user_id", ignoreDuplicates: true },
+  );
+
+  // Deposit directly via RPC (no relative URL — works in server context)
+  const amountGBP = amountPence / 100;
+  const { error } = await supabase.rpc("update_lending_pot", {
+    p_user_id: user.id,
+    p_entry_type: "DEPOSIT",
+    p_amount: amountGBP,
+    p_trade_id: null,
+    p_allocation_id: null,
+    p_description: `Top up £${amountGBP.toFixed(2)}`,
+    p_idempotency_key: `deposit-${user.id}-${Date.now()}`,
   });
 
-  if (!res.ok) {
-    const { error } = await res.json();
-    throw new Error(error ?? "Top-up failed");
-  }
-
-  return res.json();
+  if (error) throw new Error(`Top-up failed: ${error.message}`);
 }
 
 export async function withdrawFromPot(amountPence: number) {

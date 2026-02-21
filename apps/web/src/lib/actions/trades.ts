@@ -20,6 +20,19 @@ export async function createTrade(formData: FormData) {
     fee_pence: Number(formData.get("fee_pence")),
   });
 
+  // Verify obligation ownership if provided
+  if (input.obligation_id) {
+    const { data: obl, error: oblErr } = await supabase
+      .from("obligations")
+      .select("user_id")
+      .eq("id", input.obligation_id)
+      .single();
+
+    if (oblErr || !obl || obl.user_id !== user.id) {
+      throw new Error("Obligation not found or does not belong to you");
+    }
+  }
+
   // DB stores GBP decimal, frontend sends pence — convert at boundary
   const { data, error } = await supabase
     .from("trades")
@@ -76,6 +89,15 @@ export async function cancelTrade(tradeId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
+
+  // Log cancellation event for audit trail
+  await supabase.from("flowzo_events").insert({
+    event_type: "trade.cancelled",
+    entity_type: "trade",
+    entity_id: tradeId,
+    actor: user.id,
+    payload: { cancelled_by: "borrower" },
+  });
 
   const { error } = await supabase
     .from("trades")

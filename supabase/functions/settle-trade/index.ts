@@ -84,7 +84,7 @@ serve(async (req: Request) => {
                 p_trade_id: trade.id,
                 p_allocation_id: alloc.id,
                 p_description: `Disburse for trade ${trade.id}`,
-                p_idempotency_key: `disburse-${trade.id}-${alloc.lender_id}`,
+                p_idempotency_key: `disburse-${trade.id}-${alloc.id}`,
               },
             );
 
@@ -99,11 +99,21 @@ serve(async (req: Request) => {
               continue;
             }
 
-            // Update allocation status to ACTIVE
-            await supabase
+            // Update allocation status to ACTIVE — only if ledger succeeded
+            const { error: allocUpdateErr } = await supabase
               .from("allocations")
               .update({ status: "ACTIVE", updated_at: new Date().toISOString() })
               .eq("id", alloc.id);
+
+            if (allocUpdateErr) {
+              console.error(
+                `Allocation ACTIVE status update failed for ${alloc.id}:`,
+                allocUpdateErr,
+              );
+              results.errors.push(
+                `Allocation ACTIVE status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
+              );
+            }
           }
 
           // Log event
@@ -177,7 +187,7 @@ serve(async (req: Request) => {
                 p_trade_id: trade.id,
                 p_allocation_id: alloc.id,
                 p_description: `Repay principal for trade ${trade.id}`,
-                p_idempotency_key: `repay-principal-${trade.id}-${alloc.lender_id}`,
+                p_idempotency_key: `repay-principal-${trade.id}-${alloc.id}`,
               },
             );
 
@@ -189,10 +199,12 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Repay principal failed for allocation ${alloc.id}: ${repayErr.message}`,
               );
+              // Skip status update — ledger and allocation must stay in sync
               continue;
             }
 
             // FEE_CREDIT: return fee share to lender
+            let feeSuccess = true;
             if (feeShare > 0) {
               const { error: feeErr } = await supabase.rpc(
                 "update_lending_pot",
@@ -203,7 +215,7 @@ serve(async (req: Request) => {
                   p_trade_id: trade.id,
                   p_allocation_id: alloc.id,
                   p_description: `Fee credit for trade ${trade.id}`,
-                  p_idempotency_key: `fee-credit-${trade.id}-${alloc.lender_id}`,
+                  p_idempotency_key: `fee-credit-${trade.id}-${alloc.id}`,
                 },
               );
 
@@ -215,17 +227,30 @@ serve(async (req: Request) => {
                 results.errors.push(
                   `Fee credit failed for allocation ${alloc.id}: ${feeErr.message}`,
                 );
+                feeSuccess = false;
               }
             }
 
-            // Update allocation status to REPAID
-            await supabase
-              .from("allocations")
-              .update({
-                status: "REPAID",
-                updated_at: new Date().toISOString(),
-              })
-              .eq("id", alloc.id);
+            // Only update allocation status if both ledger operations succeeded
+            if (feeSuccess) {
+              const { error: allocUpdateErr } = await supabase
+                .from("allocations")
+                .update({
+                  status: "REPAID",
+                  updated_at: new Date().toISOString(),
+                })
+                .eq("id", alloc.id);
+
+              if (allocUpdateErr) {
+                console.error(
+                  `Allocation status update failed for ${alloc.id}:`,
+                  allocUpdateErr,
+                );
+                results.errors.push(
+                  `Allocation REPAID status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
+                );
+              }
+            }
           }
 
           // Update trade status to REPAID
@@ -315,7 +340,7 @@ serve(async (req: Request) => {
                 p_trade_id: trade.id,
                 p_allocation_id: alloc.id,
                 p_description: `Default release for trade ${trade.id}`,
-                p_idempotency_key: `default-release-${trade.id}-${alloc.lender_id}`,
+                p_idempotency_key: `default-release-${trade.id}-${alloc.id}`,
               },
             );
 
@@ -330,14 +355,24 @@ serve(async (req: Request) => {
               continue;
             }
 
-            // Mark allocation as DEFAULTED
-            await supabase
+            // Mark allocation as DEFAULTED — only if ledger succeeded
+            const { error: allocUpdateErr } = await supabase
               .from("allocations")
               .update({
                 status: "DEFAULTED",
                 updated_at: new Date().toISOString(),
               })
               .eq("id", alloc.id);
+
+            if (allocUpdateErr) {
+              console.error(
+                `Allocation DEFAULTED status update failed for ${alloc.id}:`,
+                allocUpdateErr,
+              );
+              results.errors.push(
+                `Allocation DEFAULTED status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
+              );
+            }
           }
 
           // Update trade status to DEFAULTED

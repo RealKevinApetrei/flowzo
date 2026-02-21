@@ -65,17 +65,46 @@ export async function GET(request: Request) {
       data: { truelayer_state: null },
     });
 
-    // Fire pipeline async — user doesn't wait for it to complete
-    fetch(`${origin}/api/pipeline/run`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: user.id,
-        connection_id: connection.id,
-      }),
-    }).catch((err) => {
-      console.error("Pipeline fire-and-forget failed:", err);
-    });
+    // Store sync_pending flag so borrower page can show loading state
+    await supabase
+      .from("bank_connections")
+      .update({ status: "syncing" })
+      .eq("id", connection.id);
+
+    // Fire pipeline — await the call to ensure it reaches the server,
+    // but don't block the redirect on the full pipeline completing.
+    // The pipeline route itself handles the 3-step orchestration.
+    try {
+      const pipelineRes = await fetch(`${origin}/api/pipeline/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: user.id,
+          connection_id: connection.id,
+        }),
+      });
+
+      if (!pipelineRes.ok) {
+        console.error("Pipeline returned error:", pipelineRes.status);
+        // Mark connection as needing retry
+        await supabase
+          .from("bank_connections")
+          .update({ status: "sync_failed" })
+          .eq("id", connection.id);
+      } else {
+        // Pipeline succeeded — mark active
+        await supabase
+          .from("bank_connections")
+          .update({ status: "active" })
+          .eq("id", connection.id);
+      }
+    } catch (err) {
+      console.error("Pipeline call failed:", err);
+      await supabase
+        .from("bank_connections")
+        .update({ status: "sync_failed" })
+        .eq("id", connection.id);
+    }
 
     return NextResponse.redirect(`${origin}/borrower`);
   } catch (error) {

@@ -56,14 +56,21 @@ serve(async (req: Request) => {
     }
 
     // 2. Build context for Claude ---------------------------------------
-    const payload = proposal.payload as Record<string, unknown>;
+    const payload = proposal.payload;
+    if (!payload || typeof payload !== "object") {
+      return new Response(
+        JSON.stringify({ error: "Proposal payload is missing or invalid" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+    const p = payload as Record<string, unknown>;
     const obligation = proposal.obligations as Record<string, unknown> | null;
 
-    const amountGBP = payload.amount_pence
-      ? (Number(payload.amount_pence) / 100).toFixed(2)
+    const amountGBP = p.amount_pence
+      ? (Number(p.amount_pence) / 100).toFixed(2)
       : "unknown";
-    const feeGBP = payload.fee_pence
-      ? (Number(payload.fee_pence) / 100).toFixed(2)
+    const feeGBP = p.fee_pence
+      ? (Number(p.fee_pence) / 100).toFixed(2)
       : "unknown";
 
     const prompt = `You are Flowzo, a friendly personal finance assistant for UK consumers.
@@ -73,13 +80,13 @@ A user has a bill that falls on a day when their account balance would be danger
 We are proposing to shift this bill to a safer date for a small fee.
 
 Here are the details:
-- Bill name: ${obligation?.name ?? payload.obligation_name ?? "Unknown bill"}
+- Bill name: ${obligation?.name ?? p.obligation_name ?? "Unknown bill"}
 - Bill amount: \u00a3${amountGBP}
-- Original due date: ${payload.original_date}
-- Proposed new date: ${payload.shifted_date}
-- Number of days shifted: ${payload.shift_days}
+- Original due date: ${p.original_date}
+- Proposed new date: ${p.shifted_date}
+- Number of days shifted: ${p.shift_days}
 - Fee for this shift: \u00a3${feeGBP}
-- Risk grade: ${payload.risk_grade ?? "B"}
+- Risk grade: ${p.risk_grade ?? "B"}
 - Bill frequency: ${obligation?.frequency ?? "monthly"}
 - Bill category: ${obligation?.category ?? "general"}
 

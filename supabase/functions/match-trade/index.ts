@@ -107,10 +107,38 @@ serve(async (req: Request) => {
       );
     }
 
+    // Guard: prevent double-matching if trade already has allocations
+    const { data: existingAllocs } = await supabase
+      .from("allocations")
+      .select("id, lender_id, amount_slice, fee_slice, status")
+      .eq("trade_id", trade_id)
+      .in("status", ["RESERVED", "ACTIVE"]);
+
+    if (existingAllocs && existingAllocs.length > 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          trade_id,
+          message: "Trade already has allocations — skipping re-match",
+          allocations: existingAllocs,
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
     const tradeAmount = Number(trade.amount);
     const tradeFee = Number(trade.fee);
     const tradeRiskGrade = trade.risk_grade as string;
     const tradeShiftDays = Number(trade.shift_days);
+
+    if (tradeAmount <= 0) {
+      return new Response(
+        JSON.stringify({ error: "Trade amount must be positive" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     // Compute implied APR for min_apr filtering
     const impliedAPR = tradeShiftDays > 0
@@ -161,6 +189,32 @@ serve(async (req: Request) => {
     }
 
     // 4. Score and rank lenders ------------------------------------------
+    // Batch-fetch lending pots and exposures to avoid N+1 queries
+    const lenderIds = lenderPrefs.map((p) => p.user_id as string);
+
+    const { data: allPots } = await supabase
+      .from("lending_pots")
+      .select("user_id, available")
+      .in("user_id", lenderIds);
+
+    const potMap = new Map<string, number>();
+    for (const pot of allPots ?? []) {
+      potMap.set(pot.user_id as string, Number(pot.available));
+    }
+
+    // Batch-fetch all lender exposures in one query
+    const { data: allExposures } = await supabase
+      .from("allocations")
+      .select("lender_id, amount_slice")
+      .in("lender_id", lenderIds)
+      .in("status", ["RESERVED", "ACTIVE"]);
+
+    const exposureMap = new Map<string, number>();
+    for (const alloc of allExposures ?? []) {
+      const lid = alloc.lender_id as string;
+      exposureMap.set(lid, (exposureMap.get(lid) ?? 0) + Number(alloc.amount_slice));
+    }
+
     const scoredLenders: ScoredLender[] = [];
 
     for (const pref of lenderPrefs) {
@@ -170,34 +224,12 @@ serve(async (req: Request) => {
       // Enforce min_apr: skip lenders whose minimum exceeds the trade's implied APR
       if (minAPR > 0 && impliedAPR < minAPR) continue;
 
-      // Fetch lending pot
-      const { data: pot, error: potErr } = await supabase
-        .from("lending_pots")
-        .select("available")
-        .eq("user_id", lenderId)
-        .single();
-
-      if (potErr || !pot) continue;
-
-      const available = Number(pot.available);
+      const available = potMap.get(lenderId) ?? 0;
       if (available <= 0) continue;
 
       // Check total exposure against max_total_exposure
       const maxTotalExposure = Number(pref.max_total_exposure ?? 10000);
-      let currentExposure = 0;
-
-      const { data: activeAllocs } = await supabase
-        .from("allocations")
-        .select("amount_slice")
-        .eq("lender_id", lenderId)
-        .in("status", ["RESERVED", "ACTIVE"]);
-
-      if (activeAllocs) {
-        currentExposure = activeAllocs.reduce(
-          (sum, a) => sum + Number(a.amount_slice),
-          0,
-        );
-      }
+      const currentExposure = exposureMap.get(lenderId) ?? 0;
 
       // Skip if already at max total exposure
       if (currentExposure >= maxTotalExposure) continue;
@@ -221,6 +253,9 @@ serve(async (req: Request) => {
     let remainingAmount = tradeAmount;
     const allocations: Record<string, unknown>[] = [];
 
+    // Track newly allocated amounts during this run
+    const newAllocAmounts = new Map<string, number>();
+
     for (const { pref, available } of scoredLenders) {
       if (remainingAmount <= 0) break;
 
@@ -231,20 +266,9 @@ serve(async (req: Request) => {
       // Diversification cap: max % of single trade
       const diversificationCap = tradeAmount * MAX_SINGLE_LENDER_PCT;
 
-      // Recalculate current exposure for cap enforcement
-      let currentExposure = 0;
-      const { data: currentAllocs } = await supabase
-        .from("allocations")
-        .select("amount_slice")
-        .eq("lender_id", lenderId)
-        .in("status", ["RESERVED", "ACTIVE"]);
-
-      if (currentAllocs) {
-        currentExposure = currentAllocs.reduce(
-          (sum, a) => sum + Number(a.amount_slice),
-          0,
-        );
-      }
+      // Use pre-fetched exposure + any new allocations in this run
+      const currentExposure = (exposureMap.get(lenderId) ?? 0) +
+        (newAllocAmounts.get(lenderId) ?? 0);
 
       const exposureHeadroom = Math.max(maxTotalExposure - currentExposure, 0);
 
@@ -295,7 +319,7 @@ serve(async (req: Request) => {
           p_trade_id: trade_id,
           p_allocation_id: allocation.id,
           p_description: `Reserve for trade ${trade_id}`,
-          p_idempotency_key: `reserve-${trade_id}-${lenderId}`,
+          p_idempotency_key: `reserve-${trade_id}-${allocation.id}`,
         },
       );
 
@@ -311,6 +335,9 @@ serve(async (req: Request) => {
           .eq("id", allocation.id);
         continue;
       }
+
+      // Track allocation for exposure calculation within this run
+      newAllocAmounts.set(lenderId, (newAllocAmounts.get(lenderId) ?? 0) + allocatable);
 
       allocations.push({
         id: allocation.id,

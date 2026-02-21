@@ -35,6 +35,7 @@ export async function POST(request: Request) {
 
   // Deposit via atomic RPC (row-level lock + ledger entry)
   const amountGBP = amountPence / 100;
+  const idempotencyKey = `deposit-${user.id}-${Date.now()}`;
   const { error } = await supabase.rpc("update_lending_pot", {
     p_user_id: user.id,
     p_entry_type: "DEPOSIT",
@@ -42,6 +43,7 @@ export async function POST(request: Request) {
     p_trade_id: null,
     p_allocation_id: null,
     p_description: `Top up £${amountGBP.toFixed(2)}`,
+    p_idempotency_key: idempotencyKey,
   });
 
   if (error) {

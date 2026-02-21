@@ -1,11 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { z } from "zod";
+
+const uuidSchema = z.string().uuid();
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ tradeId: string }> },
 ) {
   const { tradeId } = await params;
+
+  // Validate tradeId is a valid UUID
+  const parsed = uuidSchema.safeParse(tradeId);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid trade ID" }, { status: 400 });
+  }
+
   const supabase = await createClient();
 
   const {

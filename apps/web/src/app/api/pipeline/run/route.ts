@@ -1,16 +1,32 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
+    // Auth check: caller must be authenticated
+    const userClient = await createClient();
+    const { data: { user } } = await userClient.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { user_id, connection_id } = await request.json();
 
     if (!user_id || !connection_id) {
       return NextResponse.json(
         { error: "user_id and connection_id are required" },
         { status: 400 },
+      );
+    }
+
+    // Ensure caller can only run pipeline for themselves
+    if (user_id !== user.id) {
+      return NextResponse.json(
+        { error: "Cannot run pipeline for another user" },
+        { status: 403 },
       );
     }
 

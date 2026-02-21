@@ -111,11 +111,15 @@ serve(async (req: Request) => {
     }
 
     // 4. Fetch all forecasts for safe-day lookup -------------------------
-    const { data: allForecasts } = await supabase
+    const { data: allForecasts, error: allFcErr } = await supabase
       .from("forecasts")
       .select("forecast_date, projected_balance")
       .eq("user_id", user_id)
       .order("forecast_date", { ascending: true });
+
+    if (allFcErr || !allForecasts || allForecasts.length === 0) {
+      console.warn("No forecasts found for safe-day lookup — proposals will use default 7-day shift");
+    }
 
     // 5. Create an agent run record -------------------------------------
     const { data: agentRun, error: runErr } = await supabase

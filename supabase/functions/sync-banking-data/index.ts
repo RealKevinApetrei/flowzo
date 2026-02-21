@@ -153,20 +153,23 @@ serve(async (req: Request) => {
       );
     }
 
-    const accessToken: string =
-      conn.truelayer_token?.access_token ?? conn.truelayer_token;
-    const refreshTokenValue: string | undefined =
-      conn.truelayer_token?.refresh_token;
-    const retryCtx = refreshTokenValue
-      ? { refreshTokenValue, supabase, connectionId: connection_id }
-      : undefined;
-
-    if (!accessToken) {
+    // Validate token structure
+    const tokenObj = conn.truelayer_token;
+    if (!tokenObj || typeof tokenObj !== "object" || !tokenObj.access_token) {
       return new Response(
-        JSON.stringify({ error: "No access_token in bank connection" }),
+        JSON.stringify({
+          error: "Invalid token format in bank connection",
+          detail: "Expected truelayer_token to be an object with access_token",
+        }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
+
+    const accessToken: string = tokenObj.access_token;
+    const refreshTokenValue: string | undefined = tokenObj.refresh_token;
+    const retryCtx = refreshTokenValue
+      ? { refreshTokenValue, supabase, connectionId: connection_id }
+      : undefined;
 
     // 2. Fetch accounts from TrueLayer -----------------------------------
     const tlAccounts = await tlFetch("/data/v1/accounts", accessToken, retryCtx);
@@ -178,6 +181,7 @@ serve(async (req: Request) => {
     let accountsSynced = 0;
     let transactionsSynced = 0;
     let obligationsDetected = 0;
+    const obligationErrors: string[] = [];
 
     for (const tlAcct of tlAccounts) {
       // 3. Upsert account ------------------------------------------------
@@ -324,7 +328,7 @@ serve(async (req: Request) => {
         const lastDate = new Date(lastTxn.booked_at as string);
         const expectedDay = lastDate.getDate();
 
-        // Calculate next expected date
+        // Calculate next expected date (handle month boundary safely)
         const nextExpected = new Date(lastDate);
         switch (frequency) {
           case "WEEKLY":
@@ -333,12 +337,24 @@ serve(async (req: Request) => {
           case "FORTNIGHTLY":
             nextExpected.setDate(nextExpected.getDate() + 14);
             break;
-          case "MONTHLY":
-            nextExpected.setMonth(nextExpected.getMonth() + 1);
+          case "MONTHLY": {
+            // Advance month, then clamp to last day if overflowed
+            const targetMonth = nextExpected.getMonth() + 1;
+            nextExpected.setMonth(targetMonth);
+            // If setMonth overflowed (e.g. Jan 31 → Mar 3), clamp to last day of target month
+            if (nextExpected.getMonth() !== targetMonth % 12) {
+              nextExpected.setDate(0); // sets to last day of previous month
+            }
             break;
-          case "QUARTERLY":
-            nextExpected.setMonth(nextExpected.getMonth() + 3);
+          }
+          case "QUARTERLY": {
+            const targetQMonth = nextExpected.getMonth() + 3;
+            nextExpected.setMonth(targetQMonth);
+            if (nextExpected.getMonth() !== targetQMonth % 12) {
+              nextExpected.setDate(0);
+            }
             break;
+          }
         }
 
         // Find the account_id from the most recent transaction
@@ -370,6 +386,7 @@ serve(async (req: Request) => {
 
         if (oblErr) {
           console.error(`Obligation upsert error for ${merchantKey}:`, oblErr);
+          obligationErrors.push(`${merchantKey}: ${oblErr.message}`);
         } else {
           obligationsDetected++;
         }
@@ -387,11 +404,12 @@ serve(async (req: Request) => {
 
     // 8. Return summary --------------------------------------------------
     const summary = {
-      success: true,
+      success: obligationErrors.length === 0,
       connection_id,
       accounts_synced: accountsSynced,
       transactions_synced: transactionsSynced,
       obligations_detected: obligationsDetected,
+      obligation_errors: obligationErrors.length > 0 ? obligationErrors : undefined,
       synced_at: new Date().toISOString(),
     };
 
