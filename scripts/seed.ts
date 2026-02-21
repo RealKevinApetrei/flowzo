@@ -168,29 +168,65 @@ const EXPLANATION_TEMPLATES = [
 async function cleanup() {
   console.log("Cleaning up existing demo data...");
 
-  // List all demo users
-  const { data: allUsers } = await supabase.auth.admin.listUsers({
-    perPage: 1000,
-  });
+  // Use RPC to clean up everything in dependency order within a single
+  // transaction. This avoids soft-delete issues with the JS admin client.
+  const { error } = await supabase.rpc("exec_sql" as never, {
+    sql: `
+      DO $$ DECLARE demo_ids uuid[]; trade_ids uuid[];
+      BEGIN
+        SELECT array_agg(id) INTO demo_ids
+        FROM auth.users WHERE email LIKE '%@flowzo-demo.test';
+        IF demo_ids IS NULL THEN RETURN; END IF;
 
-  const demoUsers = (allUsers?.users ?? []).filter((u) =>
-    u.email?.endsWith("@flowzo-demo.test"),
-  );
+        SELECT array_agg(id) INTO trade_ids
+        FROM public.trades WHERE borrower_id = ANY(demo_ids);
 
-  if (demoUsers.length === 0) {
-    console.log("  No existing demo users found.");
-    return;
-  }
+        IF trade_ids IS NOT NULL THEN
+          DELETE FROM public.flowzo_events WHERE entity_id = ANY(trade_ids);
+          DELETE FROM public.payment_orders WHERE trade_id = ANY(trade_ids);
+          DELETE FROM public.pool_ledger WHERE trade_id = ANY(trade_ids);
+          DELETE FROM public.trade_state_transitions WHERE trade_id = ANY(trade_ids);
+          DELETE FROM public.allocations WHERE trade_id = ANY(trade_ids);
+          DELETE FROM public.trades WHERE id = ANY(trade_ids);
+        END IF;
 
-  console.log(`  Found ${demoUsers.length} demo users to delete...`);
+        DELETE FROM public.allocations WHERE lender_id = ANY(demo_ids);
+        DELETE FROM public.agent_proposals WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.agent_runs WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.pool_ledger WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.lender_preferences WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.lending_pots WHERE user_id = ANY(demo_ids);
+        DELETE FROM auth.users WHERE id = ANY(demo_ids);
+      END $$;
+    `,
+  } as never);
 
-  // Delete in batches of 20
-  for (let i = 0; i < demoUsers.length; i += 20) {
-    const batch = demoUsers.slice(i, i + 20);
-    await Promise.all(
-      batch.map((u) => supabase.auth.admin.deleteUser(u.id)),
+  if (error) {
+    // If RPC doesn't exist, fall back to admin API
+    console.log("  RPC cleanup unavailable, using admin API...");
+
+    const { data: allUsers } = await supabase.auth.admin.listUsers({
+      perPage: 1000,
+    });
+
+    const demoUsers = (allUsers?.users ?? []).filter((u) =>
+      u.email?.endsWith("@flowzo-demo.test"),
     );
-    if (i + 20 < demoUsers.length) await sleep(200);
+
+    if (demoUsers.length === 0) {
+      console.log("  No existing demo users found.");
+      return;
+    }
+
+    console.log(`  Found ${demoUsers.length} demo users to delete...`);
+    for (let i = 0; i < demoUsers.length; i += 20) {
+      const batch = demoUsers.slice(i, i + 20);
+      await Promise.all(
+        batch.map((u) => supabase.auth.admin.deleteUser(u.id, false)),
+      );
+      if (i + 20 < demoUsers.length) await sleep(200);
+    }
+    await sleep(2000);
   }
 
   console.log("  Cleanup complete.");
@@ -279,18 +315,27 @@ async function createUsers(): Promise<SeedUser[]> {
 async function updateProfiles(users: SeedUser[]) {
   console.log("Updating profiles with risk grades and roles...");
 
-  const updates = users.map((u) => ({
-    id: u.id,
-    risk_grade: u.riskGrade,
-    role_preference: u.role,
-    onboarding_completed: true,
-  }));
-
-  // Batch upsert in chunks of 50
-  for (let i = 0; i < updates.length; i += 50) {
-    const batch = updates.slice(i, i + 50);
-    const { error } = await supabase.from("profiles").upsert(batch);
-    if (error) console.error("  Profile upsert error:", error.message);
+  // Profiles already exist (created by handle_new_user trigger).
+  // Use individual updates to set risk_grade and role.
+  const BATCH_SIZE = 20;
+  for (let i = 0; i < users.length; i += BATCH_SIZE) {
+    const batch = users.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map((u) =>
+        supabase
+          .from("profiles")
+          .update({
+            risk_grade: u.riskGrade,
+            role_preference: u.role,
+            onboarding_completed: true,
+          })
+          .eq("id", u.id)
+          .then(({ error }) => {
+            if (error)
+              console.error(`  Profile update error for ${u.email}:`, error.message);
+          }),
+      ),
+    );
   }
 
   console.log("  Profiles updated.");
