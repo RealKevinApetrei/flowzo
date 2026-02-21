@@ -239,6 +239,9 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 | End-to-end visual QA pass for dark mode across all pages | P1 | 1h | IN-PROGRESS |
 | Fix dark mode: separate navy-bg from navy text, improve contrast, fix hardcoded bg-white | P0 | 30m | DONE |
 | Segmented theme toggle UI (pill container with emoji labels) | P1 | 15m | DONE |
+| Fix Card UI component bg-white → card-surface for dark mode compat | P0 | 15m | DONE |
+| Theme-aware bottom nav (nav-bg variable, dark in light mode, elevated surface in dark mode) | P0 | 15m | DONE |
+| Fix lending pot dot color for dark mode (bg-navy → bg-text-secondary) | P1 | 5m | DONE |
 | Add page transition animations between routes (ViewTransitions API or framer-motion) | P2 | 2h | SUGGESTED |
 | A/B landing page variants for demo vs investor pitch | P2 | 2h | SUGGESTED |
 | Accessibility audit (ARIA labels, keyboard nav, contrast ratios) | P1 | 2h | SUGGESTED |

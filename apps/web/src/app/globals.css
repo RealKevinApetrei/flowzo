@@ -8,6 +8,7 @@
   --navy: #1b1b3a;
   --navy-light: #2d2d5e;
   --navy-bg: #1b1b3a;
+  --nav-bg: #1b1b3a;
   --soft-white: #fafafa;
   --warm-grey: #f0f0f0;
   --cool-grey: #e5e5e5;
@@ -35,6 +36,7 @@
   --navy: #f0f0f8;
   --navy-light: #d0d0e8;
   --navy-bg: #12121f;
+  --nav-bg: #161625;
   --soft-white: #0a0a14;
   --warm-grey: #1c1c2e;
   --cool-grey: #2a2a3e;
@@ -58,6 +60,7 @@
   --color-navy: var(--navy);
   --color-navy-light: var(--navy-light);
   --color-navy-bg: var(--navy-bg);
+  --color-nav-bg: var(--nav-bg);
   --color-soft-white: var(--soft-white);
   --color-warm-grey: var(--warm-grey);
   --color-cool-grey: var(--cool-grey);

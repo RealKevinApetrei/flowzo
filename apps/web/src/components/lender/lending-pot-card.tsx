@@ -104,7 +104,7 @@ export function LendingPotCard({ pot }: LendingPotCardProps) {
             label="Total deployed"
             sublabel="All time"
             value={formatPounds(totalDeployed)}
-            dotColor="bg-navy"
+            dotColor="bg-text-secondary"
           />
           <StatRow
             label="Yield earned"
