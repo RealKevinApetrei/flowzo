@@ -22,7 +22,7 @@ export default async function TradeDetailPage({
     redirect("/login");
   }
 
-  // Fetch trade data
+  // Fetch trade data (DB stores GBP decimal)
   const { data: trade, error } = await supabase
     .from("trades")
     .select("*")
@@ -41,6 +41,17 @@ export default async function TradeDetailPage({
   // Determine risk grade (default to B if missing)
   const riskGrade = trade.risk_grade ?? "B";
 
+  // Convert GBP to pence for display (formatCurrency expects pence)
+  const amountPence = Math.round(Number(trade.amount) * 100);
+  const feePence = Math.round(Number(trade.fee) * 100);
+  const shiftDays =
+    trade.shift_days ??
+    Math.round(
+      (new Date(trade.new_due_date).getTime() -
+        new Date(trade.original_due_date).getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
   return (
     <div className="max-w-lg mx-auto">
       <TopBar title="Trade Details" showBack backHref="/borrower" />
@@ -50,7 +61,7 @@ export default async function TradeDetailPage({
         <div className="rounded-2xl bg-white shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-extrabold text-navy">
-              {formatCurrency(trade.amount_pence)}
+              {formatCurrency(amountPence)}
             </h1>
             <span
               className={`inline-flex items-center text-xs font-bold px-3 py-1 rounded-full bg-warm-grey ${statusColor}`}
@@ -70,24 +81,19 @@ export default async function TradeDetailPage({
             <div className="flex items-center justify-between text-sm">
               <span className="text-text-secondary">Shifted date</span>
               <span className="font-semibold text-navy">
-                {formatDate(trade.shifted_due_date)}
+                {formatDate(trade.new_due_date)}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-text-secondary">Shift</span>
               <span className="font-semibold text-navy">
-                {trade.shift_days ?? Math.round(
-                  (new Date(trade.shifted_due_date).getTime() -
-                    new Date(trade.original_due_date).getTime()) /
-                    (1000 * 60 * 60 * 24),
-                )}{" "}
-                days
+                {shiftDays} days
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="text-text-secondary">Current fee</span>
               <span className="font-semibold text-navy">
-                {formatCurrency(trade.fee_pence)}
+                {formatCurrency(feePence)}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -102,15 +108,9 @@ export default async function TradeDetailPage({
           <TradeDetailClient
             trade={{
               id: trade.id,
-              amount_pence: trade.amount_pence,
-              fee_pence: trade.fee_pence,
-              shift_days:
-                trade.shift_days ??
-                Math.round(
-                  (new Date(trade.shifted_due_date).getTime() -
-                    new Date(trade.original_due_date).getTime()) /
-                    (1000 * 60 * 60 * 24),
-                ),
+              amount_pence: amountPence,
+              fee_pence: feePence,
+              shift_days: shiftDays,
               risk_grade: riskGrade,
             }}
           />

@@ -14,10 +14,10 @@ export default async function LenderHomePage() {
     redirect("/login");
   }
 
-  // Fetch lending pot data
+  // Fetch lending pot data (DB stores GBP decimal)
   const { data: pot } = await supabase
     .from("lending_pots")
-    .select("available_pence, locked_pence, total_deployed_pence, realized_yield_pence")
+    .select("available, locked, total_deployed, realized_yield")
     .eq("user_id", user.id)
     .single();
 
@@ -28,27 +28,36 @@ export default async function LenderHomePage() {
     .eq("user_id", user.id)
     .single();
 
-  // Fetch yield stats (aggregated from completed trades where this user was lender)
-  const { data: completedTrades } = await supabase
-    .from("trades")
-    .select("fee_pence, shift_days, amount_pence, status")
+  // Fetch trades where this user has allocations (lenders don't have lender_id on trades)
+  const { data: allocations } = await supabase
+    .from("allocations")
+    .select("trade_id, amount_slice, fee_slice, status, trades(amount, fee, shift_days, status)")
     .eq("lender_id", user.id);
 
-  const allTrades = completedTrades ?? [];
+  const allTrades = (allocations ?? []).map((a) => {
+    const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+    return {
+      amount: Number(trade?.amount ?? a.amount_slice ?? 0),
+      fee: Number(trade?.fee ?? a.fee_slice ?? 0),
+      shift_days: Number(trade?.shift_days ?? 0),
+      status: (trade?.status ?? a.status) as string,
+    };
+  });
+
   const activeTrades = allTrades.filter((t) =>
     ["MATCHED", "LIVE"].includes(t.status),
   );
   const settledTrades = allTrades.filter((t) => t.status === "REPAID");
 
-  const totalYieldPence = settledTrades.reduce(
-    (sum, t) => sum + (t.fee_pence ?? 0),
-    0,
+  // Convert GBP to pence for client components
+  const totalYieldPence = Math.round(
+    settledTrades.reduce((sum, t) => sum + t.fee, 0) * 100,
   );
 
   const avgTermDays =
     allTrades.length > 0
       ? Math.round(
-          allTrades.reduce((sum, t) => sum + (t.shift_days ?? 0), 0) /
+          allTrades.reduce((sum, t) => sum + t.shift_days, 0) /
             allTrades.length,
         )
       : 0;
@@ -57,9 +66,9 @@ export default async function LenderHomePage() {
     allTrades.length > 0
       ? Math.round(
           allTrades.reduce((sum, t) => {
-            if (!t.amount_pence || !t.shift_days) return sum;
+            if (!t.amount || !t.shift_days) return sum;
             const annualRate =
-              (t.fee_pence / t.amount_pence) * (365 / t.shift_days);
+              (t.fee / t.amount) * (365 / t.shift_days);
             return sum + annualRate * 10000; // convert to bps
           }, 0) / allTrades.length,
         )
@@ -80,10 +89,10 @@ export default async function LenderHomePage() {
         initialPot={
           pot
             ? {
-                available_pence: pot.available_pence,
-                locked_pence: pot.locked_pence,
-                total_deployed_pence: pot.total_deployed_pence,
-                realized_yield_pence: pot.realized_yield_pence,
+                available_pence: Math.round(Number(pot.available) * 100),
+                locked_pence: Math.round(Number(pot.locked) * 100),
+                total_deployed_pence: Math.round(Number(pot.total_deployed) * 100),
+                realized_yield_pence: Math.round(Number(pot.realized_yield) * 100),
               }
             : null
         }

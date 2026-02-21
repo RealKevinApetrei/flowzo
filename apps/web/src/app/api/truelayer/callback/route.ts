@@ -31,15 +31,17 @@ export async function GET(request: Request) {
     // Exchange code for tokens
     const tokens = await exchangeCode(code);
 
-    // Store bank connection in database
+    // Store bank connection in database (truelayer_token is a jsonb column)
     const { error } = await supabase.from("bank_connections").insert({
       user_id: user.id,
       provider: "truelayer",
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token,
-      token_expires_at: new Date(
-        Date.now() + tokens.expires_in * 1000,
-      ).toISOString(),
+      truelayer_token: {
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+        expires_at: new Date(
+          Date.now() + tokens.expires_in * 1000,
+        ).toISOString(),
+      },
       status: "active",
     });
 

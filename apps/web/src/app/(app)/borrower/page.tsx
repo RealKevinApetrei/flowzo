@@ -77,7 +77,7 @@ export default async function BorrowerHomePage() {
   const proposals = activeProposals ?? [];
   const totalFlowzoFee = proposals
     .filter((p) => p.status === "ACCEPTED")
-    .reduce((sum, p) => sum + (p.payload?.estimated_fee ?? 0), 0);
+    .reduce((sum, p) => sum + (p.payload?.fee_pence ?? 0), 0);
   const billsShifted = proposals.filter((p) => p.status === "ACCEPTED").length;
 
   const totalWithout = estimatedOverdraftFees + estimatedFailedPayments;

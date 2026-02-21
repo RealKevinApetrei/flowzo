@@ -19,13 +19,13 @@ export const signupSchema = z
 export const createTradeSchema = z.object({
   obligation_id: z.string().uuid(),
   original_due_date: z.string().date(),
-  shifted_due_date: z.string().date(),
+  new_due_date: z.string().date(),
   amount_pence: z.number().int().positive(),
   fee_pence: z.number().int().nonnegative(),
 });
 
 export const lenderPreferencesSchema = z.object({
-  min_apr_bps: z.number().int().min(0).max(10000),
+  min_apr: z.number().min(0).max(100),
   max_shift_days: z.number().int().min(1).max(90),
   risk_bands: z.array(z.enum(["A", "B", "C"])).min(1),
   auto_match_enabled: z.boolean(),

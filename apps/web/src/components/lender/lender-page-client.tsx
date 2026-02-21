@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useCallback } from "react";
 import { useBubbleBoard } from "@/lib/hooks/use-bubble-board";
-import { toggleAutoMatch } from "@/lib/actions/lending";
+import { toggleAutoMatch, fundTrade } from "@/lib/actions/lending";
 import { AutoPopToggle } from "./auto-pop-toggle";
 import { LendingPotCard } from "./lending-pot-card";
 import { BubbleBoard } from "./bubble-board";
@@ -69,10 +69,14 @@ export function LenderPageClient({
 
   const handleFundTrade = useCallback(
     async (tradeId: string) => {
-      // In production this would call a server action to fund the trade.
-      // For now, close the modal and log.
-      console.log("Fund trade:", tradeId);
-      setSelectedTradeId(null);
+      startTransition(async () => {
+        try {
+          await fundTrade(tradeId);
+          setSelectedTradeId(null);
+        } catch (err) {
+          console.error("Failed to fund trade:", err);
+        }
+      });
     },
     [],
   );

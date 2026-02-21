@@ -61,6 +61,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
 
     if (!error && data) {
       // Map the database payload shape to our component shape
+      // Edge Function writes: shifted_date, amount_pence, fee_pence
       const mapped: Proposal[] = data.map((row) => ({
         id: row.id,
         type: row.type,
@@ -68,9 +69,9 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         payload: {
           obligation_name: row.payload.obligation_name,
           original_date: row.payload.original_date,
-          shifted_date: row.payload.suggested_date,
-          amount_pence: row.payload.amount,
-          fee_pence: row.payload.estimated_fee,
+          shifted_date: row.payload.shifted_date,
+          amount_pence: row.payload.amount_pence,
+          fee_pence: row.payload.fee_pence,
           shift_days: row.payload.shift_days,
         },
         explanation_text: row.explanation_text,
@@ -93,7 +94,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
       const formData = new FormData();
       formData.set("obligation_id", proposalId);
       formData.set("original_due_date", proposal.payload.original_date);
-      formData.set("shifted_due_date", proposal.payload.shifted_date);
+      formData.set("new_due_date", proposal.payload.shifted_date);
       formData.set("amount_pence", String(proposal.payload.amount_pence));
       formData.set("fee_pence", String(proposal.payload.fee_pence));
 

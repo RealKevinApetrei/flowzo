@@ -14,20 +14,21 @@ export async function createTrade(formData: FormData) {
   const input = createTradeSchema.parse({
     obligation_id: formData.get("obligation_id"),
     original_due_date: formData.get("original_due_date"),
-    shifted_due_date: formData.get("shifted_due_date"),
+    new_due_date: formData.get("new_due_date") ?? formData.get("shifted_due_date"),
     amount_pence: Number(formData.get("amount_pence")),
     fee_pence: Number(formData.get("fee_pence")),
   });
 
+  // DB stores GBP decimal, frontend sends pence — convert at boundary
   const { data, error } = await supabase
     .from("trades")
     .insert({
       borrower_id: user.id,
       obligation_id: input.obligation_id,
       original_due_date: input.original_due_date,
-      shifted_due_date: input.shifted_due_date,
-      amount_pence: input.amount_pence,
-      fee_pence: input.fee_pence,
+      new_due_date: input.new_due_date,
+      amount: input.amount_pence / 100,
+      fee: input.fee_pence / 100,
       status: "DRAFT",
     })
     .select()
