@@ -111,12 +111,12 @@ export default async function OnboardingPage({
               {params.error === "storage_failed" && "Failed to save your connection. Please try again."}
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Link
+              <a
                 href="/api/truelayer/auth"
                 className="text-sm font-semibold bg-coral text-white px-5 py-2 rounded-full hover:bg-coral-dark transition-colors"
               >
                 Try Again
-              </Link>
+              </a>
               <Link
                 href="/borrower"
                 className="text-sm font-medium text-text-muted hover:text-text-secondary transition-colors"
