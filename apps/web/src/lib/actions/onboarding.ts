@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { buildAuthUrl } from "@/lib/truelayer/auth";
 
@@ -12,6 +13,12 @@ export async function startBankConnection() {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  // Derive origin from the incoming request headers
+  const headersList = await headers();
+  const host = headersList.get("host") ?? "localhost:3000";
+  const proto = headersList.get("x-forwarded-proto") ?? "http";
+  const origin = `${proto}://${host}`;
+
   // Generate state token for CSRF protection
   const state = crypto.randomUUID();
 
@@ -20,7 +27,7 @@ export async function startBankConnection() {
     data: { truelayer_state: state },
   });
 
-  const authUrl = buildAuthUrl(state);
+  const authUrl = buildAuthUrl(state, origin);
   redirect(authUrl);
 }
 
