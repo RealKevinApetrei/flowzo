@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeCode } from "@/lib/truelayer/auth";
+
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -65,50 +68,60 @@ export async function GET(request: Request) {
       data: { truelayer_state: null },
     });
 
-    // Store sync_pending flag so borrower page can show loading state
+    // Mark as syncing
     await supabase
       .from("bank_connections")
       .update({ status: "syncing" })
       .eq("id", connection.id);
 
-    // Fire pipeline — await the call to ensure it reaches the server,
-    // but don't block the redirect on the full pipeline completing.
-    // The pipeline route itself handles the 3-step orchestration.
+    // Run pipeline directly using admin client (avoids cookie/auth issues on serverless)
+    const admin = createAdminClient();
     try {
-      // Forward cookies so the pipeline route can authenticate the user
-      const cookieHeader = request.headers.get("cookie") ?? "";
-      const pipelineRes = await fetch(`${origin}/api/pipeline/run`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          cookie: cookieHeader,
-        },
-        body: JSON.stringify({
-          user_id: user.id,
-          connection_id: connection.id,
-        }),
+      // Step 1: Sync banking data
+      const { error: syncError } = await admin.functions.invoke("sync-banking-data", {
+        body: { user_id: user.id, connection_id: connection.id },
       });
 
-      if (!pipelineRes.ok) {
-        console.error("Pipeline returned error:", pipelineRes.status);
-        // Mark connection as needing retry
-        await supabase
-          .from("bank_connections")
-          .update({ status: "sync_failed" })
-          .eq("id", connection.id);
-      } else {
-        // Pipeline succeeded — mark active
-        await supabase
-          .from("bank_connections")
-          .update({ status: "active" })
-          .eq("id", connection.id);
+      if (syncError) {
+        console.error("Pipeline sync-banking-data failed:", syncError.message);
+        await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
+        return NextResponse.redirect(`${origin}/borrower`);
       }
+
+      // Step 1.5: Compute borrower features (non-blocking)
+      const { error: featError } = await admin.functions.invoke("compute-borrower-features", {
+        body: { user_id: user.id },
+      });
+      if (featError) {
+        console.warn("Feature computation failed (continuing):", featError.message);
+      }
+
+      // Step 2: Run forecast
+      const { error: forecastError } = await admin.functions.invoke("run-forecast", {
+        body: { user_id: user.id },
+      });
+
+      if (forecastError) {
+        console.error("Pipeline run-forecast failed:", forecastError.message);
+        await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
+        return NextResponse.redirect(`${origin}/borrower`);
+      }
+
+      // Step 3: Generate proposals
+      const { error: proposalsError } = await admin.functions.invoke("generate-proposals", {
+        body: { user_id: user.id },
+      });
+
+      if (proposalsError) {
+        console.error("Pipeline generate-proposals failed:", proposalsError.message);
+        // Still mark active — sync + forecast succeeded
+      }
+
+      // Pipeline succeeded
+      await admin.from("bank_connections").update({ status: "active" }).eq("id", connection.id);
     } catch (err) {
       console.error("Pipeline call failed:", err);
-      await supabase
-        .from("bank_connections")
-        .update({ status: "sync_failed" })
-        .eq("id", connection.id);
+      await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
     }
 
     return NextResponse.redirect(`${origin}/borrower`);
