@@ -218,7 +218,8 @@ serve(async (req: Request) => {
 
       // Confidence bands — absolute uncertainty that grows with time
       // Near term (0-13 days): ±£3/day; further out (14-29 days): ±£6/day
-      const absoluteUncertainty = dayOffset < 14 ? dayOffset * 3 : dayOffset * 6;
+      const absoluteUncertainty =
+        dayOffset < 14 ? dayOffset * 3 : 13 * 3 + (dayOffset - 13) * 6;
       const confidenceLow =
         Math.round((runningBalance - absoluteUncertainty) * 100) / 100;
       const confidenceHigh =
@@ -275,10 +276,17 @@ serve(async (req: Request) => {
     }
 
     // 7. Update snapshot danger count -----------------------------------
-    await supabase
+    const { error: snapUpdateErr } = await supabase
       .from("forecast_snapshots")
-      .update({ danger_days_count: dangerDaysCount, recommended_loan_amount: recommendedLoanAmount, completed_at: new Date().toISOString() })
+      .update({
+        danger_days_count: dangerDaysCount,
+        recommended_loan_amount: recommendedLoanAmount,
+        completed_at: new Date().toISOString(),
+      })
       .eq("id", runId);
+    if (snapUpdateErr) {
+      console.error("Failed to update forecast snapshot:", snapUpdateErr);
+    }
 
     // 8. Return forecast ------------------------------------------------
     return new Response(
