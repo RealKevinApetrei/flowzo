@@ -189,6 +189,7 @@ serve(async (req: Request) => {
     today.setHours(0, 0, 0, 0);
     let runningBalance = currentBalance;
     let dangerDaysCount = 0;
+    let minimumProjectedBalance = currentBalance;
     const forecastRows: Record<string, unknown>[] = [];
 
     for (let dayOffset = 0; dayOffset < FORECAST_DAYS; dayOffset++) {
@@ -210,13 +211,18 @@ serve(async (req: Request) => {
       runningBalance =
         runningBalance - dailyOutgoings + incomeExpected;
 
-      // Confidence bands
-      // Near term (0-13 days): +/- 10%; further out (14-29 days): +/- 25%
-      const uncertaintyPct = dayOffset < 14 ? 0.1 : 0.25;
+      // Track the deepest trough for loan recommendation
+      if (runningBalance < minimumProjectedBalance) {
+        minimumProjectedBalance = runningBalance;
+      }
+
+      // Confidence bands — absolute uncertainty that grows with time
+      // Near term (0-13 days): ±£3/day; further out (14-29 days): ±£6/day
+      const absoluteUncertainty = dayOffset < 14 ? dayOffset * 3 : dayOffset * 6;
       const confidenceLow =
-        Math.round((runningBalance * (1 - uncertaintyPct)) * 100) / 100;
+        Math.round((runningBalance - absoluteUncertainty) * 100) / 100;
       const confidenceHigh =
-        Math.round((runningBalance * (1 + uncertaintyPct)) * 100) / 100;
+        Math.round((runningBalance + absoluteUncertainty) * 100) / 100;
 
       // Danger flag: balance below 0 or below overdraft buffer
       const isDanger = runningBalance < OVERDRAFT_BUFFER;
@@ -235,6 +241,12 @@ serve(async (req: Request) => {
         run_id: runId,
       });
     }
+
+    // 5b. Calculate recommended loan amount ------------------------------
+    const recommendedLoanAmount =
+      minimumProjectedBalance < OVERDRAFT_BUFFER
+        ? Math.ceil(OVERDRAFT_BUFFER - minimumProjectedBalance)
+        : 0;
 
     // 6. Store forecast rows --------------------------------------------
     // Delete previous forecasts for this user first
@@ -265,7 +277,7 @@ serve(async (req: Request) => {
     // 7. Update snapshot danger count -----------------------------------
     await supabase
       .from("forecast_snapshots")
-      .update({ danger_days_count: dangerDaysCount, completed_at: new Date().toISOString() })
+      .update({ danger_days_count: dangerDaysCount, recommended_loan_amount: recommendedLoanAmount, completed_at: new Date().toISOString() })
       .eq("id", runId);
 
     // 8. Return forecast ------------------------------------------------
@@ -278,6 +290,7 @@ serve(async (req: Request) => {
         danger_days: dangerDaysCount,
         daily_income_estimate: Math.round(dailyIncome * 100) / 100,
         obligations_count: (obligations ?? []).length,
+        recommended_loan_amount: recommendedLoanAmount,
         forecast: forecastRows,
       }),
       {
