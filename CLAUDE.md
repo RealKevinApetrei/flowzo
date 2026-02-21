@@ -138,3 +138,4 @@ pnpm dev
 source apps/web/.env.local && npx tsx scripts/seed.ts
 ```
 Demo user credentials: `borrower-001@flowzo-demo.test` / `FlowzoDemo2026!`
+# worktree note
