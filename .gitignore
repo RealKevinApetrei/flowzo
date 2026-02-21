@@ -40,3 +40,13 @@ test-results/
 # Vercel
 .vercel/
 .vercel
+
+
+# Raw data — too large for git, obtain separately
+*.csv
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
