@@ -89,22 +89,35 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
                     ──► Member D (needs working demo for script + video)
 ```
 
-## Pipeline Status (Member A — Updated 2026-02-21)
+## Pipeline Status (Member A — Updated 2026-02-21 16:30)
 
-### P0 Complete
+### P0 Complete — All Critical Path DONE
 - [x] Migration 013 applied (RLS bubble board, obligations constraint, forecast_snapshots.completed_at)
-- [x] All 6 Edge Functions deployed and ACTIVE
-- [x] Pipeline orchestration route: `/api/pipeline/run` (sync → forecast → proposals)
+- [x] All 6 Edge Functions deployed and ACTIVE (sync, forecast, proposals, match, settle, explain)
+- [x] Pipeline orchestration: `/api/pipeline/run` chains sync → forecast → proposals
+- [x] TrueLayer sandbox working: `uk-cs-mock` provider, dynamic redirect URI from request origin
 - [x] TrueLayer callback fires pipeline async, redirects to `/borrower`
 - [x] Auto-match wired in `submitTrade()` — invokes `match-trade` Edge Function
 - [x] Cron routes: `/api/cron/forecast` (6am UTC), `/api/cron/settlement` (7am UTC)
 - [x] Seed data: ~425 users, ~1,050 trades, ~500 proposals in DB
-- [x] TrueLayer redirect URI fix: derive from request origin (works on localhost + Vercel)
+- [x] Edge Function secrets: TRUELAYER_ENV, CLIENT_ID, CLIENT_SECRET set
+- [x] Token refresh: sync-banking-data retries with refreshed token on 401
+- [x] Build: Fixed missing `@radix-ui/react-slider` dependency
+
+### TrueLayer Sandbox Notes
+- Sandbox Mock bank only accepts credentials: **john** / **doe**
+- Random credentials will hang on "connecting..." — this is TrueLayer's expected behavior
+- Vercel redirect URI must be registered in TrueLayer Console: `https://<domain>/api/truelayer/callback`
+- Production: set `TRUELAYER_ENV=production` to switch to real banks (uk-ob-all uk-oauth-all)
 
 ### Known Issues / Tech Debt
-- `fundTrade()` in `lib/actions/lending.ts` bypasses `update_lending_pot()` RPC — manipulates pot columns directly
+- `fundTrade()` in `lib/actions/lending.ts` bypasses `update_lending_pot()` RPC — manipulates pot columns directly (race condition risk)
 - `ShiftProposalPayload` type mismatch between Edge Function fields and shared types
-- `sonner` package missing from `apps/web` (Member C needs to install)
+
+### Team Unblock Status
+- **Member B (Data Science):** UNBLOCKED — seed data in DB, pipeline works, can start backtest/EDA pages
+- **Member C (Frontend):** DONE — all UI complete, build passes
+- **Member D (Infra/Pitch):** UNBLOCKED — working demo exists, can write demo script + pitch deck
 
 ### Handoff Reminders
 **Always** create/update handoff docs when completing pipeline work:
