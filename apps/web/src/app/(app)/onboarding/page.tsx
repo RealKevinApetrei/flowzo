@@ -102,11 +102,38 @@ export default async function OnboardingPage({
           </div>
         )}
         {params.error && (
-          <div className="bg-danger/10 text-danger px-4 py-3 rounded-xl text-sm font-medium text-center">
-            {params.error === "no_code" && "Bank connection was cancelled."}
-            {params.error === "invalid_state" && "Security check failed. Please try again."}
-            {params.error === "token_exchange_failed" && "Failed to connect bank. Please try again."}
-            {params.error === "storage_failed" && "Failed to save connection. Please try again."}
+          <div className="bg-danger/10 border border-danger/20 px-4 py-4 rounded-xl text-center space-y-3">
+            <p className="text-sm font-semibold text-danger">Connection failed</p>
+            <p className="text-xs text-text-secondary">
+              {params.error === "no_code" && "Bank connection was cancelled. You can try again."}
+              {params.error === "invalid_state" && "Security check failed. Please try again."}
+              {params.error === "token_exchange_failed" && "Failed to connect to your bank. This can happen with sandbox credentials — please try again."}
+              {params.error === "storage_failed" && "Failed to save your connection. Please try again."}
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <Link
+                href="/api/truelayer/auth"
+                className="text-sm font-semibold bg-coral text-white px-5 py-2 rounded-full hover:bg-coral-dark transition-colors"
+              >
+                Try Again
+              </Link>
+              <Link
+                href="/borrower"
+                className="text-sm font-medium text-text-muted hover:text-text-secondary transition-colors"
+              >
+                Skip for now
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* Sandbox credential hint */}
+        {!hasConnection && process.env.NEXT_PUBLIC_TRUELAYER_ENV !== "production" && (
+          <div className="bg-warning/10 border border-warning/20 px-4 py-3 rounded-xl text-center">
+            <p className="text-xs font-semibold text-warning">Demo mode</p>
+            <p className="text-xs text-text-secondary mt-1">
+              Use credentials <span className="font-mono font-bold text-navy">john</span> / <span className="font-mono font-bold text-navy">doe</span> at the mock bank
+            </p>
           </div>
         )}
 

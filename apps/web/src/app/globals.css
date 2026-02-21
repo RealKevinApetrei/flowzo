@@ -151,16 +151,6 @@ body {
   border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
-/* Charging ring animation for long-press */
-@keyframes charge-fill {
-  from {
-    stroke-dashoffset: var(--circumference);
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
 /* ========================
    MOBILE TOUCH
    ======================== */

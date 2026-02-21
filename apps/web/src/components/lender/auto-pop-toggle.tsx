@@ -3,25 +3,37 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { formatCurrency } from "@flowzo/shared";
 
 interface AutoPopToggleProps {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
-  avgAprBps: number;
-  monthlyYieldPence: number;
 }
 
-function bpsToPercent(bps: number): string {
-  return (bps / 100).toFixed(2) + "%";
+function SparkleIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M12 3l1.912 5.813a2 2 0 001.275 1.275L21 12l-5.813 1.912a2 2 0 00-1.275 1.275L12 21l-1.912-5.813a2 2 0 00-1.275-1.275L3 12l5.813-1.912a2 2 0 001.275-1.275L12 3z" />
+    </svg>
+  );
 }
 
-export function AutoPopToggle({
-  enabled,
-  onToggle,
-  avgAprBps,
-  monthlyYieldPence,
-}: AutoPopToggleProps) {
+function ZapIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+    </svg>
+  );
+}
+
+function MoonIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+    </svg>
+  );
+}
+
+export function AutoPopToggle({ enabled, onToggle }: AutoPopToggleProps) {
   const [justEnabled, setJustEnabled] = useState(false);
 
   useEffect(() => {
@@ -39,9 +51,7 @@ export function AutoPopToggle({
   return (
     <Card
       className={`transition-all duration-300 ${
-        enabled
-          ? "ring-2 ring-coral/30 shadow-md"
-          : ""
+        enabled ? "ring-2 ring-coral/30 shadow-md" : ""
       }`}
     >
       <CardContent className="p-5">
@@ -53,20 +63,18 @@ export function AutoPopToggle({
                 enabled ? "bg-coral/10" : "bg-warm-grey"
               }`}
             >
-              <span
-                className={`text-xl transition-transform duration-300 ${
-                  justEnabled ? "animate-bounce" : ""
-                }`}
-                role="img"
-                aria-label="Auto-pop"
-              >
-                {justEnabled ? "✨" : enabled ? "🍿" : "💤"}
-              </span>
+              {justEnabled ? (
+                <SparkleIcon className="w-5 h-5 text-coral animate-bounce" />
+              ) : enabled ? (
+                <ZapIcon className="w-5 h-5 text-coral" />
+              ) : (
+                <MoonIcon className="w-5 h-5 text-text-muted" />
+              )}
             </div>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="font-bold text-navy">Auto-Pop</h3>
+                <h3 className="font-bold text-navy">Auto-match</h3>
                 {enabled && (
                   <span
                     className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold rounded-full bg-coral/10 text-coral transition-opacity duration-300 ${
@@ -79,10 +87,8 @@ export function AutoPopToggle({
               </div>
               <p className="text-xs text-text-secondary mt-0.5 leading-snug">
                 {enabled
-                  ? avgAprBps > 0
-                    ? `Earning at ~${bpsToPercent(avgAprBps)} APR passively`
-                    : "Bubbles will pop automatically!"
-                  : "Pop bubbles to earn yield"}
+                  ? "Trades matching your APY preference will be auto-funded"
+                  : "Enable to automatically fund matching trades"}
               </p>
             </div>
           </div>
@@ -94,31 +100,6 @@ export function AutoPopToggle({
             className="shrink-0"
           />
         </div>
-
-        {/* Contextual description */}
-        {enabled ? (
-          <div className="mt-3 space-y-2">
-            {monthlyYieldPence > 0 && (
-              <div className="flex items-center justify-between text-sm bg-success/5 border border-success/15 rounded-lg px-3 py-2">
-                <span className="text-text-secondary">Est. monthly return</span>
-                <span className="font-bold text-success">
-                  {formatCurrency(monthlyYieldPence)}
-                </span>
-              </div>
-            )}
-            <p className="text-xs text-text-muted leading-relaxed">
-              Flowzo automatically fills trades that match your preferences —
-              sit back and earn
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <p className="text-xs text-text-muted leading-relaxed">
-              Long-press trade bubbles to fund them manually, or enable
-              Auto-Pop to match trades automatically
-            </p>
-          </div>
-        )}
 
         {/* Pulse bar when active */}
         {enabled && (

@@ -68,7 +68,7 @@ export default async function TradeDetailPage({
   const isFailed = status === "DEFAULTED" || status === "CANCELLED";
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg sm:max-w-2xl mx-auto">
       <TopBar title="Trade Details" showBack backHref="/borrower" />
 
       <div className="px-4 py-6 space-y-6">

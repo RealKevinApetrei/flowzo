@@ -1,6 +1,6 @@
 export default function AppLoading() {
   return (
-    <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-lg sm:max-w-2xl mx-auto px-4 py-6 space-y-6">
       {/* TopBar skeleton */}
       <div className="h-8 w-32 bg-warm-grey rounded-lg animate-pulse" />
       {/* Content skeletons */}

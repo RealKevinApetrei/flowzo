@@ -4,8 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const tabs = [
-  { label: "Home", href: "/borrower" as const },
+  { label: "Bills", href: "/borrower" as const },
   { label: "Lending", href: "/lender" as const },
+  { label: "Data", href: "/data" as const },
   { label: "Settings", href: "/settings" as const },
 ] as const;
 
@@ -28,6 +29,16 @@ function CoinsIcon({ className }: { className?: string }) {
   );
 }
 
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M18 20V10" />
+      <path d="M12 20V4" />
+      <path d="M6 20v-6" />
+    </svg>
+  );
+}
+
 function GearIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
@@ -40,6 +51,7 @@ function GearIcon({ className }: { className?: string }) {
 const iconMap: Record<string, React.FC<{ className?: string }>> = {
   "/borrower": HomeIcon,
   "/lender": CoinsIcon,
+  "/data": ChartIcon,
   "/settings": GearIcon,
 };
 
@@ -48,7 +60,7 @@ export function BottomNav() {
 
   return (
     <nav aria-label="Main navigation" className="fixed bottom-0 left-0 right-0 bg-[var(--card-surface)] border-t border-cool-grey pb-safe z-50">
-      <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
+      <div className="flex items-center justify-around h-16 max-w-lg sm:max-w-2xl mx-auto">
         {tabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href);
           const Icon = iconMap[tab.href];
@@ -57,7 +69,7 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               aria-current={isActive ? "page" : undefined}
-              className={`flex flex-col items-center gap-1 px-4 py-2 text-xs font-medium transition-colors ${
+              className={`flex flex-col items-center gap-1 px-3 py-2 text-xs font-medium transition-colors ${
                 isActive ? "text-coral" : "text-text-muted hover:text-navy"
               }`}
             >

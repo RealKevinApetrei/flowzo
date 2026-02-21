@@ -1,8 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
 import { SuggestionFeed } from "@/components/borrower/suggestion-feed";
 import { DangerSummary } from "@/components/borrower/danger-summary";
+import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -65,9 +67,10 @@ export default async function BorrowerHomePage() {
   }));
 
   const dangerCount = forecasts.filter((f) => f.is_danger).length;
+  const hasData = forecasts.length > 0;
 
   return (
-    <div className="max-w-lg mx-auto">
+    <div className="max-w-lg sm:max-w-2xl mx-auto">
       <TopBar title="Flowzo" />
 
       <div className="px-4 py-6 space-y-6">
@@ -81,10 +84,38 @@ export default async function BorrowerHomePage() {
           </p>
         </div>
 
+        <FirstVisitBanner
+          storageKey="flowzo-bills-intro-seen"
+          message="This is where you manage your bills and see your cash forecast."
+        />
+
+        {/* Connect bank banner -- shown when no data */}
+        {!hasData && (
+          <div className="rounded-2xl bg-coral/5 border border-coral/20 p-5 text-center space-y-3">
+            <div className="w-12 h-12 bg-coral/10 rounded-full flex items-center justify-center mx-auto">
+              <svg className="w-6 h-6 text-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+              </svg>
+            </div>
+            <h3 className="text-base font-bold text-navy">Connect your bank to get started</h3>
+            <p className="text-sm text-text-secondary">
+              We need your transaction data to forecast your cash flow and suggest bill shifts.
+            </p>
+            <Link
+              href="/onboarding"
+              className="inline-block bg-coral text-white font-semibold px-6 py-2.5 rounded-full text-sm hover:bg-coral-dark transition-colors active:scale-95"
+            >
+              Connect Bank
+            </Link>
+          </div>
+        )}
+
         {/* Danger Summary -- collapsible, expands to full heatmap */}
-        <section>
-          <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
-        </section>
+        {hasData && (
+          <section>
+            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
+          </section>
+        )}
 
         {/* AI Suggestions -- primary actionable content */}
         <section>
