@@ -64,10 +64,19 @@ export function SettingsClient({
     lenderPrefs?.auto_match_enabled ?? false,
   );
 
-  // Notification preferences (UI only — no backend wiring)
-  const [notifTradeUpdates, setNotifTradeUpdates] = useState(true);
-  const [notifForecastAlerts, setNotifForecastAlerts] = useState(true);
-  const [notifEmailDigest, setNotifEmailDigest] = useState(false);
+  // Notification preferences — persisted to localStorage
+  const [notifTradeUpdates, setNotifTradeUpdates] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("flowzo-notif-trade") !== "false";
+  });
+  const [notifForecastAlerts, setNotifForecastAlerts] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem("flowzo-notif-forecast") !== "false";
+  });
+  const [notifEmailDigest, setNotifEmailDigest] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("flowzo-notif-digest") === "true";
+  });
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -201,6 +210,7 @@ export function SettingsClient({
               checked={notifTradeUpdates}
               onCheckedChange={(checked) => {
                 setNotifTradeUpdates(checked);
+                localStorage.setItem("flowzo-notif-trade", String(checked));
                 toast(checked ? "Trade updates enabled" : "Trade updates disabled");
               }}
             />
@@ -216,6 +226,7 @@ export function SettingsClient({
               checked={notifForecastAlerts}
               onCheckedChange={(checked) => {
                 setNotifForecastAlerts(checked);
+                localStorage.setItem("flowzo-notif-forecast", String(checked));
                 toast(checked ? "Forecast alerts enabled" : "Forecast alerts disabled");
               }}
             />
@@ -231,6 +242,7 @@ export function SettingsClient({
               checked={notifEmailDigest}
               onCheckedChange={(checked) => {
                 setNotifEmailDigest(checked);
+                localStorage.setItem("flowzo-notif-digest", String(checked));
                 toast(checked ? "Email digest enabled" : "Email digest disabled");
               }}
             />
@@ -442,7 +454,7 @@ export function SettingsClient({
               </p>
             </div>
             <span className="text-sm font-medium text-coral capitalize">
-              {rolePreference}
+              {rolePreference === "borrower" ? "Borrower" : rolePreference === "lender" ? "Lender" : rolePreference === "both" ? "Both" : rolePreference}
             </span>
           </div>
           <div className="flex items-center justify-between">

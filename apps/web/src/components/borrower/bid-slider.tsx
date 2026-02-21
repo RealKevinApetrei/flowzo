@@ -90,13 +90,14 @@ export function BidSlider({ trade, onSubmit, onChange }: BidSliderProps) {
             setFeePence(val);
             onChange?.(val);
           }}
+          aria-label="Fee amount"
           className="absolute inset-0 w-full h-2 opacity-0 cursor-pointer"
           style={{ top: "0" }}
         />
 
         {/* Custom thumb indicator */}
         <div
-          className="absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border-3 border-coral shadow-md transition-all duration-150 pointer-events-none"
+          className="absolute top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-white border-[3px] border-coral shadow-md transition-all duration-150 pointer-events-none"
           style={{ left: `calc(${currentPercent}% - 12px)`, marginTop: "0px" }}
         />
       </div>

@@ -142,11 +142,8 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     }
   }
 
-  function handleCustomise(proposalId: string) {
-    const proposal = proposals.find((p) => p.id === proposalId);
-    if (!proposal) return;
-    // Navigate to a customisation flow (trade creation page)
-    router.push(`/borrower/trades/new?proposal=${proposalId}`);
+  function handleCustomise(_proposalId: string) {
+    toast("Custom fee coming soon — use the Accept button for now");
   }
 
   if (loading) {
