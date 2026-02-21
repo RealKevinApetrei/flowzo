@@ -135,7 +135,7 @@ export default async function BorrowerHomePage() {
           </div>
         )}
 
-        {/* Danger Summary -- collapsible, expands to full heatmap */}
+        {/* Danger Summary + Calendar */}
         {hasData && (
           <section>
             <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
