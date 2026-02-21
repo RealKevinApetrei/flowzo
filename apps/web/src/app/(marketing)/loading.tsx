@@ -1,6 +1,6 @@
 export default function MarketingLoading() {
   return (
-    <div className="min-h-screen bg-soft-white px-6 py-12">
+    <div className="min-h-screen bg-background px-6 py-12">
       <div className="max-w-3xl mx-auto space-y-6">
         <div className="h-8 w-48 bg-warm-grey rounded-lg animate-pulse" />
         <div className="space-y-3">

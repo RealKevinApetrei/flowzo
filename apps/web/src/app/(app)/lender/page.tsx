@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { TopBar } from "@/components/layout/top-bar";
 import { LenderPageClient } from "@/components/lender/lender-page-client";
 
 export default async function LenderHomePage() {
@@ -84,7 +83,6 @@ export default async function LenderHomePage() {
 
   return (
     <>
-      <TopBar title="Lending" />
       <LenderPageClient
         initialPot={
           pot

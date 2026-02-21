@@ -66,49 +66,44 @@ export async function fundTrade(tradeId: string) {
     throw new Error("Trade not found or not available for funding");
   }
 
-  // Check lender has sufficient funds in their pot
-  const { data: pot } = await supabase
-    .from("lending_pots")
-    .select("available")
-    .eq("user_id", user.id)
+  // Create allocation
+  const { data: allocation, error: allocErr } = await supabase
+    .from("allocations")
+    .insert({
+      trade_id: tradeId,
+      lender_id: user.id,
+      amount_slice: trade.amount,
+      fee_slice: trade.fee,
+      status: "RESERVED",
+    })
+    .select("id")
     .single();
 
-  const available = Number(pot?.available ?? 0);
-  const tradeAmount = Number(trade.amount);
-
-  if (available < tradeAmount) {
-    throw new Error("Insufficient funds in lending pot");
+  if (allocErr || !allocation) {
+    throw new Error(`Failed to create allocation: ${allocErr?.message}`);
   }
 
-  // Create allocation
-  const { error: allocErr } = await supabase.from("allocations").insert({
-    trade_id: tradeId,
-    lender_id: user.id,
-    amount_slice: trade.amount,
-    fee_slice: trade.fee,
-    status: "RESERVED",
+  // Reserve funds atomically via RPC (row-level lock + ledger entry)
+  const { error: potErr } = await supabase.rpc("update_lending_pot", {
+    p_user_id: user.id,
+    p_entry_type: "RESERVE",
+    p_amount: Number(trade.amount),
+    p_trade_id: tradeId,
+    p_allocation_id: allocation.id,
+    p_description: `Fund trade ${tradeId}`,
   });
 
-  if (allocErr) throw new Error(`Failed to create allocation: ${allocErr.message}`);
+  if (potErr) {
+    // Rollback allocation if pot update fails
+    await supabase.from("allocations").delete().eq("id", allocation.id);
+    throw new Error(`Insufficient funds or pot error: ${potErr.message}`);
+  }
 
   // Update trade status to MATCHED
   const { error: updateErr } = await supabase
     .from("trades")
-    .update({ status: "MATCHED" })
+    .update({ status: "MATCHED", matched_at: new Date().toISOString() })
     .eq("id", tradeId);
 
   if (updateErr) throw new Error(`Failed to update trade: ${updateErr.message}`);
-
-  // Update lending pot: move funds from available to locked
-  const { error: potErr } = await supabase
-    .from("lending_pots")
-    .update({
-      available: available - tradeAmount,
-      locked: Number(pot?.available ?? 0) > 0 ? tradeAmount : 0,
-    })
-    .eq("user_id", user.id);
-
-  if (potErr) {
-    console.error("Failed to update lending pot:", potErr);
-  }
 }

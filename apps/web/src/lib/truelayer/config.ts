@@ -10,6 +10,14 @@ export const TRUELAYER_CONFIG = {
     : "https://api.truelayer.com",
   clientId: process.env.TRUELAYER_CLIENT_ID ?? "",
   clientSecret: process.env.TRUELAYER_CLIENT_SECRET ?? "",
-  redirectUri: `${process.env.NEXT_PUBLIC_APP_URL}/api/truelayer/callback`,
   scopes: ["info", "accounts", "balance", "transactions", "offline_access"],
+  providers: isSandbox
+    ? "uk-cs-mock"
+    : "uk-ob-all uk-oauth-all",
 } as const;
+
+/** Build the redirect URI from the request origin so it always matches
+ *  the actual URL the user is visiting (localhost, Vercel preview, prod). */
+export function getRedirectUri(origin: string): string {
+  return `${origin}/api/truelayer/callback`;
+}

@@ -55,6 +55,17 @@ export async function submitTrade(tradeId: string) {
     .eq("status", "DRAFT");
 
   if (error) throw new Error(`Failed to submit trade: ${error.message}`);
+
+  // Auto-match: invoke match-trade Edge Function
+  // If no eligible lenders, trade stays PENDING_MATCH on the bubble board
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+  const { error: matchError } = await admin.functions.invoke("match-trade", {
+    body: { trade_id: tradeId },
+  });
+  if (matchError) {
+    console.error("Auto-match failed (trade still PENDING_MATCH):", matchError);
+  }
 }
 
 export async function cancelTrade(tradeId: string) {

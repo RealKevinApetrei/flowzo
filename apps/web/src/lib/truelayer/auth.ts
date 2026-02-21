@@ -1,19 +1,22 @@
-import { TRUELAYER_CONFIG } from "./config";
+import { TRUELAYER_CONFIG, getRedirectUri } from "./config";
 
-export function buildAuthUrl(state: string): string {
+export function buildAuthUrl(state: string, origin: string): string {
   const params = new URLSearchParams({
     response_type: "code",
     client_id: TRUELAYER_CONFIG.clientId,
-    redirect_uri: TRUELAYER_CONFIG.redirectUri,
+    redirect_uri: getRedirectUri(origin),
     scope: TRUELAYER_CONFIG.scopes.join(" "),
     state,
-    providers: "uk-ob-all uk-oauth-all",
+    providers: TRUELAYER_CONFIG.providers,
   });
 
   return `${TRUELAYER_CONFIG.authUrl}/?${params.toString()}`;
 }
 
-export async function exchangeCode(code: string): Promise<{
+export async function exchangeCode(
+  code: string,
+  origin: string,
+): Promise<{
   access_token: string;
   refresh_token: string;
   expires_in: number;
@@ -25,7 +28,7 @@ export async function exchangeCode(code: string): Promise<{
       grant_type: "authorization_code",
       client_id: TRUELAYER_CONFIG.clientId,
       client_secret: TRUELAYER_CONFIG.clientSecret,
-      redirect_uri: TRUELAYER_CONFIG.redirectUri,
+      redirect_uri: getRedirectUri(origin),
       code,
     }),
   });

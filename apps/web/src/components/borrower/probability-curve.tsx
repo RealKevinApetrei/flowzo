@@ -91,7 +91,7 @@ export function ProbabilityCurve({
         : "text-danger";
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm p-5">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-lg font-bold text-navy">Fill Probability</h2>
         <div className={`text-2xl font-extrabold ${probColor}`}>
@@ -133,7 +133,7 @@ export function ProbabilityCurve({
                   y1={y}
                   x2={padding.left + chartWidth}
                   y2={y}
-                  stroke="#F0F0F0"
+                  stroke="var(--warm-grey)"
                   strokeWidth={1}
                 />
                 <text
@@ -141,7 +141,7 @@ export function ProbabilityCurve({
                   y={y + 3}
                   textAnchor="end"
                   className="text-[8px]"
-                  fill="#9CA3AF"
+                  fill="var(--text-muted)"
                 >
                   {pct}%
                 </text>
@@ -189,7 +189,7 @@ export function ProbabilityCurve({
             y1={currentY}
             x2={currentX}
             y2={padding.top + chartHeight}
-            stroke="#1B1B3A"
+            stroke="var(--navy)"
             strokeWidth={2}
             opacity={0.8}
           />
@@ -199,7 +199,7 @@ export function ProbabilityCurve({
             cx={currentX}
             cy={currentY}
             r={5}
-            fill="#1B1B3A"
+            fill="var(--navy)"
             stroke="white"
             strokeWidth={2}
           />
@@ -210,7 +210,7 @@ export function ProbabilityCurve({
             y={padding.top + chartHeight + 16}
             textAnchor="start"
             className="text-[8px]"
-            fill="#9CA3AF"
+            fill="var(--text-muted)"
           >
             {formatCurrency(0)}
           </text>
@@ -219,7 +219,7 @@ export function ProbabilityCurve({
             y={padding.top + chartHeight + 16}
             textAnchor="end"
             className="text-[8px]"
-            fill="#9CA3AF"
+            fill="var(--text-muted)"
           >
             {formatCurrency(maxFee)}
           </text>
@@ -230,7 +230,7 @@ export function ProbabilityCurve({
             y1={padding.top + chartHeight}
             x2={padding.left + chartWidth}
             y2={padding.top + chartHeight}
-            stroke="#E5E5E5"
+            stroke="var(--cool-grey)"
             strokeWidth={1}
           />
         </svg>

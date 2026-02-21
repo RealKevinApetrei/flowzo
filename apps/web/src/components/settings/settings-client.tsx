@@ -5,7 +5,10 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
+import { useLenderSettings, BUBBLE_COLOR_PRESETS } from "@/lib/hooks/use-lender-settings";
+import type { HudPosition, FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
+import { Switch } from "@/components/ui/switch";
 
 interface SettingsClientProps {
   email: string;
@@ -30,6 +33,16 @@ export function SettingsClient({
   const supabase = useSupabase();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const {
+    hudPosition,
+    setHudPosition,
+    defaultFilterMode,
+    setDefaultFilterMode,
+    bubbleColorMode,
+    setBubbleColorMode,
+    unifiedColorHex,
+    setUnifiedColorHex,
+  } = useLenderSettings();
   const [signingOut, setSigningOut] = useState(false);
 
   // Notification preferences (UI only — no backend wiring)
@@ -135,23 +148,13 @@ export function SettingsClient({
                 Get notified when trades are matched or settled
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifTradeUpdates}
-              onClick={() => {
-                setNotifTradeUpdates(!notifTradeUpdates);
-                toast(notifTradeUpdates ? "Trade updates disabled" : "Trade updates enabled");
+            <Switch
+              checked={notifTradeUpdates}
+              onCheckedChange={(checked) => {
+                setNotifTradeUpdates(checked);
+                toast(checked ? "Trade updates enabled" : "Trade updates disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifTradeUpdates ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifTradeUpdates ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -160,23 +163,13 @@ export function SettingsClient({
                 Warn when upcoming bills may cause a shortfall
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifForecastAlerts}
-              onClick={() => {
-                setNotifForecastAlerts(!notifForecastAlerts);
-                toast(notifForecastAlerts ? "Forecast alerts disabled" : "Forecast alerts enabled");
+            <Switch
+              checked={notifForecastAlerts}
+              onCheckedChange={(checked) => {
+                setNotifForecastAlerts(checked);
+                toast(checked ? "Forecast alerts enabled" : "Forecast alerts disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifForecastAlerts ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifForecastAlerts ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -185,23 +178,13 @@ export function SettingsClient({
                 Summary of your activity and upcoming bills
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifEmailDigest}
-              onClick={() => {
-                setNotifEmailDigest(!notifEmailDigest);
-                toast(notifEmailDigest ? "Email digest disabled" : "Email digest enabled");
+            <Switch
+              checked={notifEmailDigest}
+              onCheckedChange={(checked) => {
+                setNotifEmailDigest(checked);
+                toast(checked ? "Email digest enabled" : "Email digest disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifEmailDigest ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifEmailDigest ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
         </section>
 
@@ -227,6 +210,98 @@ export function SettingsClient({
                 {option === "light" ? "☀️ Light" : option === "dark" ? "🌙 Dark" : "💻 System"}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Lender Display */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Lender Display
+          </h2>
+          <div>
+            <p className="font-medium text-navy mb-2">HUD Position</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
+              {(["top", "side", "hidden"] as const).map((pos) => (
+                <button
+                  key={pos}
+                  onClick={() => {
+                    setHudPosition(pos);
+                    toast(`HUD position set to ${pos}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    hudPosition === pos
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-medium text-navy mb-2">Default Filter Mode</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
+              {(["simple", "advanced"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setDefaultFilterMode(mode);
+                    toast(`Default filter mode set to ${mode}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    defaultFilterMode === mode
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-medium text-navy mb-2">Bubble Colors</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full mb-3">
+              {(["by-grade", "unified"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setBubbleColorMode(mode);
+                    toast(`Bubble colors set to ${mode === "by-grade" ? "by grade" : "unified"}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                    bubbleColorMode === mode
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {mode === "by-grade" ? "By Grade" : "Unified"}
+                </button>
+              ))}
+            </div>
+            {bubbleColorMode === "unified" && (
+              <div className="flex flex-wrap gap-2.5">
+                {BUBBLE_COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    onClick={() => {
+                      setUnifiedColorHex(preset.hex);
+                      toast(`Bubble color set to ${preset.name}`);
+                    }}
+                    className="relative w-10 h-10 rounded-full transition-transform hover:scale-110 active:scale-95"
+                    style={{ background: preset.hex }}
+                    aria-label={preset.name}
+                  >
+                    {unifiedColorHex === preset.hex && (
+                      <svg className="absolute inset-0 m-auto w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

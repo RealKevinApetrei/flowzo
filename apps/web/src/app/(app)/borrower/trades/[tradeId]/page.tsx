@@ -58,7 +58,7 @@ export default async function TradeDetailPage({
 
       <div className="px-4 py-6 space-y-6">
         {/* Trade header */}
-        <div className="rounded-2xl bg-white shadow-sm p-5">
+        <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-xl font-extrabold text-navy">
               {formatCurrency(amountPence)}
@@ -118,7 +118,7 @@ export default async function TradeDetailPage({
 
         {/* Matched / completed info */}
         {status === "MATCHED" && (
-          <div className="rounded-2xl bg-white shadow-sm p-5 text-center">
+          <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 text-center">
             <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -141,7 +141,7 @@ export default async function TradeDetailPage({
         )}
 
         {status === "REPAID" && (
-          <div className="rounded-2xl bg-white shadow-sm p-5 text-center">
+          <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 text-center">
             <div className="w-12 h-12 rounded-full bg-success/10 flex items-center justify-center mx-auto mb-3">
               <svg
                 xmlns="http://www.w3.org/2000/svg"

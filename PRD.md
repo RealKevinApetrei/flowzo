@@ -254,20 +254,20 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 
 **Branch prefix:** `feat/infra-*` or `feat/pitch-*`
 
-| Task | Priority | Est. |
-|---|---|---|
-| Connect GitHub repo to Vercel for auto-deploys | P0 | 15m |
-| Set up Vercel env vars for Preview + Development environments | P0 | 15m |
-| Set up GitHub Actions CI (lint + typecheck + build on every PR) | P0 | 1h |
-| Configure branch protection on `main` (require PR, require CI pass) | P0 | 15m |
-| Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h |
-| Write Playwright E2E test for: signup -> bank connect -> see forecast -> accept proposal | P2 | 2h |
-| Create detailed demo script (step-by-step walkthrough for judges, with fallback paths) | P0 | 1.5h |
-| Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h |
-| Write the "Best Use of Data" submission narrative (SIG-focused, quantitative language) | P0 | 2h |
-| Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h |
-| Record backup demo video (in case live demo fails on the day) | P1 | 1h |
-| Set up error monitoring (Sentry free tier) if time permits | P2 | 30m |
+| Task | Priority | Est. | Status |
+|---|---|---|---|
+| Connect GitHub repo to Vercel for auto-deploys | P0 | 15m | DONE |
+| Set up Vercel env vars for Preview + Development environments | P0 | 15m | DONE |
+| Set up GitHub Actions CI (lint + typecheck + build on every PR) | P0 | 1h | DONE |
+| Configure branch protection on `main` (require PR, require CI pass) | P0 | 15m | TODO |
+| Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h | TODO |
+| Write Playwright E2E test for: signup -> bank connect -> see forecast -> accept proposal | P2 | 2h | TODO |
+| Create detailed demo script (step-by-step walkthrough for judges, with fallback paths) | P0 | 1.5h | DONE |
+| Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h | DONE |
+| Write the "Best Use of Data" submission narrative (SIG-focused, quantitative language) | P0 | 2h | TODO |
+| Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h | TODO |
+| Record backup demo video (in case live demo fails on the day) | P1 | 1h | TODO |
+| Set up error monitoring (Sentry free tier) if time permits | P2 | 30m | TODO |
 
 **Deliverable:** Working CI/CD, branch protection, test coverage on critical business logic, a compelling pitch deck, polished demo script, and the winning "Best Use of Data" narrative.
 

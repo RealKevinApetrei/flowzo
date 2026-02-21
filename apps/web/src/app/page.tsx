@@ -8,7 +8,7 @@ export default async function LandingPage() {
   } = await supabase.auth.getUser();
 
   return (
-    <div className="min-h-screen bg-soft-white font-sans">
+    <div className="min-h-screen bg-background font-sans">
       {/* Header */}
       <header className="px-6 py-4 flex items-center justify-between max-w-6xl mx-auto">
         <span className="text-2xl font-bold text-navy">Flowzo</span>

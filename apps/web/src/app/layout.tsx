@@ -7,6 +7,7 @@ import "./globals.css";
 const inter = Inter({
   subsets: ["latin"],
   variable: "--font-inter",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -43,6 +44,7 @@ export default function RootLayout({
               style: {
                 borderRadius: "9999px",
                 fontFamily: "var(--font-sans)",
+                textAlign: "center" as const,
               },
             }}
           />
