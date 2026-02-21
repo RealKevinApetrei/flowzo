@@ -137,9 +137,15 @@ body {
 
 /* Glass surface utility */
 .glass-surface {
-  background: color-mix(in srgb, var(--card-surface) 60%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: color-mix(in srgb, var(--card-surface) 75%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.dark .glass-surface {
+  background: color-mix(in srgb, var(--card-surface) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
 }
 
 /* Charging ring animation for long-press */

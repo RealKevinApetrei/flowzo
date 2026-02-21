@@ -12,6 +12,7 @@ import { LenderHud } from "./lender-hud";
 import { FilterBar } from "./filter-bar";
 import type { FilterState } from "./filter-bar";
 import { BubbleTooltip } from "./bubble-tooltip";
+import { RiskLegend } from "./risk-legend";
 import { TradeDetailModal } from "./trade-detail-modal";
 
 interface LendingPot {
@@ -165,6 +166,9 @@ export function LenderPageClient({
           onModeChange={setFilterMode}
         />
       )}
+
+      {/* z-10: Risk legend */}
+      <RiskLegend />
 
       {/* z-20: Tooltip */}
       <BubbleTooltip

@@ -22,15 +22,16 @@ interface BubbleBoardProps {
   hudPosition: HudPosition;
 }
 
-const RISK_COLORS: Record<string, string> = {
-  A: "#10B981",
-  B: "#F59E0B",
-  C: "#EF4444",
+// Monzo-branded risk colors — gradient pairs (inner highlight, outer base)
+const RISK_GRADIENTS: Record<string, { inner: string; outer: string; glow: string }> = {
+  A: { inner: "#99F6E4", outer: "#14B8A6", glow: "rgba(20,184,166,0.25)" },
+  B: { inner: "#FFB4B8", outer: "#FF5A5F", glow: "rgba(255,90,95,0.25)" },
+  C: { inner: "#C4B5FD", outer: "#8B5CF6", glow: "rgba(139,92,246,0.25)" },
 };
 
 const CHARGE_DURATION = 500;
 
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
+const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(0);
 
 interface SimNode extends d3.SimulationNodeDatum {
   id: string;
@@ -76,10 +77,9 @@ export function BubbleBoard({
     const max = Math.max(...allAmounts);
     const range = max - min || 1;
     const normalized = (amountPence - min) / range;
-    return 35 + normalized * 55; // 35px to 90px
+    return 35 + normalized * 55;
   }, []);
 
-  // Store callbacks in refs to avoid D3 rebinding
   const onQuickTapRef = useRef(onQuickTap);
   const onLongPressRef = useRef(onLongPress);
   useEffect(() => {
@@ -94,10 +94,35 @@ export function BubbleBoard({
     const container = svg.parentElement;
     if (!container) return;
 
-    // ResizeObserver for dynamic viewBox
     const width = container.clientWidth;
     const height = container.clientHeight;
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+
+    const d3Svg = d3.select(svg);
+
+    // Define gradient defs + glow filters
+    let defs = d3Svg.select<SVGDefsElement>("defs");
+    if (defs.empty()) {
+      defs = d3Svg.append("defs");
+      (["A", "B", "C"] as const).forEach((grade) => {
+        const g = RISK_GRADIENTS[grade];
+        const grad = defs
+          .append("radialGradient")
+          .attr("id", `grad-${grade}`)
+          .attr("cx", "35%")
+          .attr("cy", "35%");
+        grad.append("stop").attr("offset", "0%").attr("stop-color", g.inner).attr("stop-opacity", "1");
+        grad.append("stop").attr("offset", "100%").attr("stop-color", g.outer).attr("stop-opacity", "0.9");
+
+        const filter = defs.append("filter").attr("id", `bubble-glow-${grade}`).attr("x", "-50%").attr("y", "-50%").attr("width", "200%").attr("height", "200%");
+        filter.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "5").attr("result", "blur");
+        filter.append("feFlood").attr("flood-color", g.glow).attr("result", "color");
+        filter.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "glow");
+        const merge = filter.append("feMerge");
+        merge.append("feMergeNode").attr("in", "glow");
+        merge.append("feMergeNode").attr("in", "SourceGraphic");
+      });
+    }
 
     const filtered = applyFilters(trades, filters);
     const amounts = filtered.map((t) => t.amount_pence);
@@ -123,8 +148,6 @@ export function BubbleBoard({
       y: height / 2 + (Math.random() - 0.5) * 100,
     }));
 
-    const d3Svg = d3.select(svg);
-
     // Pop animation for removed bubbles
     if (removedIds.size > 0) {
       d3Svg
@@ -145,15 +168,14 @@ export function BubbleBoard({
 
     bubbles.exit().transition().duration(300).style("opacity", 0).remove();
 
-    // Enter new bubbles
     const enter = bubbles
       .enter()
       .append("g")
       .attr("class", "bubble")
       .style("cursor", "pointer");
 
-    // Pointer events for long-press / quick-tap
-    enter.each(function (_d) {
+    // Pointer events
+    enter.each(function () {
       const group = d3.select(this);
       group
         .on("pointerdown", function (event: PointerEvent) {
@@ -161,7 +183,6 @@ export function BubbleBoard({
           const d = d3.select<SVGGElement, SimNode>(this).datum();
           chargingRef.current = d.id;
 
-          // Show charging ring
           const circum = 2 * Math.PI * (d.radius + 4);
           group
             .select(".charge-ring")
@@ -174,17 +195,11 @@ export function BubbleBoard({
             .ease(d3.easeLinear)
             .attr("stroke-dashoffset", "0");
 
-          // Highlight ring
           group.select(".highlight-ring").style("opacity", 0.6);
 
           chargeTimerRef.current = setTimeout(() => {
             chargingRef.current = null;
-            // Pop animation then call handler
-            group
-              .select(".charge-ring")
-              .transition()
-              .duration(200)
-              .style("opacity", 0);
+            group.select(".charge-ring").transition().duration(200).style("opacity", 0);
             group.select(".highlight-ring").style("opacity", 0);
             onLongPressRef.current(d.id);
           }, CHARGE_DURATION);
@@ -195,22 +210,14 @@ export function BubbleBoard({
             clearTimeout(chargeTimerRef.current);
             chargeTimerRef.current = null;
           }
-          // Cancel charging ring
-          group
-            .select(".charge-ring")
-            .interrupt()
-            .style("opacity", 0);
+          group.select(".charge-ring").interrupt().style("opacity", 0);
           group.select(".highlight-ring").style("opacity", 0);
 
           if (chargingRef.current === d.id) {
-            // Quick tap
             chargingRef.current = null;
             const trade = filtered.find((t) => t.id === d.id);
             if (trade) {
-              onQuickTapRef.current(trade, {
-                x: event.clientX,
-                y: event.clientY,
-              });
+              onQuickTapRef.current(trade, { x: event.clientX, y: event.clientY });
             }
           }
         })
@@ -220,30 +227,24 @@ export function BubbleBoard({
             chargeTimerRef.current = null;
           }
           chargingRef.current = null;
-          group
-            .select(".charge-ring")
-            .interrupt()
-            .style("opacity", 0);
+          group.select(".charge-ring").interrupt().style("opacity", 0);
           group.select(".highlight-ring").style("opacity", 0);
         });
     });
 
-    // Main circle
+    // Main circle with gradient + glow
     enter
       .append("circle")
       .attr("class", "main-circle")
       .attr("r", 0)
-      .attr("fill", (d) => RISK_COLORS[d.risk_grade] ?? RISK_COLORS.B)
-      .attr("fill-opacity", 0.85)
-      .attr("stroke", (d) => RISK_COLORS[d.risk_grade] ?? RISK_COLORS.B)
-      .attr("stroke-opacity", 0.3)
-      .attr("stroke-width", 3)
+      .attr("fill", (d) => `url(#grad-${d.risk_grade})`)
+      .attr("filter", (d) => `url(#bubble-glow-${d.risk_grade})`)
       .transition()
       .duration(addedIds.size > 0 ? 600 : 0)
       .ease(d3.easeElasticOut.amplitude(1).period(0.4))
       .attr("r", (d) => d.radius);
 
-    // Highlight ring (white stroke on tap)
+    // Highlight ring
     enter
       .append("circle")
       .attr("class", "highlight-ring")
@@ -260,21 +261,22 @@ export function BubbleBoard({
       .attr("class", "charge-ring")
       .attr("r", (d) => d.radius + 4)
       .attr("fill", "none")
-      .attr("stroke", "var(--coral)")
+      .attr("stroke", "white")
       .attr("stroke-width", 3)
       .attr("stroke-linecap", "round")
       .style("opacity", 0)
       .attr("pointer-events", "none")
       .attr("transform", "rotate(-90)");
 
-    // Label — show amount instead of fee
+    // Amount label
     enter
       .append("text")
+      .attr("class", "bubble-amount")
       .attr("text-anchor", "middle")
-      .attr("dy", "0.35em")
+      .attr("dy", "-0.15em")
       .attr("fill", "white")
       .attr("font-weight", "700")
-      .attr("font-size", (d) => `${Math.max(10, d.radius / 3.5)}px`)
+      .attr("font-size", (d) => `${Math.max(10, d.radius / 3.2)}px`)
       .attr("pointer-events", "none")
       .style("opacity", 0)
       .text((d) => formatPounds(d.amount_pence))
@@ -283,33 +285,49 @@ export function BubbleBoard({
       .duration(300)
       .style("opacity", "1");
 
+    // Shift days sub-label
+    enter
+      .append("text")
+      .attr("class", "bubble-days")
+      .attr("text-anchor", "middle")
+      .attr("dy", "1.1em")
+      .attr("fill", "rgba(255,255,255,0.7)")
+      .attr("font-weight", "500")
+      .attr("font-size", (d) => `${Math.max(8, d.radius / 5)}px`)
+      .attr("pointer-events", "none")
+      .style("opacity", 0)
+      .text((d) => `${d.shift_days}d`)
+      .transition()
+      .delay(400)
+      .duration(300)
+      .style("opacity", "1");
+
     // Merge
     const merged = enter.merge(bubbles);
 
-    // Update existing
     merged
       .select(".main-circle")
       .transition()
       .duration(300)
       .attr("r", (d) => d.radius)
-      .attr("fill", (d) => RISK_COLORS[d.risk_grade] ?? RISK_COLORS.B)
-      .attr("stroke", (d) => RISK_COLORS[d.risk_grade] ?? RISK_COLORS.B);
+      .attr("fill", (d) => `url(#grad-${d.risk_grade})`)
+      .attr("filter", (d) => `url(#bubble-glow-${d.risk_grade})`);
+
+    merged.select(".highlight-ring").attr("r", (d) => d.radius + 2);
 
     merged
-      .select(".highlight-ring")
-      .attr("r", (d) => d.radius + 2);
-
-    merged
-      .select("text")
+      .select(".bubble-amount")
       .text((d) => formatPounds(d.amount_pence))
-      .attr("font-size", (d) => `${Math.max(10, d.radius / 3.5)}px`);
+      .attr("font-size", (d) => `${Math.max(10, d.radius / 3.2)}px`);
+
+    merged
+      .select(".bubble-days")
+      .text((d) => `${d.shift_days}d`)
+      .attr("font-size", (d) => `${Math.max(8, d.radius / 5)}px`);
 
     // Force simulation
-    if (simulationRef.current) {
-      simulationRef.current.stop();
-    }
+    if (simulationRef.current) simulationRef.current.stop();
 
-    // Offset center based on HUD position
     const centerX = hudPosition === "side" ? width / 2 - 40 : width / 2;
     const centerY = hudPosition === "top" ? height / 2 + 30 : height / 2;
 
@@ -321,7 +339,7 @@ export function BubbleBoard({
         "collide",
         d3
           .forceCollide<SimNode>()
-          .radius((d) => d.radius + 4)
+          .radius((d) => d.radius + 6)
           .strength(0.8)
           .iterations(3),
       )
@@ -362,7 +380,7 @@ export function BubbleBoard({
             🫧
           </span>
           <p className="text-sm font-medium">No active trade requests</p>
-          <p className="text-xs text-muted mt-1">
+          <p className="text-xs text-text-muted mt-1">
             Bubbles will appear when borrowers request shifts
           </p>
         </div>

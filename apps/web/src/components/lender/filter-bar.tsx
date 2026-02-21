@@ -19,6 +19,12 @@ interface FilterBarProps {
 
 const RISK_GRADES = ["A", "B", "C"] as const;
 
+const GRADE_COLORS: Record<string, string> = {
+  A: "bg-[#14B8A6]",
+  B: "bg-coral",
+  C: "bg-[#8B5CF6]",
+};
+
 function summarize(filters: FilterState): string {
   const grades = filters.riskGrades;
   if (grades.size === 3 || grades.size === 0) return "All grades";
@@ -34,7 +40,6 @@ export function FilterBar({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
   useEffect(() => {
     if (!open) return;
     function handler(e: MouseEvent) {
@@ -68,7 +73,7 @@ export function FilterBar({
       {/* Collapsed chip */}
       <button
         onClick={() => setOpen(!open)}
-        className="glass-surface rounded-full px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-medium text-navy hover:shadow-xl transition-shadow"
+        className="glass-surface rounded-full px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-medium text-foreground hover:shadow-xl transition-shadow"
       >
         <svg
           width="14"
@@ -99,7 +104,7 @@ export function FilterBar({
                 className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
                   mode === m
                     ? "bg-coral text-white shadow-sm"
-                    : "text-text-secondary hover:text-navy"
+                    : "text-text-secondary hover:text-foreground"
                 }`}
               >
                 {m === "simple" ? "Simple" : "Advanced"}
@@ -107,7 +112,7 @@ export function FilterBar({
             ))}
           </div>
 
-          {/* Risk grade chips */}
+          {/* Risk grade chips — colored dots to match bubble colors */}
           <div>
             <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2">
               Risk Grade
@@ -127,12 +132,13 @@ export function FilterBar({
                 <button
                   key={g}
                   onClick={() => toggleGrade(g)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${
                     filters.riskGrades.has(g)
-                      ? "bg-coral text-white"
+                      ? "bg-foreground/10 text-foreground"
                       : "bg-warm-grey text-text-secondary"
                   }`}
                 >
+                  <span className={`w-2 h-2 rounded-full ${GRADE_COLORS[g]}`} />
                   {g}
                 </button>
               ))}

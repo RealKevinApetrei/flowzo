@@ -18,10 +18,10 @@ interface BubbleTooltipProps {
 
 const fmt = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
-const RISK_COLORS: Record<string, string> = {
-  A: "bg-success/10 text-success",
-  B: "bg-warning/10 text-warning",
-  C: "bg-danger/10 text-danger",
+const RISK_BADGE: Record<string, { bg: string; text: string }> = {
+  A: { bg: "bg-[#14B8A6]/15", text: "text-[#14B8A6]" },
+  B: { bg: "bg-coral/15", text: "text-coral" },
+  C: { bg: "bg-[#8B5CF6]/15", text: "text-[#8B5CF6]" },
 };
 
 export function BubbleTooltip({ trade, position, onDismiss }: BubbleTooltipProps) {
@@ -35,13 +35,11 @@ export function BubbleTooltip({ trade, position, onDismiss }: BubbleTooltipProps
     };
   }, [trade, onDismiss]);
 
-  // Dismiss on tap away
   useEffect(() => {
     if (!trade) return;
     function handler() {
       onDismiss();
     }
-    // Delay listener to avoid immediate self-dismiss
     const id = setTimeout(() => {
       document.addEventListener("pointerdown", handler);
     }, 50);
@@ -53,7 +51,7 @@ export function BubbleTooltip({ trade, position, onDismiss }: BubbleTooltipProps
 
   if (!trade || !position) return null;
 
-  const badge = RISK_COLORS[trade.risk_grade] ?? RISK_COLORS.B;
+  const badge = RISK_BADGE[trade.risk_grade] ?? RISK_BADGE.B;
 
   return (
     <div
@@ -66,11 +64,11 @@ export function BubbleTooltip({ trade, position, onDismiss }: BubbleTooltipProps
     >
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-lg font-bold text-navy">
+          <span className="text-lg font-bold text-foreground">
             {fmt(trade.amount_pence)}
           </span>
           <span
-            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge}`}
+            className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge.bg} ${badge.text}`}
           >
             Grade {trade.risk_grade}
           </span>

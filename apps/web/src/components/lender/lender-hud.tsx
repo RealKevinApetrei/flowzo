@@ -34,7 +34,7 @@ function StatItem({
       <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
         {label}
       </p>
-      <p className="text-sm font-bold text-navy">{value}</p>
+      <p className="text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }
@@ -55,7 +55,7 @@ export function LenderHud({
   if (position === "side") {
     return (
       <div className="absolute right-3 top-3 z-10 glass-surface rounded-2xl p-3 space-y-4 shadow-lg min-w-[80px]">
-        <p className="text-xs font-bold text-navy">Lending</p>
+        <p className="text-xs font-bold text-foreground">Lending</p>
         <StatItem label="Avail" value={fmt(available)} compact />
         <StatItem label="Locked" value={fmt(locked)} compact />
         <StatItem label="Yield" value={fmt(yieldPence)} compact />
@@ -79,7 +79,7 @@ export function LenderHud({
   return (
     <div className="absolute top-3 left-3 right-3 z-10 glass-surface rounded-2xl px-4 py-3 shadow-lg">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-bold text-navy shrink-0">Lending</p>
+        <p className="text-sm font-bold text-foreground shrink-0">Lending</p>
         <div className="flex items-center gap-4 flex-1 justify-center">
           <StatItem label="Available" value={fmt(available)} />
           <StatItem label="Locked" value={fmt(locked)} />
