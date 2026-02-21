@@ -35,11 +35,11 @@ export function SuggestionCard({
 
   const { payload } = proposal;
 
-  // Fee slider: allow 0.5x to 2x of the suggested fee, min 1p
+  // Fee slider: allow lowering fee from suggested down to 50%, starts at max (100%)
   const suggestedFee = payload.fee_pence;
   const feeRange = useMemo(() => {
     const min = Math.max(1, Math.round(suggestedFee * 0.5));
-    const max = Math.max(min + 1, Math.round(suggestedFee * 2));
+    const max = Math.max(suggestedFee, min);
     return { min, max };
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
