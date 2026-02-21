@@ -93,7 +93,8 @@ export default async function DataPage() {
                     <th className="py-2 pr-3 text-right">Count</th>
                     <th className="py-2 pr-3 text-right">Total</th>
                     <th className="py-2 pr-3 text-right">Avg Amount</th>
-                    <th className="py-2 text-right">Avg Term</th>
+                    <th className="py-2 pr-3 text-right">Avg Term</th>
+                    <th className="py-2 text-right">Avg APR</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -105,7 +106,10 @@ export default async function DataPage() {
                       <td className="py-2 pr-3 text-right font-medium">{row.trade_count}</td>
                       <td className="py-2 pr-3 text-right">{fmt(Number(row.total_amount))}</td>
                       <td className="py-2 pr-3 text-right">{fmt(Number(row.avg_amount))}</td>
-                      <td className="py-2 text-right">{row.avg_term_days}d</td>
+                      <td className="py-2 pr-3 text-right">{row.avg_term_days}d</td>
+                      <td className="py-2 text-right font-medium text-coral">
+                        {row.avg_implied_apr_pct != null ? `${Number(row.avg_implied_apr_pct).toFixed(1)}%` : "\u2014"}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

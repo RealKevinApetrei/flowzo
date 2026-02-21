@@ -43,18 +43,27 @@ Flowzo is a Monzo-native fintech webapp that uses Open Banking data to power an 
 
 ### What Works (Green)
 - Auth flow (signup/login/logout) via Supabase
-- TrueLayer OAuth PKCE flow (redirect + consent screen)
-- Full UI: borrower home, lender home, settings, onboarding
-- 6 Supabase Edge Functions written (sync, forecast, proposals, match, settle, explain)
+- TrueLayer OAuth PKCE flow (redirect + consent screen + token refresh on 401)
+- Full UI: borrower home, lender home, settings, onboarding, data analytics
+- 6 Supabase Edge Functions deployed and ACTIVE (sync, forecast, proposals, match, settle, explain)
 - D3 bubble board with force simulation
 - Calendar heatmap with worst-case toggle
 - Suggestion feed with accept/dismiss/customise
 - Bid slider + probability curve
 - Claude API integration for explanations
-- 12 database migrations with RLS
+- 20 database migrations with RLS + security_invoker views
 - Shared package with types, constants, utilities
 - Build passes with zero TypeScript errors
-- Deployed to Vercel
+- Deployed to Vercel with 4 cron routes (forecast, settlement, expire-pending, retry-match)
+- Pipeline orchestration: `/api/pipeline/run` chains sync -> forecast -> proposals
+- Auto-match wired: `submitTrade()` invokes `match-trade` Edge Function on PENDING_MATCH
+- TrueLayer callback fires pipeline async, redirects to `/borrower`
+- Seed data: ~482 users, ~1,306 trades, ~500+ proposals, 304 lending pots
+- Capital-weighted APY display on lender page via `get_lender_current_apy` RPC
+- Cancel trade with atomic allocation release via `releaseTradeAllocations()` helper
+- 9-section /data analytics page with 12+ Postgres views
+- Quant API proxy: `/api/quant/*` routes proxy to Member B's FastAPI endpoints
+- E2E tests: 6 Playwright spec files (~30 tests) covering borrower, lender, data, auth guards, error states
 
 ### Critical Bugs (All Fixed)
 
@@ -75,16 +84,16 @@ All 8 critical bugs have been resolved in commit `ffec26b`:
 
 | Feature | Status | Priority |
 |---|---|---|
-| Apply DB migrations to Supabase | `combined_migrations.sql` ready | P0 -- nothing works without this |
-| Get & configure Supabase service role key | Missing from env | P0 -- Edge Functions need it |
-| Deploy Edge Functions to Supabase | Written, not deployed | P0 -- pipeline doesn't run |
-| Cron jobs (daily forecast, hourly settlement) | Not implemented | HIGH -- pipeline doesn't auto-run |
-| Auto-trigger match-trade after PENDING_MATCH | Missing | HIGH -- matching doesn't happen |
-| Seed/demo data | Empty seed.sql | HIGH -- demo needs data |
-| Compliance page content | Placeholder text | LOW |
-| Tests (Vitest + Playwright) | Zero tests | MEDIUM |
-| CI/CD (GitHub Actions) | No workflows | LOW |
-| Payment provider wiring | Stubs exist, not connected | LOW for hackathon |
+| Apply DB migrations to Supabase | DONE -- 20 migrations applied (001-020) | P0 |
+| Get & configure Supabase service role key | DONE -- set in .env.local + Vercel + Edge Function secrets | P0 |
+| Deploy Edge Functions to Supabase | DONE -- all 6 deployed and ACTIVE | P0 |
+| Cron jobs (forecast, settlement, expire, retry) | DONE -- 4 Vercel cron routes in vercel.json | P0 |
+| Auto-trigger match-trade after PENDING_MATCH | DONE -- wired in submitTrade() server action | P0 |
+| Seed/demo data | DONE -- ~482 users, ~1,306 trades, 304 lending pots, 500+ proposals | P0 |
+| Compliance page content | DONE -- Terms, Privacy, FCA disclaimer (Member C) | LOW |
+| Tests (Vitest + Playwright) | PARTIAL -- 6 Playwright E2E spec files (~30 tests), Vitest not configured | MEDIUM |
+| CI/CD (GitHub Actions) | DONE -- lint + typecheck + build on PRs (Member D) | LOW |
+| Payment provider wiring | Stubs exist, not connected (not needed for hackathon) | LOW |
 
 ---
 
@@ -161,14 +170,44 @@ Full preferences form in Settings page:
 
 ### Data & Analytics Page
 
-`/data` route with aggregate analytics views:
-- **Pool Summary:** total pool size, available, locked, lender count
-- **Trade Summary:** total trades, volume, fees
-- **Trade Analytics by Grade:** table with count, avg amount, avg fee, default rate per risk grade/status
-- **Risk Distribution:** user count per risk grade (A/B/C)
-- **ML Integration placeholder:** ready for Member B's FastAPI endpoints (backtest, EDA, SHAP, stress testing)
+`/data` route with 9 sections and sticky pill navigation:
 
-Powered by three Postgres views: `trade_analytics`, `risk_distribution`, `pool_overview` (migration 014).
+1. **Pool Summary:** total pool size, available, locked, lender count (view: `pool_overview`)
+2. **Trade Summary:** live/pending/repaid/defaulted trade counts (view: `platform_totals`)
+3. **Order Book:** PENDING_MATCH trades by risk grade with depth, avg amount, avg term, implied APR (view: `order_book_depth`)
+4. **Performance:** repaid/defaulted counts, default rate, avg APR by grade (view: `trade_performance`)
+5. **Yield Curve:** avg APR by term bucket (0-7d, 8-14d) and grade (view: `yield_curve`)
+6. **Lenders:** leaderboard with total capital, locked, realized yield, trade count (view: `lender_leaderboard`)
+7. **Trade Analytics by Grade:** count, avg amount, avg fee, default rate per risk grade/status (view: `trade_analytics`)
+8. **Risk Distribution:** user count per risk grade A/B/C (view: `risk_distribution`)
+9. **ML Scoring:** Quant API integration with backtest, SHAP, stress testing, EDA, forecast accuracy, lender simulation
+
+**Matching Efficiency:** fill rate and avg hours-to-match by grade (view: `matching_efficiency`)
+
+Powered by 12+ Postgres views across migrations 014, 017, and 020. All views use `security_invoker = true` with `GRANT SELECT TO authenticated`.
+
+### Migration Changelog
+
+| Migration | Name | What |
+|---|---|---|
+| 001-012 | Core schema | Tables, enums, RLS, Edge Function grants |
+| 013 | RLS + constraints | Bubble board RLS, obligations uniqueness, completed_at |
+| 014 | Analytics views | trade_analytics, risk_distribution, pool_overview |
+| 015 | Flowzo events | Event sourcing table for audit trail |
+| 016 | Allocation release | RELEASED status, cancel/expire support |
+| 017 | Quant views | order_book_summary, settlement_performance, yield_trends, lender_concentration, pool_health, match_speed_analytics |
+| 018 | Lender APY RPC | get_lender_current_apy() capital-weighted function |
+| 019 | Security fixes | pool_summary security_invoker, function search_paths, locked balance guards |
+| 020 | Data page views | order_book_depth, trade_performance, yield_curve, lender_leaderboard, platform_totals, matching_efficiency |
+
+### Cron Routes (Vercel)
+
+| Route | Schedule | Purpose |
+|---|---|---|
+| `/api/cron/forecast` | 06:00 UTC daily | Run forecasts for all users with bank connections |
+| `/api/cron/settlement` | 07:00 UTC daily | Settle LIVE trades (disburse, repay, or default) |
+| `/api/cron/expire-pending` | 12:00 UTC daily | Cancel stale PENDING_MATCH trades (>24h), release allocations |
+| `/api/cron/retry-match` | 08:00 UTC daily | Retry matching for unmatched PENDING_MATCH trades |
 
 ---
 
@@ -184,12 +223,17 @@ Powered by three Postgres views: `trade_analytics`, `risk_distribution`, `pool_o
 | Claude API Key | `sk-ant-api03-...` | Set |
 | GoCardless Access Token | `sandbox_ZvRPUAS2...` | Set |
 
-### Need
+### Configured
+| Service | Status |
+|---|---|
+| **Supabase Service Role Key** | SET in .env.local, Vercel, and Edge Function secrets |
+| **CRON_SECRET** | SET in Vercel environment variables |
+| **Edge Function Secrets** | SET: TRUELAYER_ENV, TRUELAYER_CLIENT_ID, TRUELAYER_CLIENT_SECRET |
+
+### Still Needed
 | Service | Why | Action |
 |---|---|---|
-| **Supabase Service Role Key** | Edge Functions need it to bypass RLS; currently missing from .env.local and Vercel | Get from Supabase Dashboard > Settings > API > service_role key |
-| **CRON_SECRET** | Secure the cron Edge Function endpoints | Generate a random string, add to Supabase secrets and Vercel |
-| **Vercel Preview/Dev env vars** | GitHub CI deploys to Preview which has zero env vars | Copy all Production env vars to Preview in Vercel Dashboard |
+| **Vercel Preview/Dev env vars** | GitHub CI deploys to Preview which may lack env vars | Copy all Production env vars to Preview in Vercel Dashboard |
 
 ### Optional (for production, not hackathon)
 | Service | Why |
@@ -254,20 +298,25 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 
 **Branch prefix:** `feat/pipeline-*`
 
-| Task | Priority | Est. |
-|---|---|---|
-| Apply DB migrations to Supabase (run `combined_migrations.sql` in SQL Editor) | P0 | 15m |
-| Get & configure Supabase service role key (Dashboard > Settings > API) | P0 | 10m |
-| Deploy all 6 Edge Functions to Supabase (`supabase functions deploy`) | P0 | 30m |
-| Register TrueLayer redirect URIs (production + localhost) | P0 | 10m |
-| Test TrueLayer sandbox flow end-to-end (john/doe -> sync -> see data) | P0 | 30m |
-| Wire auto-trigger: after trade status -> PENDING_MATCH, call match-trade Edge Function | P1 | 1h |
-| Implement cron-daily-forecast Edge Function (pg_cron or Vercel cron) | P1 | 1h |
-| Implement cron-hourly-settlements Edge Function | P1 | 1h |
-| Create seed data for demo (realistic borrower + lender profiles, transactions, forecasts, proposals) | P0 | 2h |
-| Test full pipeline: bank connect -> sync -> forecast -> proposals -> trade -> match -> settle | P0 | 1h |
-| Verify RLS policies don't block lender bubble board (PENDING_MATCH trades visible) | P1 | 30m |
-| Verify Supabase Realtime is working (trades table changes propagate) | P1 | 15m |
+| Task | Priority | Est. | Status |
+|---|---|---|---|
+| Apply DB migrations to Supabase (20 migrations, 001-020) | P0 | 15m | DONE |
+| Get & configure Supabase service role key | P0 | 10m | DONE |
+| Deploy all 6 Edge Functions to Supabase | P0 | 30m | DONE |
+| Register TrueLayer redirect URIs (production + localhost) | P0 | 10m | DONE |
+| Test TrueLayer sandbox flow end-to-end (john/doe -> sync -> see data) | P0 | 30m | DONE |
+| Wire auto-trigger: PENDING_MATCH -> match-trade Edge Function | P1 | 1h | DONE |
+| Implement cron routes (forecast, settlement, expire-pending, retry-match) | P1 | 1h | DONE |
+| Implement settlement cron with DEFAULT path | P1 | 1h | DONE |
+| Create seed data (~482 users, ~1,306 trades, 304 pots, 500+ proposals) | P0 | 2h | DONE |
+| Test full pipeline: bank connect -> sync -> forecast -> proposals -> trade -> match -> settle | P0 | 1h | DONE |
+| Verify RLS policies (bubble board, analytics views, security_invoker) | P1 | 30m | DONE |
+| Verify Supabase Realtime is working | P1 | 15m | DONE |
+| Build /data analytics page with 9 sections + 12 Postgres views | P1 | 4h | DONE |
+| Capital-weighted APY RPC + lender page display | P1 | 1h | DONE |
+| Cancel trade with atomic allocation release | P1 | 1h | DONE |
+| Production code review + security fixes (migration 019) | P1 | 2h | DONE |
+| E2E tests (6 spec files, ~30 tests) | P1 | 2h | DONE |
 
 **Deliverable:** Fully working live pipeline from bank connection through to settlement. Someone can sign up, connect a bank, see forecasts, accept a proposal, and have it matched + settled. Seed data makes the demo rich from minute one.
 
@@ -345,11 +394,11 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 | Set up GitHub Actions CI (lint + typecheck + build on every PR) | P0 | 1h | DONE |
 | Configure branch protection on `main` (require PR, require CI pass) | P0 | 15m | TODO |
 | Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h | TODO |
-| Write Playwright E2E test for: signup -> bank connect -> see forecast -> accept proposal | P2 | 2h | TODO |
+| Write Playwright E2E tests (borrower, lender, data, auth guards, error states) | P2 | 2h | DONE (Member A) |
 | Create detailed demo script (step-by-step walkthrough for judges, with fallback paths) | P0 | 1.5h | DONE |
 | Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h | DONE |
 | Write the "Best Use of Data" submission narrative (SIG-focused, quantitative language) | P0 | 2h | TODO |
-| Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h | TODO |
+| Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h | DONE (Member A — seed data boosted) |
 | Record backup demo video (in case live demo fails on the day) | P1 | 1h | TODO |
 | Set up error monitoring (Sentry free tier) if time permits | P2 | 30m | TODO |
 
