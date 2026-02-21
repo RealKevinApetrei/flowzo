@@ -61,7 +61,7 @@ export interface AgentProposal {
 }
 
 export interface ShiftProposalPayload {
-  obligation_id?: string | null;
+  obligation_id: string;
   obligation_name: string;
   amount_pence: number;
   original_date: string;

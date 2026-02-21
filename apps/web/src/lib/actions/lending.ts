@@ -95,18 +95,43 @@ export async function fundTrade(tradeId: string) {
   });
 
   if (potErr) {
-    // Rollback allocation if pot update fails — retry delete to prevent orphans
-    const { error: deleteErr } = await supabase
-      .from("allocations")
-      .delete()
-      .eq("id", allocation.id);
+    // Rollback allocation if pot update fails — retry to prevent orphans
+    let rollbackSuccess = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error: deleteErr } = await supabase
+        .from("allocations")
+        .delete()
+        .eq("id", allocation.id);
 
-    if (deleteErr) {
-      console.error(
-        `ORPHAN ALLOCATION: Failed to rollback allocation ${allocation.id}:`,
-        deleteErr,
-      );
+      if (!deleteErr) {
+        rollbackSuccess = true;
+        break;
+      }
+      // Brief delay before retry
+      await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
     }
+
+    if (!rollbackSuccess) {
+      // Flag as orphan via status so it can be cleaned up
+      await supabase
+        .from("allocations")
+        .update({ status: "RELEASED" })
+        .eq("id", allocation.id);
+
+      // Log to events for audit trail
+      await supabase.from("flowzo_events").insert({
+        event_type: "allocation.orphaned",
+        entity_type: "allocation",
+        entity_id: allocation.id,
+        actor: user.id,
+        payload: {
+          trade_id: tradeId,
+          reason: "rollback_delete_failed",
+          pot_error: potErr.message,
+        },
+      });
+    }
+
     throw new Error(`Insufficient funds or pot error: ${potErr.message}`);
   }
 
