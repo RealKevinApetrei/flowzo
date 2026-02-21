@@ -8,14 +8,12 @@ import { toggleAutoMatch, fundTrade } from "@/lib/actions/lending";
 import { TopBar } from "@/components/layout/top-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BubbleBoard } from "./bubble-board";
-import type { BubbleTrade } from "./bubble-board";
 import { DemoBubbleBoard } from "./demo-bubble-board";
 import { LendingPotCard } from "./lending-pot-card";
 import { AutoPopToggle } from "./auto-pop-toggle";
 import { YieldDashboard } from "./yield-dashboard";
 import { FilterBar } from "./filter-bar";
 import type { FilterState } from "./filter-bar";
-import { BubbleTooltip } from "./bubble-tooltip";
 import { RiskLegend } from "./risk-legend";
 import { TradeDetailModal } from "./trade-detail-modal";
 
@@ -57,9 +55,6 @@ export function LenderPageClient({
     termRange: [1, 90],
   });
 
-  const [tooltipTrade, setTooltipTrade] = useState<BubbleTrade | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
-
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const selectedTrade = selectedTradeId
     ? trades.find((t) => t.id === selectedTradeId) ?? null
@@ -82,19 +77,6 @@ export function LenderPageClient({
     },
     [],
   );
-
-  const handleQuickTap = useCallback(
-    (trade: BubbleTrade, position: { x: number; y: number }) => {
-      setTooltipTrade(trade);
-      setTooltipPos(position);
-    },
-    [],
-  );
-
-  const handleDismissTooltip = useCallback(() => {
-    setTooltipTrade(null);
-    setTooltipPos(null);
-  }, []);
 
   const handleLongPress = useCallback(
     (tradeId: string) => {
@@ -176,7 +158,6 @@ export function LenderPageClient({
               ) : (
                 <BubbleBoard
                   trades={trades}
-                  onQuickTap={handleQuickTap}
                   onLongPress={handleLongPress}
                   filters={filters}
                   bubbleColorMode={bubbleColorMode}
@@ -195,11 +176,6 @@ export function LenderPageClient({
       </div>
 
       {/* Floating overlays */}
-      <BubbleTooltip
-        trade={tooltipTrade}
-        position={tooltipPos}
-        onDismiss={handleDismissTooltip}
-      />
       <TradeDetailModal
         trade={selectedTrade}
         open={selectedTradeId !== null}

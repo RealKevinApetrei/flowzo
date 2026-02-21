@@ -6,7 +6,7 @@ import type { FilterState } from "./filter-bar";
 import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { resolveBubblePalette } from "@/lib/hooks/use-lender-settings";
 import type { BubbleTrade } from "@/lib/hooks/use-bubble-board";
-import { formatCurrency } from "@flowzo/shared";
+import { formatCurrency, calculateImpliedAPR } from "@flowzo/shared";
 
 export type { BubbleTrade } from "@/lib/hooks/use-bubble-board";
 
@@ -15,14 +15,13 @@ const formatShort = (pence: number) => formatCurrency(pence).replace(/\.00$/, ""
 
 interface BubbleBoardProps {
   trades: BubbleTrade[];
-  onQuickTap: (trade: BubbleTrade, position: { x: number; y: number }) => void;
   onLongPress: (tradeId: string) => void;
   filters: FilterState;
   bubbleColorMode: BubbleColorMode;
   unifiedColorHex: string;
 }
 
-const CHARGE_DURATION = 500;
+const CHARGE_DURATION = 1500;
 
 interface PhysicsNode {
   id: string;
@@ -56,7 +55,6 @@ function applyFilters(trades: BubbleTrade[], filters: FilterState): BubbleTrade[
 
 export function BubbleBoard({
   trades,
-  onQuickTap,
   onLongPress,
   filters,
   bubbleColorMode,
@@ -82,12 +80,10 @@ export function BubbleBoard({
     [],
   );
 
-  const onQuickTapRef = useRef(onQuickTap);
   const onLongPressRef = useRef(onLongPress);
   useEffect(() => {
-    onQuickTapRef.current = onQuickTap;
     onLongPressRef.current = onLongPress;
-  }, [onQuickTap, onLongPress]);
+  }, [onLongPress]);
 
   useEffect(() => {
     const svg = svgRef.current;
@@ -174,56 +170,106 @@ export function BubbleBoard({
           const d = d3.select<SVGGElement, PhysicsNode>(this).datum();
           chargingRef.current = d.id;
 
-          const circum = 2 * Math.PI * (d.radius + 4);
+          // Animate clip-circle from 0 to full radius
           group
-            .select(".charge-ring")
-            .attr("r", d.radius + 4)
-            .attr("stroke-dasharray", `${circum}`)
-            .attr("stroke-dashoffset", `${circum}`)
-            .style("opacity", 1)
+            .select(".clip-circle")
+            .interrupt()
+            .attr("r", 0)
             .transition()
             .duration(CHARGE_DURATION)
             .ease(d3.easeLinear)
-            .attr("stroke-dashoffset", "0");
-
-          group.select(".highlight-ring").style("opacity", 0.6);
+            .attr("r", d.radius);
 
           chargeTimerRef.current = setTimeout(() => {
             chargingRef.current = null;
-            group.select(".charge-ring").transition().duration(200).style("opacity", 0);
-            group.select(".highlight-ring").style("opacity", 0);
+
+            const palette = resolveBubblePalette(
+              d.risk_grade as "A" | "B" | "C",
+              bubbleColorMode,
+              unifiedColorHex,
+            );
+
+            // Fireworks: 10 particles flying outward
+            const cx = d.x;
+            const cy = d.y;
+            for (let i = 0; i < 10; i++) {
+              const angle = (Math.PI * 2 * i) / 10 + (Math.random() - 0.5) * 0.4;
+              const dist = d.radius * 2.5;
+              d3Svg
+                .append("circle")
+                .attr("cx", cx)
+                .attr("cy", cy)
+                .attr("r", 3)
+                .attr("fill", palette.center)
+                .attr("opacity", 0.9)
+                .attr("pointer-events", "none")
+                .transition()
+                .duration(500)
+                .ease(d3.easeCubicOut)
+                .attr("cx", cx + Math.cos(angle) * dist)
+                .attr("cy", cy + Math.sin(angle) * dist)
+                .attr("opacity", 0)
+                .remove();
+            }
+
+            // Shrink bubble to zero
+            group
+              .transition()
+              .duration(300)
+              .attr("transform", `translate(${d.x},${d.y}) scale(0)`)
+              .style("opacity", 0)
+              .remove();
+
+            // Remove from physics
+            nodesRef.current = nodesRef.current.filter((n) => n.id !== d.id);
+
+            // Floating "Funded!" text
+            d3Svg
+              .append("text")
+              .attr("x", cx)
+              .attr("y", cy)
+              .attr("text-anchor", "middle")
+              .attr("fill", palette.center)
+              .attr("font-weight", "700")
+              .attr("font-size", "13px")
+              .style("pointer-events", "none")
+              .text("Funded!")
+              .transition()
+              .duration(900)
+              .ease(d3.easeCubicOut)
+              .attr("y", cy - 50)
+              .style("opacity", 0)
+              .remove();
+
             onLongPressRef.current(d.id);
           }, CHARGE_DURATION);
         })
-        .on("pointerup", function (event: PointerEvent) {
-          const d = d3.select<SVGGElement, PhysicsNode>(this).datum();
-          if (chargeTimerRef.current) {
-            clearTimeout(chargeTimerRef.current);
-            chargeTimerRef.current = null;
-          }
-          group.select(".charge-ring").interrupt().style("opacity", 0);
-          group.select(".highlight-ring").style("opacity", 0);
-
-          if (chargingRef.current === d.id) {
-            chargingRef.current = null;
-            const trade = filtered.find((t) => t.id === d.id);
-            if (trade) {
-              onQuickTapRef.current(trade, { x: event.clientX, y: event.clientY });
-            }
-          }
-        })
-        .on("pointercancel pointerleave", function () {
+        .on("pointerup pointercancel pointerleave", function () {
           if (chargeTimerRef.current) {
             clearTimeout(chargeTimerRef.current);
             chargeTimerRef.current = null;
           }
           chargingRef.current = null;
-          group.select(".charge-ring").interrupt().style("opacity", 0);
-          group.select(".highlight-ring").style("opacity", 0);
+          // Snap clip-circle back to 0
+          group.select(".clip-circle").interrupt().attr("r", 0);
         });
     });
 
     const gradId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#grad-unified)" : `url(#grad-${d.risk_grade})`;
+
+    // ClipPath for white radial fill per bubble
+    enter.each(function (d) {
+      const group = d3.select(this);
+      const clip = group
+        .append("clipPath")
+        .attr("id", `clip-fill-${d.id}`);
+      clip
+        .append("circle")
+        .attr("class", "clip-circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", 0);
+    });
 
     // Circle — soft gradient, drop shadow
     enter
@@ -237,73 +283,22 @@ export function BubbleBoard({
       .ease(d3.easeElasticOut.amplitude(1).period(0.4))
       .attr("r", (d) => d.radius);
 
-    // Highlight ring
+    // White fill overlay (clipped by expanding circle)
     enter
       .append("circle")
-      .attr("class", "highlight-ring")
-      .attr("r", (d) => d.radius + 2)
-      .attr("fill", "none")
-      .attr("stroke", "white")
-      .attr("stroke-width", 2.5)
-      .style("opacity", 0)
+      .attr("class", "fill-overlay")
+      .attr("r", (d) => d.radius)
+      .attr("fill", "white")
+      .attr("opacity", 0.35)
+      .attr("clip-path", (d) => `url(#clip-fill-${d.id})`)
       .attr("pointer-events", "none");
 
-    // Charging ring
-    enter
-      .append("circle")
-      .attr("class", "charge-ring")
-      .attr("r", (d) => d.radius + 4)
-      .attr("fill", "none")
-      .attr("stroke", "white")
-      .attr("stroke-width", 3)
-      .attr("stroke-linecap", "round")
-      .style("opacity", 0)
-      .attr("pointer-events", "none")
-      .attr("transform", "rotate(-90)");
-
-    // Risk grade label (always visible)
-    enter
-      .append("text")
-      .attr("class", "bubble-grade")
-      .attr("text-anchor", "middle")
-      .attr("dy", (d) => `${-d.radius * 0.35}px`)
-      .attr("fill", "rgba(255,255,255,0.6)")
-      .attr("font-weight", "800")
-      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`)
-      .attr("pointer-events", "none")
-      .attr("letter-spacing", "0.05em")
-      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
-      .style("opacity", 0)
-      .text((d) => d.risk_grade)
-      .transition()
-      .delay(250)
-      .duration(300)
-      .style("opacity", "1");
-
-    // Borrower name (only on bubbles large enough)
-    enter
-      .append("text")
-      .attr("class", "bubble-name")
-      .attr("text-anchor", "middle")
-      .attr("dy", "0.05em")
-      .attr("fill", "white")
-      .attr("font-weight", "600")
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 4)}px`)
-      .attr("pointer-events", "none")
-      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.4)")
-      .style("opacity", 0)
-      .text((d) => (d.radius >= 28 && d.borrower_name ? d.borrower_name : ""))
-      .transition()
-      .delay(300)
-      .duration(300)
-      .style("opacity", "1");
-
-    // Amount
+    // Amount (line 1 — always visible)
     enter
       .append("text")
       .attr("class", "bubble-amount")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.radius >= 28 && d.borrower_name ? "1.1em" : "0.55em"))
+      .attr("dy", "-0.2em")
       .attr("fill", "rgba(255,255,255,0.9)")
       .attr("font-weight", "700")
       .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`)
@@ -313,6 +308,42 @@ export function BubbleBoard({
       .text((d) => formatShort(d.amount_pence))
       .transition()
       .delay(350)
+      .duration(300)
+      .style("opacity", "1");
+
+    // Duration (line 2 — medium+ bubbles only)
+    enter
+      .append("text")
+      .attr("class", "bubble-duration")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.9em")
+      .attr("fill", "rgba(255,255,255,0.6)")
+      .attr("font-weight", "600")
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => (d.radius >= 24 ? `${d.shift_days}d` : ""))
+      .transition()
+      .delay(400)
+      .duration(300)
+      .style("opacity", "1");
+
+    // Implied APR (line 3 — medium+ bubbles only)
+    enter
+      .append("text")
+      .attr("class", "bubble-apr")
+      .attr("text-anchor", "middle")
+      .attr("dy", "1.9em")
+      .attr("fill", "rgba(255,255,255,0.6)")
+      .attr("font-weight", "600")
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => (d.radius >= 24 ? `${calculateImpliedAPR(d.fee_pence, d.amount_pence, d.shift_days).toFixed(1)}%` : ""))
+      .transition()
+      .delay(450)
       .duration(300)
       .style("opacity", "1");
 
@@ -327,23 +358,24 @@ export function BubbleBoard({
       .attr("fill", gradId)
       .attr("filter", "url(#bubble-shadow)");
 
-    merged.select(".highlight-ring").attr("r", (d) => d.radius + 2);
-
     merged
-      .select(".bubble-grade")
-      .text((d) => d.risk_grade)
-      .attr("dy", (d) => `${-d.radius * 0.35}px`)
-      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`);
-
-    merged
-      .select(".bubble-name")
-      .text((d) => (d.radius >= 28 && d.borrower_name ? d.borrower_name : ""))
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 4)}px`);
+      .select(".fill-overlay")
+      .attr("r", (d) => d.radius);
 
     merged
       .select(".bubble-amount")
       .text((d) => formatShort(d.amount_pence))
       .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`);
+
+    merged
+      .select(".bubble-duration")
+      .text((d) => (d.radius >= 24 ? `${d.shift_days}d` : ""))
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4)}px`);
+
+    merged
+      .select(".bubble-apr")
+      .text((d) => (d.radius >= 24 ? `${calculateImpliedAPR(d.fee_pence, d.amount_pence, d.shift_days).toFixed(1)}%` : ""))
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`);
 
     // ---------- Billiard-ball physics via RAF ----------
     let lastTime = performance.now();

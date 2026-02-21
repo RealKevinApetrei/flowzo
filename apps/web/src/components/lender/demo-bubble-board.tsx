@@ -4,7 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import * as d3 from "d3";
 import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { resolveBubblePalette } from "@/lib/hooks/use-lender-settings";
-import { formatCurrency } from "@flowzo/shared";
+import { formatCurrency, calculateImpliedAPR } from "@flowzo/shared";
 
 interface DemoBubbleBoardProps {
   autoMatch: boolean;
@@ -35,8 +35,6 @@ interface PhysicsNode {
   vy: number;
   bursting?: boolean;
 }
-
-// Removed hardcoded RISK_PALETTE — now uses resolveBubblePalette
 
 const DEMO_TRADES: DemoTrade[] = [
   { id: "d-1", borrower_name: "Emma W.", amount_pence: 15000, fee_pence: 450, shift_days: 7, risk_grade: "A" },
@@ -133,6 +131,20 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
 
     const gradId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#demo-grad-unified)" : `url(#demo-grad-${d.risk_grade})`;
 
+    // ClipPath for white radial fill per bubble
+    enter.each(function (d) {
+      const group = d3.select(this);
+      const clip = group
+        .append("clipPath")
+        .attr("id", `demo-clip-fill-${d.id}`);
+      clip
+        .append("circle")
+        .attr("class", "demo-clip-circle")
+        .attr("cx", 0)
+        .attr("cy", 0)
+        .attr("r", 0);
+    });
+
     // Circle — soft gradient, drop shadow
     enter
       .append("circle")
@@ -145,49 +157,22 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       .ease(d3.easeElasticOut.amplitude(1).period(0.5))
       .attr("r", (d) => d.radius);
 
-    // Risk grade label (always visible)
+    // White fill overlay (clipped by expanding circle)
     enter
-      .append("text")
-      .attr("class", "demo-grade")
-      .attr("text-anchor", "middle")
-      .attr("dy", (d) => `${-d.radius * 0.35}px`)
-      .attr("fill", "rgba(255,255,255,0.6)")
-      .attr("font-weight", "800")
-      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`)
-      .attr("pointer-events", "none")
-      .attr("letter-spacing", "0.05em")
-      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
-      .style("opacity", 0)
-      .text((d) => d.risk_grade)
-      .transition()
-      .delay(400)
-      .duration(400)
-      .style("opacity", "1");
-
-    // Borrower name (hidden on very small bubbles)
-    enter
-      .append("text")
-      .attr("class", "demo-name")
-      .attr("text-anchor", "middle")
-      .attr("dy", "0.05em")
+      .append("circle")
+      .attr("class", "demo-fill-overlay")
+      .attr("r", (d) => d.radius)
       .attr("fill", "white")
-      .attr("font-weight", "600")
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 4)}px`)
-      .attr("pointer-events", "none")
-      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.4)")
-      .style("opacity", 0)
-      .text((d) => (d.radius >= 28 ? d.borrower_name : ""))
-      .transition()
-      .delay(500)
-      .duration(400)
-      .style("opacity", "1");
+      .attr("opacity", 0.35)
+      .attr("clip-path", (d) => `url(#demo-clip-fill-${d.id})`)
+      .attr("pointer-events", "none");
 
-    // Amount
+    // Amount (line 1 — always visible)
     enter
       .append("text")
       .attr("class", "demo-amount")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.radius >= 28 ? "1.1em" : "0.55em"))
+      .attr("dy", "-0.2em")
       .attr("fill", "rgba(255,255,255,0.9)")
       .attr("font-weight", "700")
       .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`)
@@ -197,6 +182,42 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       .text((d) => formatShort(d.amount_pence))
       .transition()
       .delay(600)
+      .duration(400)
+      .style("opacity", "1");
+
+    // Duration (line 2 — medium+ bubbles only)
+    enter
+      .append("text")
+      .attr("class", "demo-duration")
+      .attr("text-anchor", "middle")
+      .attr("dy", "0.9em")
+      .attr("fill", "rgba(255,255,255,0.6)")
+      .attr("font-weight", "600")
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => (d.radius >= 24 ? `${d.shift_days}d` : ""))
+      .transition()
+      .delay(650)
+      .duration(400)
+      .style("opacity", "1");
+
+    // Implied APR (line 3 — medium+ bubbles only)
+    enter
+      .append("text")
+      .attr("class", "demo-apr")
+      .attr("text-anchor", "middle")
+      .attr("dy", "1.9em")
+      .attr("fill", "rgba(255,255,255,0.6)")
+      .attr("font-weight", "600")
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => (d.radius >= 24 ? `${calculateImpliedAPR(d.fee_pence, d.amount_pence, d.shift_days).toFixed(1)}%` : ""))
+      .transition()
+      .delay(700)
       .duration(400)
       .style("opacity", "1");
 
@@ -296,13 +317,13 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
     return cleanup;
   }, [setupSvg]);
 
-  // Auto-burst with "Funded!" floating text
+  // Auto-burst with full long-press simulation: radial fill -> fireworks -> shrink -> respawn
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
     const d3Svg = d3.select(svg);
 
-    const baseInterval = autoMatch ? 1800 : 3500;
+    const baseInterval = autoMatch ? 2500 : 4500;
 
     const interval = setInterval(() => {
       const bubbles = d3Svg.selectAll<SVGGElement, PhysicsNode>(".demo-bubble");
@@ -318,56 +339,90 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       // Mark as bursting so physics skips it
       data.bursting = true;
 
-      // Slight scale-up → shrink to zero
+      // Step 1: Radial fill — animate clip-circle from 0 to full radius (~1000ms)
       target
+        .select(".demo-clip-circle")
+        .interrupt()
+        .attr("r", 0)
         .transition()
-        .duration(200)
-        .attr("transform", `translate(${data.x},${data.y}) scale(1.15)`)
-        .transition()
-        .duration(250)
-        .ease(d3.easeCubicIn)
-        .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
-        .style("opacity", 0)
+        .duration(1000)
+        .ease(d3.easeLinear)
+        .attr("r", data.radius)
         .on("end", function () {
-          // Give new random direction on respawn
-          const angle = Math.random() * 2 * Math.PI;
-          const speed = 0.5 + Math.random() * 0.9;
-          data.vx = Math.cos(angle) * speed;
-          data.vy = Math.sin(angle) * speed;
-
-          setTimeout(() => {
-            data.bursting = false;
-            d3.select(this)
-              .style("opacity", 1)
-              .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
+          // Step 2: Fireworks — 10 particles fly outward
+          const cx = data.x;
+          const cy = data.y;
+          for (let i = 0; i < 10; i++) {
+            const angle = (Math.PI * 2 * i) / 10 + (Math.random() - 0.5) * 0.4;
+            const dist = data.radius * 2.5;
+            d3Svg
+              .append("circle")
+              .attr("cx", cx)
+              .attr("cy", cy)
+              .attr("r", 3)
+              .attr("fill", labelColor)
+              .attr("opacity", 0.9)
+              .attr("pointer-events", "none")
               .transition()
-              .duration(600)
-              .ease(d3.easeElasticOut.amplitude(1).period(0.4))
-              .attr("transform", `translate(${data.x},${data.y}) scale(1)`);
-          }, 350);
-        });
+              .duration(500)
+              .ease(d3.easeCubicOut)
+              .attr("cx", cx + Math.cos(angle) * dist)
+              .attr("cy", cy + Math.sin(angle) * dist)
+              .attr("opacity", 0)
+              .remove();
+          }
 
-      // Floating "Funded!" label
-      d3Svg
-        .append("text")
-        .attr("x", data.x)
-        .attr("y", data.y)
-        .attr("text-anchor", "middle")
-        .attr("fill", labelColor)
-        .attr("font-weight", "700")
-        .attr("font-size", "13px")
-        .style("pointer-events", "none")
-        .text("Funded!")
-        .transition()
-        .duration(900)
-        .ease(d3.easeCubicOut)
-        .attr("y", data.y - 50)
-        .style("opacity", 0)
-        .remove();
+          // Floating "Funded!" label
+          d3Svg
+            .append("text")
+            .attr("x", cx)
+            .attr("y", cy)
+            .attr("text-anchor", "middle")
+            .attr("fill", labelColor)
+            .attr("font-weight", "700")
+            .attr("font-size", "13px")
+            .style("pointer-events", "none")
+            .text("Funded!")
+            .transition()
+            .duration(900)
+            .ease(d3.easeCubicOut)
+            .attr("y", cy - 50)
+            .style("opacity", 0)
+            .remove();
+
+          // Step 3: Shrink bubble to zero
+          target
+            .transition()
+            .duration(300)
+            .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
+            .style("opacity", 0)
+            .on("end", function () {
+              // Reset clip circle for respawn
+              target.select(".demo-clip-circle").interrupt().attr("r", 0);
+
+              // Give new random direction on respawn
+              const respawnAngle = Math.random() * 2 * Math.PI;
+              const speed = 0.5 + Math.random() * 0.9;
+              data.vx = Math.cos(respawnAngle) * speed;
+              data.vy = Math.sin(respawnAngle) * speed;
+
+              // Step 4: Respawn after 350ms with elastic bounce-in
+              setTimeout(() => {
+                data.bursting = false;
+                d3.select(this)
+                  .style("opacity", 1)
+                  .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
+                  .transition()
+                  .duration(600)
+                  .ease(d3.easeElasticOut.amplitude(1).period(0.4))
+                  .attr("transform", `translate(${data.x},${data.y}) scale(1)`);
+              }, 350);
+            });
+        });
     }, baseInterval + Math.random() * 800);
 
     return () => clearInterval(interval);
-  }, [autoMatch]);
+  }, [autoMatch, bubbleColorMode, unifiedColorHex]);
 
   return (
     <div className="w-full h-full">
