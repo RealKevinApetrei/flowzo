@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   try {
     // Exchange code for tokens
-    const tokens = await exchangeCode(code);
+    const tokens = await exchangeCode(code, origin);
 
     // Store bank connection in database (truelayer_token is a jsonb column)
     const { data: connection, error } = await supabase
