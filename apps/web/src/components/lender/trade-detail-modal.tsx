@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@flowzo/shared";
 
 interface TradeDetailModalProps {
   trade: {
@@ -18,8 +19,6 @@ interface TradeDetailModalProps {
   onClose: () => void;
   onFund: (tradeId: string) => void;
 }
-
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
 const RISK_BADGE: Record<string, { bg: string; text: string; label: string }> = {
   A: { bg: "bg-success/10", text: "text-success", label: "Grade A" },
@@ -43,6 +42,12 @@ function formatDate(iso: string): string {
 
 export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailModalProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [confirming, setConfirming] = useState(false);
+
+  // Reset confirming state when trade changes
+  useEffect(() => {
+    setConfirming(false);
+  }, [trade?.id]);
 
   // Prevent body scroll when modal open
   useEffect(() => {
@@ -78,7 +83,7 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
           </div>
 
           {/* Close button */}
-          <Dialog.Close className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-warm-grey text-text-secondary hover:bg-cool-grey transition-colors">
+          <Dialog.Close aria-label="Close" className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-warm-grey text-text-secondary hover:bg-cool-grey transition-colors">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path
                 d="M1 1l12 12M13 1L1 13"
@@ -96,7 +101,7 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
                 Trade Request
               </Dialog.Title>
               <p className="text-4xl font-extrabold text-navy mt-1 tracking-tight">
-                {formatPounds(trade.amount_pence)}
+                {formatCurrency(trade.amount_pence)}
               </p>
             </div>
 
@@ -112,7 +117,7 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
             {/* Detail rows */}
             <div className="space-y-0 divide-y divide-warm-grey">
               <DetailRow label="Shift duration" value={`${trade.shift_days} days`} />
-              <DetailRow label="Fee" value={formatPounds(trade.fee_pence)} />
+              <DetailRow label="Fee" value={formatCurrency(trade.fee_pence)} />
               <DetailRow
                 label="Annualised rate"
                 value={annualizedRate(
@@ -125,15 +130,35 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
               <DetailRow label="Created" value={formatDate(trade.created_at)} />
             </div>
 
-            {/* Fund button */}
+            {/* Fund button — two-tap confirmation */}
             {isFundable ? (
-              <Button
-                size="lg"
-                className="w-full"
-                onClick={() => onFund(trade.id)}
-              >
-                Fund this trade
-              </Button>
+              confirming ? (
+                <div className="flex gap-3">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setConfirming(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="flex-1"
+                    onClick={() => onFund(trade.id)}
+                  >
+                    Confirm
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  size="lg"
+                  className="w-full"
+                  onClick={() => setConfirming(true)}
+                >
+                  Fund this trade
+                </Button>
+              )
             ) : (
               <Button size="lg" className="w-full" variant="secondary" disabled>
                 {trade.status === "MATCHED" || trade.status === "LIVE"

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@flowzo/shared";
 import { toast } from "sonner";
 
 interface LendingPotCardProps {
@@ -14,8 +15,6 @@ interface LendingPotCardProps {
   } | null;
   onPotUpdated?: () => void;
 }
-
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
 const TOP_UP_AMOUNTS = [1000, 5000, 10000, 50000]; // pence
 
@@ -53,7 +52,7 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
         throw new Error(error ?? "Top-up failed");
       }
 
-      toast.success(`Topped up ${formatPounds(amountPence)}`);
+      toast.success(`Topped up ${formatCurrency(amountPence)}`);
       setShowTopUp(false);
       onPotUpdated?.();
     } catch (err) {
@@ -82,7 +81,7 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
           <div>
             <p className="text-sm text-text-secondary mb-1">Available to lend</p>
             <p className="text-4xl font-extrabold text-navy tracking-tight">
-              {formatPounds(available)}
+              {formatCurrency(available)}
             </p>
           </div>
 
@@ -129,19 +128,19 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
           <StatRow
             label="Locked"
             sublabel="In active trades"
-            value={formatPounds(locked)}
+            value={formatCurrency(locked)}
             dotColor="bg-warning"
           />
           <StatRow
             label="Total deployed"
             sublabel="All time"
-            value={formatPounds(totalDeployed)}
+            value={formatCurrency(totalDeployed)}
             dotColor="bg-text-secondary"
           />
           <StatRow
             label="Yield earned"
             sublabel="Realised profit"
-            value={formatPounds(yieldEarned)}
+            value={formatCurrency(yieldEarned)}
             dotColor="bg-success"
             valueColor="text-success"
           />
@@ -160,7 +159,7 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
                   disabled={loading}
                   onClick={() => handleTopUp(amount)}
                 >
-                  {formatPounds(amount)}
+                  {formatCurrency(amount)}
                 </Button>
               ))}
             </div>

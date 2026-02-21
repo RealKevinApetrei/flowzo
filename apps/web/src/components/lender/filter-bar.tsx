@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import type { FilterMode } from "@/lib/hooks/use-lender-settings";
 import { RangeSlider } from "@/components/ui/range-slider";
 
@@ -19,17 +19,11 @@ interface FilterBarProps {
 
 const RISK_GRADES = ["A", "B", "C"] as const;
 
-const GRADE_STYLES: Record<string, { dot: string; active: string }> = {
-  A: { dot: "bg-blue-400", active: "border-blue-400/50 text-blue-200" },
-  B: { dot: "bg-rose-400", active: "border-rose-400/50 text-rose-200" },
-  C: { dot: "bg-amber-400", active: "border-amber-400/50 text-amber-200" },
+const GRADE_STYLES: Record<string, { dot: string; activeBg: string; activeBorder: string; activeText: string }> = {
+  A: { dot: "bg-success", activeBg: "bg-success/10", activeBorder: "border-success/40", activeText: "text-success" },
+  B: { dot: "bg-warning", activeBg: "bg-warning/10", activeBorder: "border-warning/40", activeText: "text-warning" },
+  C: { dot: "bg-danger", activeBg: "bg-danger/10", activeBorder: "border-danger/40", activeText: "text-danger" },
 };
-
-function summarize(filters: FilterState): string {
-  const grades = filters.riskGrades;
-  if (grades.size === 3 || grades.size === 0) return "ALL GRADES";
-  return [...grades].map((g) => `Grade ${g}`).join(", ");
-}
 
 export function FilterBar({
   filters,
@@ -37,19 +31,7 @@ export function FilterBar({
   mode,
   onModeChange,
 }: FilterBarProps) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("pointerdown", handler);
-    return () => document.removeEventListener("pointerdown", handler);
-  }, [open]);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const toggleGrade = (grade: "A" | "B" | "C") => {
     const next = new Set(filters.riskGrades);
@@ -69,135 +51,113 @@ export function FilterBar({
   };
 
   return (
-    <div ref={ref} className="absolute bottom-4 left-3 z-10">
-      {/* Collapsed chip */}
-      <button
-        onClick={() => setOpen(!open)}
-        className="neon-chip rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-mono font-medium"
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
+    <div className="space-y-3">
+      {/* Risk grade pill chips — horizontal scrollable */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        {/* Mode toggle */}
+        <div className="flex items-center gap-0.5 bg-warm-grey p-0.5 rounded-full shrink-0">
+          {(["simple", "advanced"] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => {
+                onModeChange(m);
+                if (m === "advanced") setShowAdvanced(true);
+                else setShowAdvanced(false);
+              }}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                mode === m
+                  ? "bg-[var(--card-surface)] text-navy shadow-sm"
+                  : "text-text-secondary hover:text-navy"
+              }`}
+            >
+              {m === "simple" ? "Simple" : "Advanced"}
+            </button>
+          ))}
+        </div>
+
+        {/* Divider */}
+        <div className="w-px h-5 bg-cool-grey shrink-0" />
+
+        {/* All chip */}
+        <button
+          onClick={setAll}
+          className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all border shrink-0 ${
+            filters.riskGrades.size === 3
+              ? "bg-coral/10 border-coral/40 text-coral"
+              : "bg-warm-grey border-transparent text-text-secondary hover:text-navy"
+          }`}
         >
-          <line x1="4" y1="6" x2="20" y2="6" />
-          <line x1="8" y1="12" x2="16" y2="12" />
-          <line x1="11" y1="18" x2="13" y2="18" />
-        </svg>
-        <span>{summarize(filters)}</span>
-      </button>
+          All
+        </button>
 
-      {/* Expanded popover */}
-      {open && (
-        <div className="absolute bottom-full left-0 mb-2 hud-panel rounded-xl p-4 shadow-xl w-[calc(100vw-1.5rem)] max-w-[280px] space-y-4">
-          {/* Mode toggle */}
-          <div className="flex items-center gap-1 bg-blue-950/50 p-0.5 rounded-lg border border-blue-500/15">
-            {(["simple", "advanced"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => onModeChange(m)}
-                className={`flex-1 py-1.5 rounded-md text-[10px] font-mono font-bold tracking-wider transition-all ${
-                  mode === m
-                    ? "bg-blue-500/20 text-blue-200 shadow-sm border border-blue-500/30"
-                    : "text-blue-400/50 hover:text-blue-300/70 border border-transparent"
-                }`}
-              >
-                {m === "simple" ? "SIMPLE" : "ADVANCED"}
-              </button>
-            ))}
-          </div>
+        {/* Grade chips */}
+        {RISK_GRADES.map((g) => {
+          const style = GRADE_STYLES[g];
+          const active = filters.riskGrades.has(g);
+          return (
+            <button
+              key={g}
+              onClick={() => toggleGrade(g)}
+              className={`px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all flex items-center gap-1.5 border shrink-0 ${
+                active
+                  ? `${style.activeBg} ${style.activeBorder} ${style.activeText}`
+                  : "bg-warm-grey border-transparent text-text-secondary hover:text-navy"
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+              {g}
+            </button>
+          );
+        })}
+      </div>
 
-          {/* Risk grade chips */}
+      {/* Advanced sliders */}
+      {mode === "advanced" && (
+        <div className="space-y-3 pt-1">
           <div>
-            <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium mb-2">
-              Risk Grade
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={setAll}
-                className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold transition-all border ${
-                  filters.riskGrades.size === 3
-                    ? "neon-chip-active"
-                    : "neon-chip"
-                }`}
-              >
-                ALL
-              </button>
-              {RISK_GRADES.map((g) => {
-                const style = GRADE_STYLES[g];
-                const active = filters.riskGrades.has(g);
-                return (
-                  <button
-                    key={g}
-                    onClick={() => toggleGrade(g)}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold transition-all flex items-center gap-1.5 border ${
-                      active ? style.active + " bg-blue-500/10" : "neon-chip"
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
-                    {g}
-                  </button>
-                );
-              })}
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-text-secondary">Amount</p>
+              <p className="text-xs text-text-muted">
+                {"\u00A3"}
+                {(filters.amountRange[0] / 100).toFixed(0)} – {"\u00A3"}
+                {(filters.amountRange[1] / 100).toFixed(0)}
+              </p>
             </div>
+            <RangeSlider
+              min={0}
+              max={100000}
+              step={500}
+              value={filters.amountRange}
+              onValueChange={([min, max]) =>
+                onFiltersChange({
+                  ...filters,
+                  amountRange: [min, max],
+                })
+              }
+            />
           </div>
-
-          {/* Advanced sliders */}
-          {mode === "advanced" && (
-            <>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium">
-                    Amount
-                  </p>
-                  <p className="text-[10px] text-blue-300/70 font-mono">
-                    {"\u00A3"}
-                    {(filters.amountRange[0] / 100).toFixed(0)} – {"\u00A3"}
-                    {(filters.amountRange[1] / 100).toFixed(0)}
-                  </p>
-                </div>
-                <RangeSlider
-                  min={0}
-                  max={100000}
-                  step={500}
-                  value={filters.amountRange}
-                  onValueChange={([min, max]) =>
-                    onFiltersChange({
-                      ...filters,
-                      amountRange: [min, max],
-                    })
-                  }
-                />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium">
-                    Term (days)
-                  </p>
-                  <p className="text-[10px] text-blue-300/70 font-mono">
-                    {filters.termRange[0]}d – {filters.termRange[1]}d
-                  </p>
-                </div>
-                <RangeSlider
-                  min={1}
-                  max={90}
-                  step={1}
-                  value={filters.termRange}
-                  onValueChange={([min, max]) =>
-                    onFiltersChange({
-                      ...filters,
-                      termRange: [min, max],
-                    })
-                  }
-                />
-              </div>
-            </>
-          )}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-text-secondary">
+                Term (days)
+              </p>
+              <p className="text-xs text-text-muted">
+                {filters.termRange[0]}d – {filters.termRange[1]}d
+              </p>
+            </div>
+            <RangeSlider
+              min={1}
+              max={90}
+              step={1}
+              value={filters.termRange}
+              onValueChange={([min, max]) =>
+                onFiltersChange({
+                  ...filters,
+                  termRange: [min, max],
+                })
+              }
+            />
+          </div>
         </div>
       )}
     </div>

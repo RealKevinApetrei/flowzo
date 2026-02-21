@@ -3,32 +3,26 @@
 import { useRef, useEffect, useCallback } from "react";
 import * as d3 from "d3";
 import type { FilterState } from "./filter-bar";
-import type { HudPosition, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
+import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { resolveBubblePalette } from "@/lib/hooks/use-lender-settings";
+import type { BubbleTrade } from "@/lib/hooks/use-bubble-board";
+import { formatCurrency } from "@flowzo/shared";
 
-export interface BubbleTrade {
-  id: string;
-  amount_pence: number;
-  fee_pence: number;
-  shift_days: number;
-  risk_grade: string;
-  status: string;
-  borrower_name?: string;
-}
+export type { BubbleTrade } from "@/lib/hooks/use-bubble-board";
+
+/** Compact format for SVG bubble text — strips trailing .00 */
+const formatShort = (pence: number) => formatCurrency(pence).replace(/\.00$/, "");
 
 interface BubbleBoardProps {
   trades: BubbleTrade[];
   onQuickTap: (trade: BubbleTrade, position: { x: number; y: number }) => void;
   onLongPress: (tradeId: string) => void;
   filters: FilterState;
-  hudPosition: HudPosition;
   bubbleColorMode: BubbleColorMode;
   unifiedColorHex: string;
 }
 
 const CHARGE_DURATION = 500;
-
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(0);
 
 interface PhysicsNode {
   id: string;
@@ -65,7 +59,6 @@ export function BubbleBoard({
   onQuickTap,
   onLongPress,
   filters,
-  hudPosition,
   bubbleColorMode,
   unifiedColorHex,
 }: BubbleBoardProps) {
@@ -77,13 +70,13 @@ export function BubbleBoard({
 
   const getRadius = useCallback(
     (amountPence: number, allAmounts: number[], isMobile: boolean) => {
-      if (allAmounts.length === 0) return isMobile ? 30 : 45;
+      if (allAmounts.length === 0) return isMobile ? 24 : 35;
       const min = Math.min(...allAmounts);
       const max = Math.max(...allAmounts);
       const range = max - min || 1;
       const normalized = (amountPence - min) / range;
-      const rMin = isMobile ? 22 : 32;
-      const rMax = isMobile ? 40 : 55;
+      const rMin = isMobile ? 18 : 26;
+      const rMax = isMobile ? 32 : 45;
       return rMin + normalized * (rMax - rMin);
     },
     [],
@@ -115,33 +108,21 @@ export function BubbleBoard({
     d3Svg.select("defs").remove();
     const defs = d3Svg.append("defs");
 
+    // Simple drop shadow filter for subtle depth
+    const shadow = defs.append("filter").attr("id", "bubble-shadow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
+    shadow.append("feDropShadow").attr("dx", "0").attr("dy", "2").attr("stdDeviation", "3").attr("flood-color", "rgba(0,0,0,0.15)");
+
     if (bubbleColorMode === "unified") {
       const p = resolveBubblePalette("A", "unified", unifiedColorHex);
       const grad = defs.append("radialGradient").attr("id", "grad-unified").attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
       grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
       grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
-
-      const glow = defs.append("filter").attr("id", "glow-unified").attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
-      glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
-      glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
-      glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
-      const merge = glow.append("feMerge");
-      merge.append("feMergeNode").attr("in", "colored");
-      merge.append("feMergeNode").attr("in", "SourceGraphic");
     } else {
       (["A", "B", "C"] as const).forEach((grade) => {
         const p = resolveBubblePalette(grade, "by-grade", unifiedColorHex);
         const grad = defs.append("radialGradient").attr("id", `grad-${grade}`).attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
         grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
         grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
-
-        const glow = defs.append("filter").attr("id", `glow-${grade}`).attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
-        glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
-        glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
-        glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
-        const merge = glow.append("feMerge");
-        merge.append("feMergeNode").attr("in", "colored");
-        merge.append("feMergeNode").attr("in", "SourceGraphic");
       });
     }
 
@@ -243,7 +224,6 @@ export function BubbleBoard({
     });
 
     const gradId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#grad-unified)" : `url(#grad-${d.risk_grade})`;
-    const glowId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#glow-unified)" : `url(#glow-${d.risk_grade})`;
 
     // Circle — soft gradient, drop shadow
     enter
@@ -251,7 +231,7 @@ export function BubbleBoard({
       .attr("class", "main-circle")
       .attr("r", 0)
       .attr("fill", gradId)
-      .attr("filter", glowId)
+      .attr("filter", "url(#bubble-shadow)")
       .transition()
       .duration(600)
       .ease(d3.easeElasticOut.amplitude(1).period(0.4))
@@ -330,7 +310,7 @@ export function BubbleBoard({
       .attr("pointer-events", "none")
       .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
       .style("opacity", 0)
-      .text((d) => formatPounds(d.amount_pence))
+      .text((d) => formatShort(d.amount_pence))
       .transition()
       .delay(350)
       .duration(300)
@@ -345,7 +325,7 @@ export function BubbleBoard({
       .duration(300)
       .attr("r", (d) => d.radius)
       .attr("fill", gradId)
-      .attr("filter", glowId);
+      .attr("filter", "url(#bubble-shadow)");
 
     merged.select(".highlight-ring").attr("r", (d) => d.radius + 2);
 
@@ -362,7 +342,7 @@ export function BubbleBoard({
 
     merged
       .select(".bubble-amount")
-      .text((d) => formatPounds(d.amount_pence))
+      .text((d) => formatShort(d.amount_pence))
       .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`);
 
     // ---------- Billiard-ball physics via RAF ----------
@@ -446,7 +426,7 @@ export function BubbleBoard({
     return () => {
       cancelAnimationFrame(rafRef.current);
     };
-  }, [trades, filters, hudPosition, getRadius, bubbleColorMode, unifiedColorHex]);
+  }, [trades, filters, getRadius, bubbleColorMode, unifiedColorHex]);
 
   return (
     <div className="w-full h-full overflow-hidden">
