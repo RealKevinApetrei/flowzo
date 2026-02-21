@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/layout/top-bar";
 import { LendingPotCard } from "./lending-pot-card";
 import { YieldDashboard } from "./yield-dashboard";
@@ -33,6 +34,7 @@ export function LenderPageClient({
   currentApyBps,
   sparklineData,
 }: LenderPageClientProps) {
+  const router = useRouter();
 
   return (
     <div>
@@ -44,7 +46,7 @@ export function LenderPageClient({
         />
 
         {/* Lending Pot Card */}
-        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} />
+        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} onPotUpdated={() => router.refresh()} />
 
         {/* Yield Dashboard */}
         <YieldDashboard
