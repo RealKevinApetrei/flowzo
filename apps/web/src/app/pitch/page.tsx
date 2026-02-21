@@ -11,37 +11,67 @@ const slides = [
     content: (
       <div className="w-full max-w-4xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Problem</p>
-        <h1 className="text-5xl sm:text-7xl font-extrabold text-white leading-tight mb-8">
+        <h1 className="text-5xl sm:text-7xl font-extrabold text-white leading-tight mb-10">
           Your bills don't care<br />
           <span className="text-coral">when you get paid.</span>
         </h1>
-        <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-4">
+        <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-10">
           Millions of UK adults have regular income and pay their bills on time —
           but a <span className="text-white font-semibold">timing mismatch</span> between when money arrives and when recurring payments land sends them into overdraft every month.
         </p>
-        <p className="text-lg text-white/50 max-w-xl mx-auto leading-relaxed mb-6">
-          It's not a debt problem. It's a <span className="text-coral font-semibold">cashflow timing problem</span> — and no financial product has been built to solve it directly.
-        </p>
-        <p className="text-base text-white/60 max-w-xl mx-auto leading-relaxed mb-10">
-          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity without a credit score.
-        </p>
-        <div className="grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
-          {[
-            { stat: "£45", label: "Average overdraft fee from a single timing mismatch" },
-            { stat: "1 in 3", label: "UK adults regularly run short before payday" },
-            { stat: "0", label: "Financial products built specifically for cashflow timing" },
-          ].map(({ stat, label }) => (
-            <div key={stat} className="text-center">
-              <div className="text-3xl sm:text-4xl font-extrabold text-coral">{stat}</div>
-              <p className="text-xs text-white/50 mt-2 leading-snug">{label}</p>
-            </div>
-          ))}
+        <div className="text-center">
+          <div className="text-5xl sm:text-6xl font-extrabold text-coral">1 in 4</div>
+          <p className="text-sm text-white/50 mt-3">UK workers run out of money before payday (CIPHR, 2024)</p>
         </div>
       </div>
     ),
   },
   {
     id: 2,
+    label: "The Cost",
+    bg: "bg-navy-bg",
+    dark: true,
+    content: (
+      <div className="w-full max-w-4xl mx-auto px-8 text-center">
+        <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Cost</p>
+        <h1 className="text-5xl sm:text-7xl font-extrabold text-white leading-tight mb-10">
+          A timing problem.<br />
+          <span className="text-coral">An overdraft price.</span>
+        </h1>
+        <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-10">
+          It's not a debt problem. It's a <span className="text-coral font-semibold">cashflow timing problem</span> — but banks charge full overdraft rates regardless.
+        </p>
+        <div className="text-center">
+          <div className="text-5xl sm:text-6xl font-extrabold text-coral">~40%</div>
+          <p className="text-sm text-white/50 mt-3">APR charged on overdrafts by major UK banks</p>
+        </div>
+      </div>
+    ),
+  },
+  {
+    id: 3,
+    label: "The Gap",
+    bg: "bg-navy-bg",
+    dark: true,
+    content: (
+      <div className="w-full max-w-4xl mx-auto px-8 text-center">
+        <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Gap</p>
+        <h1 className="text-5xl sm:text-7xl font-extrabold text-white leading-tight mb-10">
+          No product has been<br />
+          <span className="text-coral">built to solve this.</span>
+        </h1>
+        <div className="text-center mb-10">
+          <div className="text-5xl sm:text-6xl font-extrabold text-coral">0</div>
+          <p className="text-sm text-white/50 mt-3">Financial products built specifically for cashflow timing</p>
+        </div>
+        <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed">
+          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity without a credit score.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: 4,
     label: "Data Pipeline",
     bg: "bg-soft-white",
     dark: false,
@@ -96,7 +126,7 @@ const slides = [
     ),
   },
   {
-    id: 3,
+    id: 5,
     label: "Prediction",
     bg: "bg-navy-bg",
     dark: true,
@@ -137,7 +167,7 @@ const slides = [
     ),
   },
   {
-    id: 4,
+    id: 6,
     label: "Decision Engine",
     bg: "bg-soft-white",
     dark: false,
@@ -188,7 +218,7 @@ const slides = [
     ),
   },
   {
-    id: 5,
+    id: 7,
     label: "Validation",
     bg: "bg-navy-bg",
     dark: true,
