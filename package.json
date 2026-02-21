@@ -13,10 +13,12 @@
     "test:e2e": "turbo test:e2e"
   },
   "devDependencies": {
-    "turbo": "^2",
+    "@supabase/supabase-js": "^2.97.0",
+    "@types/node": "^22",
     "prettier": "^3",
-    "typescript": "^5.7",
-    "@types/node": "^22"
+    "tsx": "^4.21.0",
+    "turbo": "^2",
+    "typescript": "^5.7"
   },
   "packageManager": "pnpm@10.28.0",
   "engines": {
