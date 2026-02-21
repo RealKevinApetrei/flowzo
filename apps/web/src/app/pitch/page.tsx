@@ -65,7 +65,7 @@ const slides = [
           <p className="text-sm text-white/50 mt-3">Financial products built specifically for cashflow timing</p>
         </div>
         <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed">
-          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity without a credit score.
+          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity.
         </p>
       </div>
     ),
@@ -93,7 +93,7 @@ const slides = [
               icon: "🔗",
               title: "Connect",
               subtitle: "TrueLayer Open Banking",
-              desc: "User connects their bank. We pull 90 days of real transaction history — income, bills, spending — in seconds.",
+              desc: "User connects their bank. We pull 90 days of real transaction history in seconds.",
             },
             {
               step: "02",
@@ -107,7 +107,7 @@ const slides = [
               icon: "🎯",
               title: "Score & Propose",
               subtitle: "AI Decision Engine",
-              desc: "An A/B/C risk grade is assigned. A fee is dynamically priced. Claude AI generates a plain-English bill-shift proposal.",
+              desc: "An A/B/C risk grade is assigned and APR calculated accordingly. Claude AI generates a plain-English bill-shift proposal.",
             },
           ].map(({ step, icon, title, subtitle, desc }) => (
             <div key={title} className="card-monzo p-6 text-left">
@@ -134,7 +134,7 @@ const slides = [
       <div className="w-full max-w-4xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Forecast</p>
         <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight mb-6">
-          30 days ahead.<br />
+          ** days ahead.<br />
           <span className="text-coral">Danger flagged.</span><br />
           Bills shifted.
         </h1>
@@ -144,7 +144,7 @@ const slides = [
         <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full mx-auto text-left border border-white/20 mb-8">
           <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">Live Proposal Example</p>
           <p className="text-white text-lg font-semibold leading-snug">
-            "Move your Netflix from the 15th to the 22nd to avoid a <span className="text-danger">−£45 overdraft</span>. Fee: <span className="text-coral">£1.20</span>."
+            "Move your rent back 7 days to avoid a <span className="text-danger">−£45 overdraft</span>. Fee: <span className="text-coral">£1.20</span>."
           </p>
           <div className="mt-4 flex gap-3">
             <span className="bg-success/20 text-success text-xs font-bold px-3 py-1 rounded-full">Accept</span>
