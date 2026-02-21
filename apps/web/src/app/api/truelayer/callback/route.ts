@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const state = searchParams.get("state");
 
+  console.log(`[TrueLayer Callback] origin=${origin}, redirect_uri=${origin}/api/truelayer/callback`);
+
   if (!code) {
     return NextResponse.redirect(`${origin}/onboarding?error=no_code`);
   }
@@ -126,7 +128,12 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(`${origin}/borrower`);
   } catch (error) {
-    console.error("TrueLayer token exchange failed:", error);
+    console.error(
+      "[TrueLayer Callback] Token exchange failed:",
+      error instanceof Error ? error.message : error,
+      `\n  origin: ${origin}`,
+      `\n  code present: ${!!code}`,
+    );
     return NextResponse.redirect(`${origin}/onboarding?error=token_exchange_failed`);
   }
 }

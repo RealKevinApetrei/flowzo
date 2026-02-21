@@ -107,7 +107,7 @@ export default async function OnboardingPage({
             <p className="text-xs text-text-secondary">
               {params.error === "no_code" && "Bank connection was cancelled. You can try again."}
               {params.error === "invalid_state" && "Security check failed. Please try again."}
-              {params.error === "token_exchange_failed" && "Failed to connect to your bank. This can happen with sandbox credentials — please try again."}
+              {params.error === "token_exchange_failed" && "Failed to connect to your bank. Please wait a moment and try again."}
               {params.error === "storage_failed" && "Failed to save your connection. Please try again."}
             </p>
             <div className="flex items-center justify-center gap-3">
