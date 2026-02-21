@@ -250,6 +250,40 @@ serve(async (req: Request) => {
                   `Allocation REPAID status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
                 );
               }
+
+              // Auto-withdraw for lenders with queued withdrawal
+              const { data: lenderPot } = await supabase
+                .from("lending_pots")
+                .select("available, locked, withdrawal_queued")
+                .eq("user_id", alloc.lender_id)
+                .single();
+
+              if (lenderPot?.withdrawal_queued && Number(lenderPot.available) > 0) {
+                const { error: autoWithdrawErr } = await supabase.rpc(
+                  "update_lending_pot",
+                  {
+                    p_user_id: alloc.lender_id,
+                    p_entry_type: "WITHDRAW",
+                    p_amount: Number(lenderPot.available),
+                    p_trade_id: trade.id,
+                    p_allocation_id: alloc.id,
+                    p_description: `Auto-withdraw (queued) after trade ${trade.id} repaid`,
+                    p_idempotency_key: `auto-withdraw-${trade.id}-${alloc.id}`,
+                  },
+                );
+
+                if (autoWithdrawErr) {
+                  console.error(
+                    `Auto-withdraw failed for lender ${alloc.lender_id}:`,
+                    autoWithdrawErr,
+                  );
+                } else if (Number(lenderPot.locked) <= principal) {
+                  await supabase
+                    .from("lending_pots")
+                    .update({ withdrawal_queued: false })
+                    .eq("user_id", alloc.lender_id);
+                }
+              }
             }
           }
 

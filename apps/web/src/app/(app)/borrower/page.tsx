@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
+import { BalanceCard } from "@/components/borrower/balance-card";
 import { CalendarHeatmap } from "@/components/borrower/calendar-heatmap";
 import { SuggestionFeed } from "@/components/borrower/suggestion-feed";
 import { ComparisonCard } from "@/components/borrower/comparison-card";
@@ -33,25 +34,63 @@ export default async function BorrowerHomePage() {
 
   const displayName = profile?.display_name ?? "there";
 
-  // Fetch 30-day forecast for the user
+  // Fetch account balances for hero card
+  const { data: accounts } = await supabase
+    .from("accounts")
+    .select("balance_current")
+    .eq("user_id", user.id);
+
+  const totalBalancePence = (accounts ?? []).reduce(
+    (sum, a) => sum + Math.round(Number(a.balance_current) * 100),
+    0,
+  );
+  const accountCount = accounts?.length ?? 0;
+
+  // Fetch 30-day forecast for the user (with enhanced fields)
   const today = new Date();
   const thirtyDaysLater = new Date(today);
   thirtyDaysLater.setDate(today.getDate() + 30);
 
   const { data: rawForecasts } = await supabase
     .from("forecasts")
-    .select("forecast_date, projected_balance, danger_flag, confidence_low")
+    .select(
+      "forecast_date, projected_balance, danger_flag, confidence_low, confidence_high, income_expected, outgoings_expected",
+    )
     .eq("user_id", user.id)
     .gte("forecast_date", today.toISOString().split("T")[0])
     .lte("forecast_date", thirtyDaysLater.toISOString().split("T")[0])
     .order("forecast_date", { ascending: true });
 
-  // Map to the heatmap component's expected prop shape
+  // Fetch active obligations for calendar tooltip
+  const { data: obligations } = await supabase
+    .from("obligations")
+    .select("id, name, amount, expected_day, merchant_name, next_expected")
+    .eq("user_id", user.id)
+    .eq("active", true);
+
+  // Map to the heatmap component's expected prop shape (DB stores GBP → convert to pence)
   const forecasts = (rawForecasts ?? []).map((f) => ({
     forecast_date: f.forecast_date,
-    projected_balance_pence: f.projected_balance,
+    projected_balance_pence: Math.round(Number(f.projected_balance) * 100),
     is_danger: f.danger_flag,
-    confidence_low_pence: f.confidence_low ?? f.projected_balance,
+    confidence_low_pence: Math.round(
+      Number(f.confidence_low ?? f.projected_balance) * 100,
+    ),
+    confidence_high_pence: Math.round(
+      Number(f.confidence_high ?? Number(f.projected_balance) * 1.2) * 100,
+    ),
+    income_expected_pence: Math.round(Number(f.income_expected ?? 0) * 100),
+    outgoings_expected_pence: Math.round(
+      Number(f.outgoings_expected ?? 0) * 100,
+    ),
+  }));
+
+  const obligationsMapped = (obligations ?? []).map((o) => ({
+    id: o.id,
+    name: o.name ?? o.merchant_name ?? "Bill",
+    amount_pence: Math.round(Number(o.amount) * 100),
+    expected_day: o.expected_day,
+    next_expected: o.next_expected,
   }));
 
   // Calculate comparison data from forecasts and proposals
@@ -62,7 +101,9 @@ export default async function BorrowerHomePage() {
   );
 
   // Estimate overdraft fees: ~1p/day per pound overdrawn is typical UK rate
-  const estimatedOverdraftFees = Math.round(totalNegativeBalance * 0.01 * dangerDays.length);
+  const estimatedOverdraftFees = Math.round(
+    totalNegativeBalance * 0.01 * dangerDays.length,
+  );
   // Estimate failed payment charges (~25 GBP each)
   const failedPaymentCharge = 2500; // 25 GBP in pence
   const estimatedFailedPayments = dangerDays.length * failedPaymentCharge;
@@ -78,10 +119,27 @@ export default async function BorrowerHomePage() {
   const totalFlowzoFee = proposals
     .filter((p) => p.status === "ACCEPTED")
     .reduce((sum, p) => sum + (p.payload?.fee_pence ?? 0), 0);
-  const billsShifted = proposals.filter((p) => p.status === "ACCEPTED").length;
+  const billsShifted = proposals.filter(
+    (p) => p.status === "ACCEPTED",
+  ).length;
 
   const totalWithout = estimatedOverdraftFees + estimatedFailedPayments;
   const savedPence = Math.max(0, totalWithout - totalFlowzoFee);
+
+  // Compute additional health metrics
+  const healthyDays = forecasts.filter((f) => !f.is_danger).length;
+  const overdraftProbability = Math.max(
+    ...forecasts.map((f) => {
+      if (f.confidence_low_pence >= 0) return 0;
+      const range = f.confidence_high_pence - f.confidence_low_pence;
+      if (range <= 0) return f.projected_balance_pence < 0 ? 95 : 0;
+      return Math.min(
+        Math.round((Math.abs(f.confidence_low_pence) / range) * 100),
+        99,
+      );
+    }),
+    0,
+  );
 
   const comparisonData = {
     withoutFlowzo: {
@@ -94,6 +152,10 @@ export default async function BorrowerHomePage() {
       billsShifted,
       savedPence,
     },
+    healthyDays,
+    totalForecastDays: forecasts.length,
+    upcomingObligations: obligationsMapped.length,
+    overdraftProbability,
   };
 
   return (
@@ -111,9 +173,22 @@ export default async function BorrowerHomePage() {
           </p>
         </div>
 
+        {/* Hero Balance Card */}
+        {accountCount > 0 && (
+          <section>
+            <BalanceCard
+              totalBalancePence={totalBalancePence}
+              accountCount={accountCount}
+            />
+          </section>
+        )}
+
         {/* Calendar Heatmap */}
         <section>
-          <CalendarHeatmap forecasts={forecasts} />
+          <CalendarHeatmap
+            forecasts={forecasts}
+            obligations={obligationsMapped}
+          />
         </section>
 
         {/* AI Suggestions */}
@@ -122,7 +197,7 @@ export default async function BorrowerHomePage() {
           <SuggestionFeed userId={user.id} />
         </section>
 
-        {/* Comparison Card */}
+        {/* Financial Health Card */}
         <section>
           <ComparisonCard {...comparisonData} />
         </section>

@@ -235,12 +235,16 @@ serve(async (req: Request) => {
 
     const { data: allPots } = await supabase
       .from("lending_pots")
-      .select("user_id, available")
+      .select("user_id, available, withdrawal_queued")
       .in("user_id", lenderIds);
 
     const potMap = new Map<string, number>();
+    const withdrawalQueuedSet = new Set<string>();
     for (const pot of allPots ?? []) {
       potMap.set(pot.user_id as string, Number(pot.available));
+      if (pot.withdrawal_queued) {
+        withdrawalQueuedSet.add(pot.user_id as string);
+      }
     }
 
     // Batch-fetch all lender exposures in one query
@@ -261,6 +265,9 @@ serve(async (req: Request) => {
     for (const pref of lenderPrefs) {
       const lenderId = pref.user_id as string;
       const minAPR = Number(pref.min_apr ?? 0);
+
+      // Skip lenders who have queued a withdrawal
+      if (withdrawalQueuedSet.has(lenderId)) continue;
 
       // Enforce min_apr: skip lenders whose minimum exceeds the trade's implied APR
       if (minAPR > 0 && impliedAPR < minAPR) continue;

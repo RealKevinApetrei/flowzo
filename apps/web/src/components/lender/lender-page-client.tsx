@@ -1,10 +1,18 @@
 "use client";
 
 import { useState, useTransition, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { formatCurrency } from "@flowzo/shared";
 import { useBubbleBoard } from "@/lib/hooks/use-bubble-board";
 import { useLenderSettings } from "@/lib/hooks/use-lender-settings";
-import { toggleAutoMatch, fundTrade } from "@/lib/actions/lending";
+import {
+  toggleAutoMatch,
+  fundTrade,
+  withdrawFromPot,
+  queueWithdrawal,
+  cancelQueuedWithdrawal,
+} from "@/lib/actions/lending";
 import { TopBar } from "@/components/layout/top-bar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BubbleBoard } from "./bubble-board";
@@ -36,16 +44,25 @@ interface LenderPageClientProps {
   initialPot: LendingPot | null;
   initialAutoMatch: boolean;
   initialYieldStats: YieldStats;
+  initialWithdrawalQueued: boolean;
+  sparklineData: number[];
 }
 
 export function LenderPageClient({
   initialPot,
   initialAutoMatch,
   initialYieldStats,
+  initialWithdrawalQueued,
+  sparklineData,
 }: LenderPageClientProps) {
+  const router = useRouter();
   const { trades, loading: tradesLoading } = useBubbleBoard();
-  const { defaultFilterMode, bubbleColorMode, unifiedColorHex } = useLenderSettings();
+  const { defaultFilterMode, bubbleColorMode, unifiedColorHex } =
+    useLenderSettings();
   const [autoMatch, setAutoMatch] = useState(initialAutoMatch);
+  const [withdrawalQueued, setWithdrawalQueued] = useState(
+    initialWithdrawalQueued,
+  );
   const [isPending, startTransition] = useTransition();
   const [filterMode, setFilterMode] = useState(defaultFilterMode);
 
@@ -62,13 +79,21 @@ export function LenderPageClient({
 
   const isDemo = initialPot === null;
 
+  // Compute projected yield for passive income display
+  const totalPotPence =
+    (initialPot?.available_pence ?? 0) + (initialPot?.locked_pence ?? 0);
+  const aprDecimal = initialYieldStats.avgAprBps / 10000;
+  const monthlyYieldPence = Math.round((totalPotPence * aprDecimal) / 12);
+
   const handleAutoMatchToggle = useCallback(
     (enabled: boolean) => {
       setAutoMatch(enabled);
       startTransition(async () => {
         try {
           await toggleAutoMatch(enabled);
-          toast.success(enabled ? "Auto-match enabled" : "Auto-match disabled");
+          toast.success(
+            enabled ? "Auto-match enabled" : "Auto-match disabled",
+          );
         } catch {
           setAutoMatch(!enabled);
           toast.error("Failed to update auto-match setting");
@@ -78,50 +103,99 @@ export function LenderPageClient({
     [],
   );
 
-  const handleLongPress = useCallback(
-    (tradeId: string) => {
-      startTransition(async () => {
-        try {
-          await fundTrade(tradeId);
-          toast.success("Trade funded successfully!");
-        } catch (err) {
-          console.error("Failed to fund trade:", err);
-          toast.error("Failed to fund trade. Please try again.");
-        }
-      });
-    },
-    [],
-  );
+  const handleLongPress = useCallback((tradeId: string) => {
+    startTransition(async () => {
+      try {
+        await fundTrade(tradeId);
+        toast.success("Trade funded successfully!");
+      } catch (err) {
+        console.error("Failed to fund trade:", err);
+        toast.error("Failed to fund trade. Please try again.");
+      }
+    });
+  }, []);
 
   const handleCloseModal = useCallback(() => {
     setSelectedTradeId(null);
   }, []);
 
-  const handleFundTrade = useCallback(
-    async (tradeId: string) => {
+  const handleFundTrade = useCallback(async (tradeId: string) => {
+    startTransition(async () => {
+      try {
+        await fundTrade(tradeId);
+        setSelectedTradeId(null);
+        toast.success("Trade funded successfully!");
+      } catch (err) {
+        console.error("Failed to fund trade:", err);
+        toast.error("Failed to fund trade. Please try again.");
+      }
+    });
+  }, []);
+
+  const handleWithdraw = useCallback(
+    async (amountPence: number) => {
       startTransition(async () => {
         try {
-          await fundTrade(tradeId);
-          setSelectedTradeId(null);
-          toast.success("Trade funded successfully!");
+          await withdrawFromPot(amountPence);
+          toast.success(`Withdrew ${formatCurrency(amountPence)}`);
+          router.refresh();
         } catch (err) {
-          console.error("Failed to fund trade:", err);
-          toast.error("Failed to fund trade. Please try again.");
+          toast.error(
+            err instanceof Error ? err.message : "Withdrawal failed",
+          );
         }
       });
     },
-    [],
+    [router],
   );
+
+  const handleQueueWithdrawal = useCallback(async () => {
+    startTransition(async () => {
+      try {
+        await queueWithdrawal();
+        setWithdrawalQueued(true);
+        toast.success(
+          "Withdrawal queued — funds will auto-withdraw as trades settle",
+        );
+      } catch {
+        toast.error("Failed to queue withdrawal");
+      }
+    });
+  }, []);
+
+  const handleCancelQueuedWithdrawal = useCallback(async () => {
+    startTransition(async () => {
+      try {
+        await cancelQueuedWithdrawal();
+        setWithdrawalQueued(false);
+        toast("Withdrawal queue cancelled");
+      } catch {
+        toast.error("Failed to cancel withdrawal queue");
+      }
+    });
+  }, []);
 
   return (
     <div>
       <TopBar title="Lending" />
       <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
         {/* Lending Pot Card */}
-        <LendingPotCard pot={initialPot} />
+        <LendingPotCard
+          pot={initialPot}
+          withdrawalQueued={withdrawalQueued}
+          onPotUpdated={() => router.refresh()}
+          onWithdraw={handleWithdraw}
+          onQueueWithdrawal={handleQueueWithdrawal}
+          onCancelQueuedWithdrawal={handleCancelQueuedWithdrawal}
+        />
 
         {/* Auto-Pop Toggle */}
-        <AutoPopToggle enabled={autoMatch} onToggle={handleAutoMatchToggle} />
+        <AutoPopToggle
+          enabled={autoMatch}
+          onToggle={handleAutoMatchToggle}
+          avgAprBps={initialYieldStats.avgAprBps}
+          monthlyYieldPence={monthlyYieldPence}
+        />
 
         {/* Trade Requests */}
         <Card>
@@ -152,8 +226,23 @@ export function LenderPageClient({
                 />
               ) : tradesLoading ? (
                 <div className="flex flex-col items-center justify-center h-full text-text-secondary">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8 animate-pulse text-text-muted"><circle cx="12" cy="10" r="6"/><circle cx="19" cy="16" r="3"/><circle cx="6" cy="18" r="2"/></svg>
-                  <p className="text-sm font-medium mt-2">Loading bubbles...</p>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="w-8 h-8 animate-pulse text-text-muted"
+                  >
+                    <circle cx="12" cy="10" r="6" />
+                    <circle cx="19" cy="16" r="3" />
+                    <circle cx="6" cy="18" r="2" />
+                  </svg>
+                  <p className="text-sm font-medium mt-2">
+                    Loading bubbles...
+                  </p>
                 </div>
               ) : (
                 <BubbleBoard
@@ -172,7 +261,12 @@ export function LenderPageClient({
         </Card>
 
         {/* Yield Dashboard */}
-        <YieldDashboard stats={initialYieldStats} />
+        <YieldDashboard
+          stats={initialYieldStats}
+          potAvailablePence={initialPot?.available_pence}
+          potLockedPence={initialPot?.locked_pence}
+          sparklineData={sparklineData}
+        />
       </div>
 
       {/* Floating overlays */}

@@ -1,0 +1,23 @@
+# Raw training data (166MB) — not needed, model is pre-trained
+data/
+
+# Scripts (only needed locally for pre-training)
+scripts/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/

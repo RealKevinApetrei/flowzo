@@ -49,14 +49,19 @@ _state: dict = {}
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Pre-warm model and shared data on startup."""
-    print("Loading dataset and training model — this may take ~30 s on first run…")
+    import time
+
+    start = time.time()
+    print("Loading dataset and model...")
     df = load_data()
-    get_model()  # trains and caches
+    get_model()  # loads pre-trained or trains from CSV
 
     _state["df"] = df
     _state["lenders"] = simulate_lender_pool()
+    _state["model_loaded"] = True
 
-    print("Model ready.")
+    elapsed = time.time() - start
+    print(f"Model ready in {elapsed:.1f}s")
     yield
     _state.clear()
 
@@ -97,6 +102,15 @@ class BorrowerFeatures(BaseModel):
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health_check():
+    """Health check for Railway / load balancers."""
+    return {
+        "status": "ok",
+        "model_loaded": _state.get("model_loaded", False),
+    }
+
 
 @app.post("/api/score")
 def score_borrower(body: BorrowerFeatures):

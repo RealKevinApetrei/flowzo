@@ -19,13 +19,15 @@ interface SuggestionCardProps {
     };
     explanation_text: string | null;
   };
+  dangerDayBalance?: number;
   onAccept: (id: string) => void | Promise<void>;
   onDismiss: (id: string) => void | Promise<void>;
-  onCustomise: (id: string) => void;
+  onCustomise: (id: string) => void | Promise<void>;
 }
 
 export function SuggestionCard({
   proposal,
+  dangerDayBalance,
   onAccept,
   onDismiss,
   onCustomise,
@@ -126,6 +128,18 @@ export function SuggestionCard({
           <span className="text-text-secondary">Flowzo fee</span>
           <span className="font-semibold text-navy">{formatCurrency(payload.fee_pence)}</span>
         </div>
+
+        {/* Data-driven brief summary */}
+        {dangerDayBalance !== undefined && (
+          <p className="mt-3 text-xs text-text-secondary leading-relaxed bg-warning/5 border border-warning/15 rounded-lg px-3 py-2">
+            Your balance {dangerDayBalance < 0 ? "drops to " : "is only "}
+            <span className="font-semibold text-navy">
+              {formatCurrency(dangerDayBalance)}
+            </span>{" "}
+            on {formatDate(payload.original_date)} — shifting this bill avoids
+            a potential shortfall.
+          </p>
+        )}
 
         {/* Why button and explanation */}
         <div className="mt-3">

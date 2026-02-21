@@ -1,11 +1,15 @@
 """
 data_prep.py — Data loading, sampling (50k rows), and proxy column mapping.
+
+Loads from pre-serialized models/sample_data.joblib if available,
+otherwise loads from CSV (slower, requires 166MB file).
 """
 
 from pathlib import Path
 import pandas as pd
 
 DATA_PATH = Path(__file__).parent.parent / "data" / "application_train.csv"
+MODELS_DIR = Path(__file__).parent.parent / "models"
 
 FEATURE_COLUMNS = [
     "AMT_INCOME_TOTAL",
@@ -28,12 +32,20 @@ COLUMN_RENAME_MAP = {
 FEATURE_NAMES = list(COLUMN_RENAME_MAP.values())
 
 
-def load_data() -> pd.DataFrame:
-    """
-    Load application_train.csv, sample to 50k rows, extract and rename
-    Open Banking proxy features, impute missing values with column medians,
-    and return the cleaned DataFrame.
-    """
+def _load_sample() -> pd.DataFrame | None:
+    """Load pre-serialized sample data if available."""
+    sample_path = MODELS_DIR / "sample_data.joblib"
+    if sample_path.exists():
+        import joblib
+
+        print(f"Loading sample data from {sample_path}")
+        return joblib.load(sample_path)
+    return None
+
+
+def _load_from_csv() -> pd.DataFrame:
+    """Load and process from the full CSV — fallback path."""
+    print(f"Loading from CSV: {DATA_PATH}")
     df = pd.read_csv(DATA_PATH)
 
     df = df.sample(n=min(50_000, len(df)), random_state=42).reset_index(drop=True)
@@ -52,3 +64,13 @@ def load_data() -> pd.DataFrame:
             df[col].fillna(df[col].median(), inplace=True)
 
     return df
+
+
+def load_data() -> pd.DataFrame:
+    """
+    Load dataset — uses pre-serialized sample if available, otherwise CSV.
+    """
+    sample = _load_sample()
+    if sample is not None:
+        return sample
+    return _load_from_csv()

@@ -16,7 +16,9 @@ export default async function LenderHomePage() {
   // Fetch lending pot data (DB stores GBP decimal)
   const { data: pot } = await supabase
     .from("lending_pots")
-    .select("available, locked, total_deployed, realized_yield")
+    .select(
+      "available, locked, total_deployed, realized_yield, withdrawal_queued",
+    )
     .eq("user_id", user.id)
     .single();
 
@@ -30,7 +32,9 @@ export default async function LenderHomePage() {
   // Fetch trades where this user has allocations (lenders don't have lender_id on trades)
   const { data: allocations } = await supabase
     .from("allocations")
-    .select("trade_id, amount_slice, fee_slice, status, trades(amount, fee, shift_days, status)")
+    .select(
+      "trade_id, amount_slice, fee_slice, status, trades(amount, fee, shift_days, status)",
+    )
     .eq("lender_id", user.id);
 
   const allTrades = (allocations ?? []).map((a) => {
@@ -73,6 +77,19 @@ export default async function LenderHomePage() {
         )
       : 0;
 
+  // Fetch recent FEE_CREDIT entries for yield sparkline
+  const { data: recentYields } = await supabase
+    .from("pool_ledger")
+    .select("amount, created_at")
+    .eq("user_id", user.id)
+    .eq("entry_type", "FEE_CREDIT")
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  const sparklineData = (recentYields ?? []).map((r) =>
+    Math.round(Number(r.amount) * 100),
+  );
+
   const yieldStats = {
     totalYieldPence,
     avgTermDays,
@@ -89,13 +106,19 @@ export default async function LenderHomePage() {
             ? {
                 available_pence: Math.round(Number(pot.available) * 100),
                 locked_pence: Math.round(Number(pot.locked) * 100),
-                total_deployed_pence: Math.round(Number(pot.total_deployed) * 100),
-                realized_yield_pence: Math.round(Number(pot.realized_yield) * 100),
+                total_deployed_pence: Math.round(
+                  Number(pot.total_deployed) * 100,
+                ),
+                realized_yield_pence: Math.round(
+                  Number(pot.realized_yield) * 100,
+                ),
               }
             : null
         }
         initialAutoMatch={prefs?.auto_match_enabled ?? false}
         initialYieldStats={yieldStats}
+        initialWithdrawalQueued={pot?.withdrawal_queued ?? false}
+        sparklineData={sparklineData}
       />
     </>
   );

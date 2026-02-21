@@ -1,0 +1,17 @@
+{
+  "feature_names": [
+    "annual_inflow",
+    "avg_monthly_balance",
+    "days_since_account_open",
+    "primary_bank_health_score",
+    "secondary_bank_health_score",
+    "failed_payment_cluster_risk"
+  ],
+  "training_rows": 50000,
+  "sample_rows": 5000,
+  "model_type": "XGBClassifier",
+  "n_estimators": 200,
+  "max_depth": 4,
+  "random_state": 42,
+  "timestamp": "2026-02-21T20:06:35Z"
+}

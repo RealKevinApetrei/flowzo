@@ -3,13 +3,25 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { formatCurrency } from "@flowzo/shared";
 
 interface AutoPopToggleProps {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
+  avgAprBps: number;
+  monthlyYieldPence: number;
 }
 
-export function AutoPopToggle({ enabled, onToggle }: AutoPopToggleProps) {
+function bpsToPercent(bps: number): string {
+  return (bps / 100).toFixed(2) + "%";
+}
+
+export function AutoPopToggle({
+  enabled,
+  onToggle,
+  avgAprBps,
+  monthlyYieldPence,
+}: AutoPopToggleProps) {
   const [justEnabled, setJustEnabled] = useState(false);
 
   useEffect(() => {
@@ -67,8 +79,10 @@ export function AutoPopToggle({ enabled, onToggle }: AutoPopToggleProps) {
               </div>
               <p className="text-xs text-text-secondary mt-0.5 leading-snug">
                 {enabled
-                  ? "Bubbles will pop automatically!"
-                  : "Enable to auto-match trades"}
+                  ? avgAprBps > 0
+                    ? `Earning at ~${bpsToPercent(avgAprBps)} APR passively`
+                    : "Bubbles will pop automatically!"
+                  : "Pop bubbles to earn yield"}
               </p>
             </div>
           </div>
@@ -81,11 +95,30 @@ export function AutoPopToggle({ enabled, onToggle }: AutoPopToggleProps) {
           />
         </div>
 
-        {/* Description */}
-        <p className="text-xs text-muted mt-3 leading-relaxed">
-          When enabled, Flowzo automatically fills trades that match your
-          preferences
-        </p>
+        {/* Contextual description */}
+        {enabled ? (
+          <div className="mt-3 space-y-2">
+            {monthlyYieldPence > 0 && (
+              <div className="flex items-center justify-between text-sm bg-success/5 border border-success/15 rounded-lg px-3 py-2">
+                <span className="text-text-secondary">Est. monthly return</span>
+                <span className="font-bold text-success">
+                  {formatCurrency(monthlyYieldPence)}
+                </span>
+              </div>
+            )}
+            <p className="text-xs text-text-muted leading-relaxed">
+              Flowzo automatically fills trades that match your preferences —
+              sit back and earn
+            </p>
+          </div>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-text-muted leading-relaxed">
+              Long-press trade bubbles to fund them manually, or enable
+              Auto-Pop to match trades automatically
+            </p>
+          </div>
+        )}
 
         {/* Pulse bar when active */}
         {enabled && (

@@ -13,14 +13,26 @@ interface LendingPotCardProps {
     total_deployed_pence: number;
     realized_yield_pence: number;
   } | null;
+  withdrawalQueued: boolean;
   onPotUpdated?: () => void;
+  onWithdraw: (amountPence: number) => Promise<void>;
+  onQueueWithdrawal: () => Promise<void>;
+  onCancelQueuedWithdrawal: () => Promise<void>;
 }
 
 const TOP_UP_AMOUNTS = [1000, 5000, 10000, 50000]; // pence
 
-export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
+export function LendingPotCard({
+  pot,
+  withdrawalQueued,
+  onPotUpdated,
+  onWithdraw,
+  onQueueWithdrawal,
+  onCancelQueuedWithdrawal,
+}: LendingPotCardProps) {
   const [showTopUp, setShowTopUp] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [customAmount, setCustomAmount] = useState("");
 
   const available = pot?.available_pence ?? 0;
   const locked = pot?.locked_pence ?? 0;
@@ -54,9 +66,30 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
 
       toast.success(`Topped up ${formatCurrency(amountPence)}`);
       setShowTopUp(false);
+      setCustomAmount("");
       onPotUpdated?.();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Top-up failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function handleCustomTopUp() {
+    const pounds = parseFloat(customAmount);
+    if (isNaN(pounds) || pounds <= 0) {
+      toast.error("Enter a valid amount");
+      return;
+    }
+    const pence = Math.round(pounds * 100);
+    handleTopUp(pence);
+  }
+
+  async function handleWithdraw() {
+    if (available <= 0) return;
+    setLoading(true);
+    try {
+      await onWithdraw(available);
     } finally {
       setLoading(false);
     }
@@ -147,9 +180,41 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
           />
         </div>
 
+        {/* Withdrawal queue banner */}
+        {withdrawalQueued && (
+          <div className="rounded-xl bg-warning/10 border border-warning/20 p-3.5">
+            <div className="flex items-start gap-2.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-warning shrink-0 mt-0.5">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-13a.75.75 0 00-1.5 0v5c0 .414.336.75.75.75h4a.75.75 0 000-1.5h-3.25V5z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-navy">Withdrawal queued</p>
+                <p className="text-xs text-text-secondary mt-0.5">
+                  {formatCurrency(locked)} will auto-withdraw as trades settle
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full mt-2 text-text-secondary"
+              onClick={onCancelQueuedWithdrawal}
+              disabled={loading}
+            >
+              Cancel queue
+            </Button>
+          </div>
+        )}
+
         {/* Top Up section */}
         {showTopUp ? (
           <div className="space-y-3">
+            {/* Current balance context */}
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Current pot balance</span>
+              <span className="font-bold text-navy">{formatCurrency(total)}</span>
+            </div>
+
             <p className="text-sm font-medium text-navy">Select amount</p>
             <div className="grid grid-cols-2 gap-2">
               {TOP_UP_AMOUNTS.map((amount) => (
@@ -164,24 +229,80 @@ export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
                 </Button>
               ))}
             </div>
+
+            {/* Custom amount input */}
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-secondary font-medium">
+                  £
+                </span>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={customAmount}
+                  onChange={(e) => setCustomAmount(e.target.value)}
+                  className="w-full pl-7 pr-3 py-2 text-sm rounded-lg border border-warm-grey bg-soft-white text-navy placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-coral/30 focus:border-coral"
+                  disabled={loading}
+                />
+              </div>
+              <Button
+                size="sm"
+                disabled={loading || !customAmount}
+                onClick={handleCustomTopUp}
+              >
+                Top Up
+              </Button>
+            </div>
+
             <Button
               variant="ghost"
               size="sm"
               className="w-full"
-              onClick={() => setShowTopUp(false)}
+              onClick={() => {
+                setShowTopUp(false);
+                setCustomAmount("");
+              }}
             >
               Cancel
             </Button>
           </div>
         ) : (
-          <Button
-            variant="outline"
-            className="w-full"
-            size="lg"
-            onClick={() => setShowTopUp(true)}
-          >
-            Top Up Pot
-          </Button>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              className="w-full"
+              size="lg"
+              onClick={() => setShowTopUp(true)}
+            >
+              Top Up Pot
+            </Button>
+
+            {/* Withdraw available */}
+            {available > 0 && (
+              <Button
+                variant="ghost"
+                className="w-full text-text-secondary"
+                size="sm"
+                onClick={handleWithdraw}
+                disabled={loading}
+              >
+                Withdraw {formatCurrency(available)}
+              </Button>
+            )}
+
+            {/* Queue withdrawal for locked funds */}
+            {locked > 0 && !withdrawalQueued && (
+              <button
+                className="w-full text-center text-xs text-text-muted hover:text-coral transition-colors py-1"
+                onClick={onQueueWithdrawal}
+                disabled={loading}
+              >
+                Want to withdraw locked funds? Queue withdrawal
+              </button>
+            )}
+          </div>
         )}
       </CardContent>
     </Card>

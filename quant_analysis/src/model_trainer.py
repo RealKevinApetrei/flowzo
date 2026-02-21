@@ -1,6 +1,11 @@
 """
 model_trainer.py — Train XGBoost classifier and expose Probability of Default (PD).
+
+Loads a pre-trained model from models/xgboost_model.joblib if available,
+otherwise trains from CSV (slower, ~30s).
 """
+
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -11,8 +16,23 @@ from .data_prep import FEATURE_NAMES, load_data
 
 _model: XGBClassifier | None = None
 
+MODELS_DIR = Path(__file__).parent.parent / "models"
+
+
+def _load_pretrained() -> XGBClassifier | None:
+    """Load pre-trained model from joblib if available."""
+    model_path = MODELS_DIR / "xgboost_model.joblib"
+    if model_path.exists():
+        import joblib
+
+        print(f"Loading pre-trained model from {model_path}")
+        return joblib.load(model_path)
+    return None
+
 
 def _train_model() -> XGBClassifier:
+    """Train from CSV — fallback when no pre-trained model exists."""
+    print("No pre-trained model found, training from CSV...")
     df = load_data()
     X = df[FEATURE_NAMES]
     y = df["TARGET"]
@@ -36,10 +56,11 @@ def _train_model() -> XGBClassifier:
 
 
 def get_model() -> XGBClassifier:
-    """Return the singleton trained model, training it on first call."""
+    """Return the singleton model — loads pre-trained if available, else trains."""
     global _model
     if _model is None:
-        _model = _train_model()
+        pretrained = _load_pretrained()
+        _model = pretrained if pretrained is not None else _train_model()
     return _model
 
 

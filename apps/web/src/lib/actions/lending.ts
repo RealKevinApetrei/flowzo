@@ -193,7 +193,80 @@ export async function withdrawFromPot(amountPence: number) {
     p_trade_id: null,
     p_allocation_id: null,
     p_description: `Withdraw £${amountGBP.toFixed(2)}`,
+    p_idempotency_key: `withdraw-${user.id}-${Date.now()}`,
   });
 
   if (error) throw new Error(`Withdrawal failed: ${error.message}`);
+}
+
+export async function queueWithdrawal() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("lending_pots")
+    .update({ withdrawal_queued: true })
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(`Failed to queue withdrawal: ${error.message}`);
+}
+
+export async function cancelQueuedWithdrawal() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("lending_pots")
+    .update({ withdrawal_queued: false })
+    .eq("user_id", user.id);
+
+  if (error) throw new Error(`Failed to cancel withdrawal queue: ${error.message}`);
+}
+
+export async function withdrawAllAvailable() {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { data: pot } = await supabase
+    .from("lending_pots")
+    .select("available, locked")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!pot || Number(pot.available) <= 0) {
+    throw new Error("No available balance to withdraw");
+  }
+
+  const amountGBP = Number(pot.available);
+  const { error } = await supabase.rpc("update_lending_pot", {
+    p_user_id: user.id,
+    p_entry_type: "WITHDRAW",
+    p_amount: amountGBP,
+    p_trade_id: null,
+    p_allocation_id: null,
+    p_description: `Withdraw all available: £${amountGBP.toFixed(2)}`,
+    p_idempotency_key: `withdraw-all-${user.id}-${Date.now()}`,
+  });
+
+  if (error) throw new Error(`Withdrawal failed: ${error.message}`);
+
+  // Clear the withdrawal queue flag if locked is also zero
+  if (Number(pot.locked) <= 0) {
+    await supabase
+      .from("lending_pots")
+      .update({ withdrawal_queued: false })
+      .eq("user_id", user.id);
+  }
 }

@@ -12,7 +12,6 @@ __pycache__/
 venv/
 env/
 
-# Model artefacts
+# Model artefacts (raw formats only — serialized models in models/ are committed)
 *.pkl
-*.joblib
 *.model

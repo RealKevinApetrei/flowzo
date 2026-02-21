@@ -49,6 +49,7 @@ function SkeletonCard() {
 
 export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [forecastMap, setForecastMap] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -67,7 +68,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
       setError("Failed to load suggestions");
     } else if (data) {
       // Map the database payload shape to our component shape
-      // Edge Function writes: shifted_date, amount_pence, fee_pence
       const mapped: Proposal[] = data.map((row) => ({
         id: row.id,
         type: row.type,
@@ -84,6 +84,22 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         explanation_text: row.explanation_text,
       }));
       setProposals(mapped);
+
+      // Fetch forecast data for each proposal's danger date
+      const proposalDates = mapped.map((p) => p.payload.original_date);
+      if (proposalDates.length > 0) {
+        const { data: forecastsForDates } = await supabase
+          .from("forecasts")
+          .select("forecast_date, projected_balance")
+          .eq("user_id", userId)
+          .in("forecast_date", proposalDates);
+
+        const map = new Map<string, number>();
+        for (const f of forecastsForDates ?? []) {
+          map.set(f.forecast_date, Math.round(Number(f.projected_balance) * 100));
+        }
+        setForecastMap(map);
+      }
     }
     setLoading(false);
   }, [supabase, userId]);
@@ -142,8 +158,39 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     }
   }
 
-  function handleCustomise(_proposalId: string) {
-    toast("Custom fee coming soon — use the Accept button for now");
+  async function handleCustomise(proposalId: string) {
+    const proposal = proposals.find((p) => p.id === proposalId);
+    if (!proposal) return;
+
+    try {
+      // Create a DRAFT trade (don't submit — let user adjust fee on trade detail page)
+      const formData = new FormData();
+      formData.set("obligation_id", proposal.payload.obligation_id ?? "");
+      formData.set("original_due_date", proposal.payload.original_date);
+      formData.set("new_due_date", proposal.payload.shifted_date);
+      formData.set("amount_pence", String(proposal.payload.amount_pence));
+      formData.set("fee_pence", String(proposal.payload.fee_pence));
+
+      const trade = await createTrade(formData);
+
+      // Link proposal to the draft trade
+      await supabase
+        .from("agent_proposals")
+        .update({
+          status: "ACCEPTED",
+          trade_id: trade.id,
+          responded_at: new Date().toISOString(),
+        })
+        .eq("id", proposalId);
+
+      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+
+      // Navigate to trade detail where BidSlider + ProbabilityCurve live
+      router.push(`/borrower/trades/${trade.id}`);
+    } catch (err) {
+      console.error("Failed to customise proposal:", err);
+      toast.error("Failed to create custom trade. Please try again.");
+    }
   }
 
   if (loading) {
@@ -197,6 +244,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         <SuggestionCard
           key={proposal.id}
           proposal={proposal}
+          dangerDayBalance={forecastMap.get(proposal.payload.original_date)}
           onAccept={handleAccept}
           onDismiss={handleDismiss}
           onCustomise={handleCustomise}
