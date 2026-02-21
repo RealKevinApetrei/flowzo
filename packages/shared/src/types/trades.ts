@@ -61,14 +61,12 @@ export interface AgentProposal {
 }
 
 export interface ShiftProposalPayload {
+  obligation_id?: string | null;
   obligation_name: string;
-  amount: number;
+  amount_pence: number;
   original_date: string;
-  suggested_date: string;
+  shifted_date: string;
   shift_days: number;
-  estimated_fee: number;
-  annualized_rate: number | null;
+  fee_pence: number;
   risk_grade: string;
-  fill_probability: number;
-  danger_balance: number | null;
 }
