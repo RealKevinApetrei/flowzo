@@ -44,9 +44,15 @@ def pd_to_score(pd_value: float) -> float:
 
 
 def get_risk_grade(score: float) -> str:
-    """Return risk grade A (best), B (mid), or C (worst) for a credit score."""
-    if score > 700:
+    """Return risk grade A (best), B (mid), or C (worst) for a credit score.
+
+    Thresholds calibrated against the Home Credit training distribution:
+      A >= 720  — low risk (PD roughly < 3.5%)
+      B >= 620  — medium risk
+      C <  620  — high risk
+    """
+    if score >= 720:
         return "A"
-    if score >= 600:
+    if score >= 620:
         return "B"
     return "C"
