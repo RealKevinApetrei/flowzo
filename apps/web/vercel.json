@@ -3,7 +3,7 @@
   "crons": [
     { "path": "/api/cron/forecast", "schedule": "0 6 * * *" },
     { "path": "/api/cron/settlement", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/expire-pending", "schedule": "0 */6 * * *" },
-    { "path": "/api/cron/retry-match", "schedule": "0 */4 * * *" }
+    { "path": "/api/cron/expire-pending", "schedule": "0 12 * * *" },
+    { "path": "/api/cron/retry-match", "schedule": "0 8 * * *" }
   ]
 }
