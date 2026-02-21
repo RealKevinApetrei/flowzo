@@ -49,9 +49,10 @@ Flowzo is a Monzo-native "Bills + Pots" fintech webapp with a pooled P2P micro-l
 - Pool mutations go through `update_lending_pot()` function (atomic + idempotent)
 
 ### Git Workflow
-- Initial MVP pushed to `main`
-- All subsequent features via PRs
+- **Never push directly to `main`** — always use feature branches + PRs
+- Multiple Claude Code instances run in parallel — **always use worktrees** (`/worktree` or `EnterWorktree`) to avoid conflicts
 - Commit messages: conventional commits style
+- Claude code review runs automatically on PRs via `anthropics/claude-code-action@v1`
 
 ### Testing
 - Vitest for unit tests (business logic: risk scoring, fee calc, recurring detection)
