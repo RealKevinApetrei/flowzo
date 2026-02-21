@@ -56,27 +56,31 @@ Flowzo is a Monzo-native fintech webapp that uses Open Banking data to power an 
 - Build passes with zero TypeScript errors
 - Deployed to Vercel
 
-### Critical Bugs to Fix (Red)
+### Critical Bugs (All Fixed)
 
-| # | Bug | Impact | Fix |
-|---|---|---|---|
-| 1 | `/api/truelayer/callback` inserts `access_token`, `refresh_token`, `token_expires_at` as columns -- schema has `truelayer_token jsonb` | Bank connection fails silently | Store as `{ truelayer_token: { access_token, refresh_token, expires_at } }` |
-| 2 | `createTrade` server action inserts `amount_pence`, `fee_pence`, `shifted_due_date` -- schema uses `amount` (decimal GBP), `fee`, `new_due_date` | Every trade creation fails | Convert pence to pounds, use correct column names |
-| 3 | `/api/trades/[tradeId]/bid` route doesn't exist -- `trade-detail-client.tsx` calls it | Bid submission 404s | Create the API route |
-| 4 | Lender page queries `trades` with `fee_pence`, `amount_pence`, `lender_id`, `shift_days` -- none exist in schema | Lender dashboard shows empty | Query `allocations` joined to `trades`, use correct column names |
-| 5 | `SuggestionFeed` reads `payload.suggested_date` / `payload.amount` -- Edge Function writes `shifted_date` / `amount_pence` | Proposals display undefined values | Align payload key names |
-| 6 | `updateLenderPreferences` uses `.upsert().eq()` -- invalid Supabase syntax | Preferences never save | Use proper upsert with `onConflict` |
-| 7 | `handleFundTrade` is `console.log` stub | Fund button does nothing | Wire to a server action that creates an allocation |
-| 8 | No `/api/trades/[tradeId]/bid` route exists | Custom bids fail | Create route handler |
+All 8 critical bugs have been resolved in commit `ffec26b`:
 
-### Missing Features (Amber)
+| # | Bug | Status |
+|---|---|---|
+| 1 | TrueLayer callback token storage (jsonb) | FIXED |
+| 2 | `createTrade` schema mismatch (column names + pence->GBP) | FIXED |
+| 3 | Missing `/api/trades/[tradeId]/bid` route | FIXED |
+| 4 | Lender page wrong column names + missing allocations join | FIXED |
+| 5 | `SuggestionFeed` payload key mismatch | FIXED |
+| 6 | `updateLenderPreferences` invalid upsert syntax | FIXED |
+| 7 | `handleFundTrade` console.log stub | FIXED |
+| 8 | `use-bubble-board` hook wrong column names | FIXED |
+
+### Remaining Work (Amber)
 
 | Feature | Status | Priority |
 |---|---|---|
+| Apply DB migrations to Supabase | `combined_migrations.sql` ready | P0 -- nothing works without this |
+| Get & configure Supabase service role key | Missing from env | P0 -- Edge Functions need it |
+| Deploy Edge Functions to Supabase | Written, not deployed | P0 -- pipeline doesn't run |
 | Cron jobs (daily forecast, hourly settlement) | Not implemented | HIGH -- pipeline doesn't auto-run |
-| Trade bid API route | Missing | HIGH -- custom bids broken |
 | Auto-trigger match-trade after PENDING_MATCH | Missing | HIGH -- matching doesn't happen |
-| Seed/demo data | Empty seed.sql | MEDIUM -- demo needs data |
+| Seed/demo data | Empty seed.sql | HIGH -- demo needs data |
 | Compliance page content | Placeholder text | LOW |
 | Tests (Vitest + Playwright) | Zero tests | MEDIUM |
 | CI/CD (GitHub Actions) | No workflows | LOW |
@@ -157,65 +161,122 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 
 ---
 
-## 6. MECE Team Split (3 members)
+## 6. MECE Team Split (4 members)
 
-### Member A: Data Pipeline & Backend (the "Quant")
-**Focus:** Make the data pipeline work end-to-end and build the hackathon-winning data features.
+> **Workflow:** `main` is protected. All new work goes on feature branches via **pull requests**. Each member creates PRs from their feature branch, gets a quick review, then merges.
 
-| Task | Priority | Est. |
-|---|---|---|
-| Fix TrueLayer callback token storage (bug #1) | P0 | 30m |
-| Fix `createTrade` schema mismatch (bug #2) | P0 | 30m |
-| Fix `SuggestionFeed` payload key mismatch (bug #5) | P0 | 15m |
-| Fix `updateLenderPreferences` upsert syntax (bug #6) | P0 | 15m |
-| Get & configure Supabase service role key | P0 | 10m |
-| Apply migrations to Supabase (run them on the actual project) | P0 | 30m |
-| Create seed data for demo (realistic borrower + lender profiles, transactions, forecasts) | P0 | 2h |
-| Wire auto-trigger: after PENDING_MATCH -> call match-trade Edge Function | P1 | 1h |
-| Add cron-daily-forecast and cron-hourly-settlements Edge Functions | P1 | 1.5h |
-| Build **backtest page** -- load LendingClub CSV, run risk scoring, show grade-vs-default-rate chart | P1 (hackathon) | 4h |
-| Build **EDA dashboard** -- transaction distributions, income pattern analysis, feature correlations | P1 (hackathon) | 3h |
-| Add forecast accuracy reporting (MAPE calculation on held-out window) | P2 | 2h |
+### Member A: Data Pipeline & Integrations (the "Plumber")
+**Focus:** Make the live data pipeline work end-to-end. Own everything from TrueLayer bank connection through to trade matching and settlement.
 
-**Deliverable:** End-to-end working pipeline from bank connect -> sync -> forecast -> proposals -> trade -> match -> settle, plus a data analysis page that wows SIG judges.
-
-### Member B: Frontend & UX (the "Designer-Dev")
-**Focus:** Fix all UI bugs, polish the experience, and make the demo flow flawless.
+**Branch prefix:** `feat/pipeline-*`
 
 | Task | Priority | Est. |
 |---|---|---|
-| Fix lender page queries (bug #4 -- wrong column names) | P0 | 1h |
-| Create `/api/trades/[tradeId]/bid` route (bug #3/#8) | P0 | 45m |
-| Wire `handleFundTrade` to a real server action (bug #7) | P0 | 1h |
-| Add Vercel env vars for Preview/Development | P0 | 15m |
-| Polish landing page (hero, value prop, demo CTA) | P1 | 2h |
-| Write real compliance page content (Terms, Privacy, FCA disclaimer) | P1 | 1.5h |
-| Add loading states, error boundaries, empty states across all pages | P1 | 2h |
-| Build **SHAP feature importance visualization** (waterfall chart component) | P1 (hackathon) | 3h |
-| Build **lender return analytics** card (Sharpe ratio, expected yield by grade) | P2 (hackathon) | 2h |
-| Add stress test toggle to calendar heatmap ("What if income drops 20%?") | P2 (hackathon) | 1.5h |
-| Mobile responsiveness polish | P2 | 1h |
+| Apply DB migrations to Supabase (run `combined_migrations.sql` in SQL Editor) | P0 | 15m |
+| Get & configure Supabase service role key (Dashboard > Settings > API) | P0 | 10m |
+| Deploy all 6 Edge Functions to Supabase (`supabase functions deploy`) | P0 | 30m |
+| Register TrueLayer redirect URIs (production + localhost) | P0 | 10m |
+| Test TrueLayer sandbox flow end-to-end (john/doe -> sync -> see data) | P0 | 30m |
+| Wire auto-trigger: after trade status -> PENDING_MATCH, call match-trade Edge Function | P1 | 1h |
+| Implement cron-daily-forecast Edge Function (pg_cron or Vercel cron) | P1 | 1h |
+| Implement cron-hourly-settlements Edge Function | P1 | 1h |
+| Create seed data for demo (realistic borrower + lender profiles, transactions, forecasts, proposals) | P0 | 2h |
+| Test full pipeline: bank connect -> sync -> forecast -> proposals -> trade -> match -> settle | P0 | 1h |
+| Verify RLS policies don't block lender bubble board (PENDING_MATCH trades visible) | P1 | 30m |
+| Verify Supabase Realtime is working (trades table changes propagate) | P1 | 15m |
 
-**Deliverable:** A demo-ready, bug-free UI with polished Monzo-feel UX and data visualization components that make the hackathon judges say "wow."
+**Deliverable:** Fully working live pipeline from bank connection through to settlement. Someone can sign up, connect a bank, see forecasts, accept a proposal, and have it matched + settled. Seed data makes the demo rich from minute one.
 
-### Member C: Infrastructure, Demo & Pitch (the "PM/DevOps")
-**Focus:** Make everything deployable, testable, and presentable. Own the demo script and pitch deck.
+### Member B: Data Science & Analytics (the "Quant")
+**Focus:** Build the hackathon-winning data features that target SIG's "Best Use of Data" prize. This is what separates us from every other fintech demo.
+
+**Branch prefix:** `feat/data-*`
 
 | Task | Priority | Est. |
 |---|---|---|
-| Set up Vercel Preview env vars (copy all from Production) | P0 | 15m |
+| Download and prepare LendingClub dataset (Kaggle, 2.2M loans) | P0 | 30m |
+| Build **backtest page** (`/data/backtest`) -- load LendingClub CSV, run Flowzo risk scoring, show grade-vs-default-rate chart | P0 (hackathon) | 4h |
+| Build **EDA dashboard** (`/data/eda`) -- transaction distributions, income pattern analysis, feature correlations | P0 (hackathon) | 3h |
+| Build **SHAP feature importance visualization** -- waterfall chart showing which features drive risk grades | P0 (hackathon) | 3h |
+| Add forecast accuracy reporting -- MAPE calculation on held-out window, display on data page | P1 (hackathon) | 2h |
+| Add **stress testing** toggle -- "What if income drops 20%?" scenario on forecast/heatmap | P1 (hackathon) | 2h |
+| Build **lender return analytics** card -- Sharpe-ratio style metrics, expected yield by grade | P1 (hackathon) | 2h |
+| Prepare supplementary datasets (Home Credit, ONS, BoE rates) for enrichment narratives | P2 | 1h |
+| Write data methodology section for pitch deck (feature engineering, model validation) | P0 | 1h |
+
+**Deliverable:** A `/data` section of the app with backtest results, EDA visualisations, SHAP charts, and stress testing that makes SIG judges say "this team thinks like quants." Provides the quantitative evidence for the pitch.
+
+### Member C: Frontend & UX (the "Designer-Dev")
+**Focus:** Polish every pixel of the user experience. Make the demo flow flawless and the UI feel like a real Monzo feature.
+
+**Branch prefix:** `feat/ui-*`
+
+| Task | Priority | Est. |
+|---|---|---|
+| Polish landing page -- hero section, value proposition, demo CTA, screenshots | P0 | 2h |
+| Add loading states, error boundaries, and empty states across all pages | P0 | 2h |
+| Write real compliance page content (Terms of Service, Privacy Policy, FCA disclaimer) | P1 | 1.5h |
+| Mobile responsiveness polish (all pages, bottom nav, modals) | P1 | 1.5h |
+| Improve onboarding flow -- progress stepper, success animation after bank connect | P1 | 1.5h |
+| Add toast notifications for actions (trade created, bid placed, trade funded) | P1 | 1h |
+| Animate bubble board pop effect when auto-match triggers | P1 | 1h |
+| Add "Why?" tap target on suggestion cards -> Claude explanation modal | P1 | 1h |
+| Dark mode support (Monzo has dark mode) | P2 | 2h |
+| Add settings page content -- notification preferences, connected accounts management | P2 | 1h |
+| Micro-interactions -- button press feedback, card swipe dismiss, transition animations | P2 | 1.5h |
+
+**Deliverable:** A demo-ready, pixel-polished UI with Monzo-feel UX, smooth animations, proper loading/error/empty states, and a landing page that sells the product at first glance.
+
+### Member D: Infrastructure, Demo & Pitch (the "PM/DevOps")
+**Focus:** Make everything deployable, testable, and presentable. Own the demo script, pitch deck, and submission narrative.
+
+**Branch prefix:** `feat/infra-*` or `feat/pitch-*`
+
+| Task | Priority | Est. |
+|---|---|---|
 | Connect GitHub repo to Vercel for auto-deploys | P0 | 15m |
-| Set up GitHub Actions CI (lint + typecheck + build) | P1 | 1h |
-| Write Vitest tests for: risk scoring, fee calculation, recurring detection | P1 | 2h |
-| Write Playwright E2E for: signup -> bank connect -> see forecast | P2 | 2h |
-| Create demo script (step-by-step walkthrough for judges) | P0 | 1.5h |
-| Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision, Validation) | P0 | 3h |
-| Download and prepare LendingClub dataset for backtest | P1 | 30m |
-| Write the "Best Use of Data" submission narrative | P0 | 2h |
-| Prepare demo data: ensure sandbox has realistic TrueLayer test accounts | P1 | 1h |
-| Record backup demo video (in case live demo fails) | P1 | 1h |
+| Set up Vercel env vars for Preview + Development environments | P0 | 15m |
+| Set up GitHub Actions CI (lint + typecheck + build on every PR) | P0 | 1h |
+| Configure branch protection on `main` (require PR, require CI pass) | P0 | 15m |
+| Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h |
+| Write Playwright E2E test for: signup -> bank connect -> see forecast -> accept proposal | P2 | 2h |
+| Create detailed demo script (step-by-step walkthrough for judges, with fallback paths) | P0 | 1.5h |
+| Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h |
+| Write the "Best Use of Data" submission narrative (SIG-focused, quantitative language) | P0 | 2h |
+| Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h |
+| Record backup demo video (in case live demo fails on the day) | P1 | 1h |
+| Set up error monitoring (Sentry free tier) if time permits | P2 | 30m |
 
-**Deliverable:** Working CI, test coverage on critical paths, pitch deck, demo script, and a compelling "Best Use of Data" narrative that speaks SIG's quantitative language.
+**Deliverable:** Working CI/CD, branch protection, test coverage on critical business logic, a compelling pitch deck, polished demo script, and the winning "Best Use of Data" narrative.
+
+---
+
+### Workflow Rules
+
+1. **All new work on feature branches** -- never commit directly to `main`
+2. **Pull requests required** -- create PR, get a quick review from one teammate, merge
+3. **Branch naming:** `feat/<area>-<short-description>` (e.g. `feat/pipeline-seed-data`, `feat/data-backtest-page`, `feat/ui-landing-polish`)
+4. **CI must pass** before merging (lint + typecheck + build)
+5. **Keep PRs small** -- one feature or fix per PR, easier to review and less conflict risk
+6. **Communicate blockers** -- if you're blocked on another member's work, say so immediately
+
+### Dependency Map
+
+```
+Member A (Pipeline)  ──────►  Member B (Data Science)
+   │ Seed data, working         │ Needs real data for
+   │ Edge Functions              │ backtest + EDA
+   │
+   ├──────────────────►  Member C (Frontend)
+   │ Working API +               │ Needs endpoints
+   │ data in DB                  │ returning real data
+   │
+   └──────────────────►  Member D (Infra/Pitch)
+                                 │ Needs working demo
+                                 │ for script + video
+```
+
+**Member A unblocks everyone else.** Pipeline + seed data is the critical path.
 
 ---
 
