@@ -5,8 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
-import { useLenderSettings } from "@/lib/hooks/use-lender-settings";
-import type { HudPosition, FilterMode } from "@/lib/hooks/use-lender-settings";
+import { useLenderSettings, BUBBLE_COLOR_PRESETS } from "@/lib/hooks/use-lender-settings";
+import type { HudPosition, FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
 import { Switch } from "@/components/ui/switch";
 
@@ -38,6 +38,10 @@ export function SettingsClient({
     setHudPosition,
     defaultFilterMode,
     setDefaultFilterMode,
+    bubbleColorMode,
+    setBubbleColorMode,
+    unifiedColorHex,
+    setUnifiedColorHex,
   } = useLenderSettings();
   const [signingOut, setSigningOut] = useState(false);
 
@@ -255,6 +259,49 @@ export function SettingsClient({
                 </button>
               ))}
             </div>
+          </div>
+          <div>
+            <p className="font-medium text-navy mb-2">Bubble Colors</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full mb-3">
+              {(["by-grade", "unified"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setBubbleColorMode(mode);
+                    toast(`Bubble colors set to ${mode === "by-grade" ? "by grade" : "unified"}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                    bubbleColorMode === mode
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {mode === "by-grade" ? "By Grade" : "Unified"}
+                </button>
+              ))}
+            </div>
+            {bubbleColorMode === "unified" && (
+              <div className="flex flex-wrap gap-2.5">
+                {BUBBLE_COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    onClick={() => {
+                      setUnifiedColorHex(preset.hex);
+                      toast(`Bubble color set to ${preset.name}`);
+                    }}
+                    className="relative w-10 h-10 rounded-full transition-transform hover:scale-110 active:scale-95"
+                    style={{ background: preset.hex }}
+                    aria-label={preset.name}
+                  >
+                    {unifiedColorHex === preset.hex && (
+                      <svg className="absolute inset-0 m-auto w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 

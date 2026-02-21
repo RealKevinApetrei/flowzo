@@ -80,14 +80,16 @@ export function LenderHud({
 
   // Default: top position — cyberpunk HUD bar
   return (
-    <div className="absolute top-3 left-3 right-3 z-10 hud-panel hud-brackets px-4 py-2.5">
+    <div className="absolute top-3 left-3 right-3 z-10 hud-panel hud-brackets px-3 py-2 sm:px-4 sm:py-2.5">
+      {/* Row 1: Label + controls (always) + stats (desktop) */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-400 status-dot" />
           <p className="text-[11px] font-bold text-blue-200 font-mono tracking-wider">LENDING</p>
         </div>
 
-        <div className="flex items-center gap-5 flex-1 justify-center">
+        {/* Stats — desktop only inline */}
+        <div className="hidden sm:flex items-center gap-5 flex-1 justify-center">
           <StatItem label="AVAILABLE" value={fmt(available)} />
           <div className="w-px h-6 bg-blue-500/20" />
           <StatItem label="LOCKED" value={fmt(locked)} />
@@ -109,6 +111,15 @@ export function LenderHud({
             />
           </div>
         </div>
+      </div>
+
+      {/* Row 2: Stats — mobile only */}
+      <div className="flex sm:hidden items-center justify-around mt-2 pt-2 border-t border-blue-500/15">
+        <StatItem label="AVAIL" value={fmt(available)} compact />
+        <div className="w-px h-5 bg-blue-500/15" />
+        <StatItem label="LOCKED" value={fmt(locked)} compact />
+        <div className="w-px h-5 bg-blue-500/15" />
+        <StatItem label="YIELD" value={fmt(yieldPence)} compact />
       </div>
     </div>
   );

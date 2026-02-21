@@ -2,9 +2,13 @@
 
 import { useRef, useEffect, useCallback } from "react";
 import * as d3 from "d3";
+import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
+import { resolveBubblePalette } from "@/lib/hooks/use-lender-settings";
 
 interface DemoBubbleBoardProps {
   autoMatch: boolean;
+  bubbleColorMode: BubbleColorMode;
+  unifiedColorHex: string;
 }
 
 interface DemoTrade {
@@ -31,12 +35,7 @@ interface PhysicsNode {
   bursting?: boolean;
 }
 
-// Neon gradient — lighter center, darker edge, colored glow
-const RISK_PALETTE: Record<string, { center: string; edge: string; glow: string; label: string }> = {
-  A: { center: "#60A5FA", edge: "#1D4ED8", glow: "rgba(96,165,250,0.35)", label: "#93C5FD" },
-  B: { center: "#FDA4AF", edge: "#E11D48", glow: "rgba(253,164,175,0.35)", label: "#FECDD3" },
-  C: { center: "#FCD34D", edge: "#B45309", glow: "rgba(252,211,77,0.35)", label: "#FDE68A" },
-};
+// Removed hardcoded RISK_PALETTE — now uses resolveBubblePalette
 
 const DEMO_TRADES: DemoTrade[] = [
   { id: "d-1", borrower_name: "Emma W.", amount_pence: 15000, fee_pence: 450, shift_days: 7, risk_grade: "A" },
@@ -55,7 +54,7 @@ const DEMO_TRADES: DemoTrade[] = [
 
 const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(0);
 
-export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
+export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }: DemoBubbleBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const rafRef = useRef<number>(0);
   const nodesRef = useRef<PhysicsNode[]>([]);
@@ -74,33 +73,31 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
     const isMobile = width < 500;
     const baseSpeed = isMobile ? 0.6 : 0.9;
 
-    // SVG defs — gradients + shadow
-    let defs = d3Svg.select<SVGDefsElement>("defs");
-    if (defs.empty()) {
-      defs = d3Svg.append("defs");
+    // SVG defs — recreate on color mode change
+    d3Svg.select("defs").remove();
+    const defs = d3Svg.append("defs");
 
+    if (bubbleColorMode === "unified") {
+      const p = resolveBubblePalette("A", "unified", unifiedColorHex);
+      const grad = defs.append("radialGradient").attr("id", "demo-grad-unified").attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
+      grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
+      grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
+
+      const glow = defs.append("filter").attr("id", "demo-glow-unified").attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
+      glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
+      glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
+      glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
+      const merge = glow.append("feMerge");
+      merge.append("feMergeNode").attr("in", "colored");
+      merge.append("feMergeNode").attr("in", "SourceGraphic");
+    } else {
       (["A", "B", "C"] as const).forEach((grade) => {
-        const p = RISK_PALETTE[grade];
-        const grad = defs
-          .append("radialGradient")
-          .attr("id", `demo-grad-${grade}`)
-          .attr("cx", "45%")
-          .attr("cy", "40%")
-          .attr("r", "55%");
+        const p = resolveBubblePalette(grade, "by-grade", unifiedColorHex);
+        const grad = defs.append("radialGradient").attr("id", `demo-grad-${grade}`).attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
         grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
         grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
-      });
 
-      // Neon glow filters per risk grade
-      (["A", "B", "C"] as const).forEach((grade) => {
-        const p = RISK_PALETTE[grade];
-        const glow = defs
-          .append("filter")
-          .attr("id", `demo-glow-${grade}`)
-          .attr("x", "-40%")
-          .attr("y", "-40%")
-          .attr("width", "180%")
-          .attr("height", "180%");
+        const glow = defs.append("filter").attr("id", `demo-glow-${grade}`).attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
         glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
         glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
         glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
@@ -145,24 +142,46 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
       .append("g")
       .attr("class", "demo-bubble");
 
+    const gradId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#demo-grad-unified)" : `url(#demo-grad-${d.risk_grade})`;
+    const glowId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#demo-glow-unified)" : `url(#demo-glow-${d.risk_grade})`;
+
     // Circle — soft gradient, drop shadow
     enter
       .append("circle")
       .attr("class", "demo-main")
       .attr("r", 0)
-      .attr("fill", (d) => `url(#demo-grad-${d.risk_grade})`)
-      .attr("filter", (d) => `url(#demo-glow-${d.risk_grade})`)
+      .attr("fill", gradId)
+      .attr("filter", glowId)
       .transition()
       .duration(800)
       .ease(d3.easeElasticOut.amplitude(1).period(0.5))
       .attr("r", (d) => d.radius);
+
+    // Risk grade label (always visible)
+    enter
+      .append("text")
+      .attr("class", "demo-grade")
+      .attr("text-anchor", "middle")
+      .attr("dy", (d) => `${-d.radius * 0.35}px`)
+      .attr("fill", "rgba(255,255,255,0.6)")
+      .attr("font-weight", "800")
+      .attr("font-size", (d) => `${Math.max(7, d.radius / 4.5)}px`)
+      .attr("pointer-events", "none")
+      .attr("letter-spacing", "0.05em")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => d.risk_grade)
+      .transition()
+      .delay(400)
+      .duration(400)
+      .style("opacity", "1");
 
     // Borrower name (hidden on very small bubbles)
     enter
       .append("text")
       .attr("class", "demo-name")
       .attr("text-anchor", "middle")
-      .attr("dy", "-0.3em")
+      .attr("dy", "0.05em")
       .attr("fill", "white")
       .attr("font-weight", "600")
       .attr("font-size", (d) => `${Math.max(8, d.radius / 4)}px`)
@@ -180,7 +199,7 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
       .append("text")
       .attr("class", "demo-amount")
       .attr("text-anchor", "middle")
-      .attr("dy", (d) => (d.radius >= 28 ? "0.95em" : "0.35em"))
+      .attr("dy", (d) => (d.radius >= 28 ? "1.1em" : "0.55em"))
       .attr("fill", "rgba(255,255,255,0.9)")
       .attr("font-weight", "700")
       .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`)
@@ -282,7 +301,7 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
     return () => {
       cancelAnimationFrame(rafRef.current);
     };
-  }, []);
+  }, [bubbleColorMode, unifiedColorHex]);
 
   useEffect(() => {
     const cleanup = setupSvg();
@@ -306,7 +325,7 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
       const idx = Math.floor(Math.random() * size);
       const target = d3.select<SVGGElement, PhysicsNode>(active.nodes()[idx]!);
       const data = target.datum();
-      const labelColor = RISK_PALETTE[data.risk_grade]?.label ?? "#3B82F6";
+      const labelColor = resolveBubblePalette(data.risk_grade, bubbleColorMode, unifiedColorHex).center;
 
       // Mark as bursting so physics skips it
       data.bursting = true;

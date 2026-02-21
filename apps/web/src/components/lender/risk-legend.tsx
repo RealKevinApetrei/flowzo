@@ -30,11 +30,11 @@ export function RiskLegend() {
   const [showInfo, setShowInfo] = useState(false);
 
   return (
-    <div className="absolute bottom-3 right-3 z-10">
+    <div className="absolute bottom-4 right-3 z-10">
       {/* Info icon */}
       <button
         onClick={() => setShowInfo(!showInfo)}
-        className="neon-chip rounded-lg w-8 h-8 flex items-center justify-center"
+        className="neon-chip rounded-lg w-11 h-11 flex items-center justify-center"
         aria-label="Risk grade information"
       >
         <svg

@@ -69,7 +69,7 @@ export function FilterBar({
   };
 
   return (
-    <div ref={ref} className="absolute bottom-3 left-3 z-10">
+    <div ref={ref} className="absolute bottom-4 left-3 z-10">
       {/* Collapsed chip */}
       <button
         onClick={() => setOpen(!open)}
@@ -94,7 +94,7 @@ export function FilterBar({
 
       {/* Expanded popover */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 hud-panel rounded-xl p-4 shadow-xl min-w-[260px] space-y-4">
+        <div className="absolute bottom-full left-0 mb-2 hud-panel rounded-xl p-4 shadow-xl w-[calc(100vw-1.5rem)] max-w-[280px] space-y-4">
           {/* Mode toggle */}
           <div className="flex items-center gap-1 bg-blue-950/50 p-0.5 rounded-lg border border-blue-500/15">
             {(["simple", "advanced"] as const).map((m) => (

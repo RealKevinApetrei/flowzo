@@ -41,7 +41,7 @@ export function LenderPageClient({
   initialAutoMatch,
 }: LenderPageClientProps) {
   const { trades, loading: tradesLoading } = useBubbleBoard();
-  const { hudPosition, defaultFilterMode } = useLenderSettings();
+  const { hudPosition, defaultFilterMode, bubbleColorMode, unifiedColorHex } = useLenderSettings();
   const [autoMatch, setAutoMatch] = useState(initialAutoMatch);
   const [isPending, startTransition] = useTransition();
   const [filterMode, setFilterMode] = useState(defaultFilterMode);
@@ -137,7 +137,7 @@ export function LenderPageClient({
       {/* z-1: Bubble board or demo */}
       <div className="absolute inset-0 z-[1]">
         {isDemo ? (
-          <DemoBubbleBoard autoMatch={autoMatch} />
+          <DemoBubbleBoard autoMatch={autoMatch} bubbleColorMode={bubbleColorMode} unifiedColorHex={unifiedColorHex} />
         ) : tradesLoading ? (
           <div className="flex flex-col items-center justify-center h-full text-blue-300/60">
             <span className="text-3xl animate-pulse">🫧</span>
@@ -150,6 +150,8 @@ export function LenderPageClient({
             onLongPress={handleLongPress}
             filters={filters}
             hudPosition={hudPosition}
+            bubbleColorMode={bubbleColorMode}
+            unifiedColorHex={unifiedColorHex}
           />
         )}
       </div>
