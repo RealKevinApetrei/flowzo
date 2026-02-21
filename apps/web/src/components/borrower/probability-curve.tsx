@@ -112,14 +112,14 @@ export function ProbabilityCurve({
           <defs>
             {/* Gradient fill for the area */}
             <linearGradient id="curveGradient" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#EF4444" stopOpacity={0.15} />
-              <stop offset="50%" stopColor="#F59E0B" stopOpacity={0.15} />
-              <stop offset="100%" stopColor="#10B981" stopOpacity={0.15} />
+              <stop offset="0%" stopColor="var(--danger)" stopOpacity={0.15} />
+              <stop offset="50%" stopColor="var(--warning)" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="var(--success)" stopOpacity={0.15} />
             </linearGradient>
             <linearGradient id="curveStroke" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stopColor="#EF4444" />
-              <stop offset="50%" stopColor="#F59E0B" />
-              <stop offset="100%" stopColor="#10B981" />
+              <stop offset="0%" stopColor="var(--danger)" />
+              <stop offset="50%" stopColor="var(--warning)" />
+              <stop offset="100%" stopColor="var(--success)" />
             </linearGradient>
           </defs>
 
@@ -168,7 +168,7 @@ export function ProbabilityCurve({
             y1={padding.top}
             x2={agentX}
             y2={padding.top + chartHeight}
-            stroke="#FF5A5F"
+            stroke="var(--coral)"
             strokeWidth={1.5}
             strokeDasharray="4 3"
             opacity={0.6}
@@ -178,7 +178,7 @@ export function ProbabilityCurve({
             y={padding.top - 5}
             textAnchor="middle"
             className="text-[8px] font-semibold"
-            fill="#FF5A5F"
+            fill="var(--coral)"
           >
             Instant fill
           </text>

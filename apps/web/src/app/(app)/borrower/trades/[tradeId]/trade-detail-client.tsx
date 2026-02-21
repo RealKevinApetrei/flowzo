@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { BidSlider } from "@/components/borrower/bid-slider";
 import { ProbabilityCurve } from "@/components/borrower/probability-curve";
 
@@ -37,9 +38,11 @@ export function TradeDetailClient({ trade }: TradeDetailClientProps) {
           throw new Error("Failed to place bid");
         }
 
+        toast.success("Bid placed successfully!");
         router.refresh();
       } catch (err) {
         console.error("Failed to place bid:", err);
+        toast.error("Failed to place bid. Please try again.");
       }
     },
     [trade.id, router],

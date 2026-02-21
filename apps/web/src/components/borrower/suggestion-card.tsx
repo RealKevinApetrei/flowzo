@@ -19,8 +19,8 @@ interface SuggestionCardProps {
     };
     explanation_text: string | null;
   };
-  onAccept: (id: string) => void;
-  onDismiss: (id: string) => void;
+  onAccept: (id: string) => void | Promise<void>;
+  onDismiss: (id: string) => void | Promise<void>;
   onCustomise: (id: string) => void;
 }
 
@@ -40,7 +40,7 @@ export function SuggestionCard({
   async function handleAccept() {
     setIsAccepting(true);
     try {
-      onAccept(proposal.id);
+      await onAccept(proposal.id);
     } finally {
       setIsAccepting(false);
     }
@@ -49,7 +49,7 @@ export function SuggestionCard({
   async function handleDismiss() {
     setIsDismissing(true);
     try {
-      onDismiss(proposal.id);
+      await onDismiss(proposal.id);
     } finally {
       setIsDismissing(false);
     }
