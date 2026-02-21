@@ -8,6 +8,7 @@ import { useTheme } from "@/components/providers/theme-provider";
 import { useLenderSettings } from "@/lib/hooks/use-lender-settings";
 import type { HudPosition, FilterMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
+import { Switch } from "@/components/ui/switch";
 
 interface SettingsClientProps {
   email: string;
@@ -143,23 +144,13 @@ export function SettingsClient({
                 Get notified when trades are matched or settled
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifTradeUpdates}
-              onClick={() => {
-                setNotifTradeUpdates(!notifTradeUpdates);
-                toast(notifTradeUpdates ? "Trade updates disabled" : "Trade updates enabled");
+            <Switch
+              checked={notifTradeUpdates}
+              onCheckedChange={(checked) => {
+                setNotifTradeUpdates(checked);
+                toast(checked ? "Trade updates enabled" : "Trade updates disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifTradeUpdates ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifTradeUpdates ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -168,23 +159,13 @@ export function SettingsClient({
                 Warn when upcoming bills may cause a shortfall
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifForecastAlerts}
-              onClick={() => {
-                setNotifForecastAlerts(!notifForecastAlerts);
-                toast(notifForecastAlerts ? "Forecast alerts disabled" : "Forecast alerts enabled");
+            <Switch
+              checked={notifForecastAlerts}
+              onCheckedChange={(checked) => {
+                setNotifForecastAlerts(checked);
+                toast(checked ? "Forecast alerts enabled" : "Forecast alerts disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifForecastAlerts ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifForecastAlerts ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
           <div className="flex items-center justify-between">
             <div>
@@ -193,23 +174,13 @@ export function SettingsClient({
                 Summary of your activity and upcoming bills
               </p>
             </div>
-            <button
-              role="switch"
-              aria-checked={notifEmailDigest}
-              onClick={() => {
-                setNotifEmailDigest(!notifEmailDigest);
-                toast(notifEmailDigest ? "Email digest disabled" : "Email digest enabled");
+            <Switch
+              checked={notifEmailDigest}
+              onCheckedChange={(checked) => {
+                setNotifEmailDigest(checked);
+                toast(checked ? "Email digest enabled" : "Email digest disabled");
               }}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                notifEmailDigest ? "bg-coral" : "bg-cool-grey"
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
-                  notifEmailDigest ? "translate-x-6" : "translate-x-1"
-                }`}
-              />
-            </button>
+            />
           </div>
         </section>
 

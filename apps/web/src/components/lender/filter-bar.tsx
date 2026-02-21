@@ -19,15 +19,15 @@ interface FilterBarProps {
 
 const RISK_GRADES = ["A", "B", "C"] as const;
 
-const GRADE_COLORS: Record<string, string> = {
-  A: "bg-blue-500",
-  B: "bg-rose-400",
-  C: "bg-amber-500",
+const GRADE_STYLES: Record<string, { dot: string; active: string }> = {
+  A: { dot: "bg-blue-400", active: "border-blue-400/50 text-blue-200" },
+  B: { dot: "bg-rose-400", active: "border-rose-400/50 text-rose-200" },
+  C: { dot: "bg-amber-400", active: "border-amber-400/50 text-amber-200" },
 };
 
 function summarize(filters: FilterState): string {
   const grades = filters.riskGrades;
-  if (grades.size === 3 || grades.size === 0) return "All grades";
+  if (grades.size === 3 || grades.size === 0) return "ALL GRADES";
   return [...grades].map((g) => `Grade ${g}`).join(", ");
 }
 
@@ -73,11 +73,11 @@ export function FilterBar({
       {/* Collapsed chip */}
       <button
         onClick={() => setOpen(!open)}
-        className="glass-surface rounded-full px-3 py-2 flex items-center gap-2 shadow-lg text-sm font-medium text-foreground hover:shadow-xl transition-shadow"
+        className="neon-chip rounded-lg px-3 py-2 flex items-center gap-2 text-xs font-mono font-medium"
       >
         <svg
-          width="14"
-          height="14"
+          width="12"
+          height="12"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -94,54 +94,56 @@ export function FilterBar({
 
       {/* Expanded popover */}
       {open && (
-        <div className="absolute bottom-full left-0 mb-2 glass-surface rounded-2xl p-4 shadow-xl min-w-[260px] space-y-4">
+        <div className="absolute bottom-full left-0 mb-2 hud-panel rounded-xl p-4 shadow-xl min-w-[260px] space-y-4">
           {/* Mode toggle */}
-          <div className="flex items-center gap-1.5 bg-warm-grey p-0.5 rounded-full">
+          <div className="flex items-center gap-1 bg-blue-950/50 p-0.5 rounded-lg border border-blue-500/15">
             {(["simple", "advanced"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => onModeChange(m)}
-                className={`flex-1 py-1.5 rounded-full text-xs font-medium transition-all ${
+                className={`flex-1 py-1.5 rounded-md text-[10px] font-mono font-bold tracking-wider transition-all ${
                   mode === m
-                    ? "bg-coral text-white shadow-sm"
-                    : "text-text-secondary hover:text-foreground"
+                    ? "bg-blue-500/20 text-blue-200 shadow-sm border border-blue-500/30"
+                    : "text-blue-400/50 hover:text-blue-300/70 border border-transparent"
                 }`}
               >
-                {m === "simple" ? "Simple" : "Advanced"}
+                {m === "simple" ? "SIMPLE" : "ADVANCED"}
               </button>
             ))}
           </div>
 
-          {/* Risk grade chips — colored dots to match bubble colors */}
+          {/* Risk grade chips */}
           <div>
-            <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2">
+            <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium mb-2">
               Risk Grade
             </p>
             <div className="flex gap-2">
               <button
                 onClick={setAll}
-                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors ${
+                className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold transition-all border ${
                   filters.riskGrades.size === 3
-                    ? "bg-coral text-white"
-                    : "bg-warm-grey text-text-secondary"
+                    ? "neon-chip-active"
+                    : "neon-chip"
                 }`}
               >
-                All
+                ALL
               </button>
-              {RISK_GRADES.map((g) => (
-                <button
-                  key={g}
-                  onClick={() => toggleGrade(g)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-colors flex items-center gap-1.5 ${
-                    filters.riskGrades.has(g)
-                      ? "bg-foreground/10 text-foreground"
-                      : "bg-warm-grey text-text-secondary"
-                  }`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${GRADE_COLORS[g]}`} />
-                  {g}
-                </button>
-              ))}
+              {RISK_GRADES.map((g) => {
+                const style = GRADE_STYLES[g];
+                const active = filters.riskGrades.has(g);
+                return (
+                  <button
+                    key={g}
+                    onClick={() => toggleGrade(g)}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-mono font-bold transition-all flex items-center gap-1.5 border ${
+                      active ? style.active + " bg-blue-500/10" : "neon-chip"
+                    }`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${style.dot}`} />
+                    {g}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -150,10 +152,10 @@ export function FilterBar({
             <>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+                  <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium">
                     Amount
                   </p>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-[10px] text-blue-300/70 font-mono">
                     {"\u00A3"}
                     {(filters.amountRange[0] / 100).toFixed(0)} – {"\u00A3"}
                     {(filters.amountRange[1] / 100).toFixed(0)}
@@ -174,10 +176,10 @@ export function FilterBar({
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+                  <p className="text-[9px] uppercase tracking-widest text-blue-400/50 font-mono font-medium">
                     Term (days)
                   </p>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-[10px] text-blue-300/70 font-mono">
                     {filters.termRange[0]}d – {filters.termRange[1]}d
                   </p>
                 </div>

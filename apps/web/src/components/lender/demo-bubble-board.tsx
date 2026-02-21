@@ -31,11 +31,11 @@ interface PhysicsNode {
   bursting?: boolean;
 }
 
-// Soft gradient — lighter center, darker edge, no specular
-const RISK_PALETTE: Record<string, { center: string; edge: string; label: string }> = {
-  A: { center: "#60A5FA", edge: "#1D4ED8", label: "#3B82F6" },
-  B: { center: "#FDA4AF", edge: "#E11D48", label: "#FB7185" },
-  C: { center: "#FCD34D", edge: "#B45309", label: "#F59E0B" },
+// Neon gradient — lighter center, darker edge, colored glow
+const RISK_PALETTE: Record<string, { center: string; edge: string; glow: string; label: string }> = {
+  A: { center: "#60A5FA", edge: "#1D4ED8", glow: "rgba(96,165,250,0.35)", label: "#93C5FD" },
+  B: { center: "#FDA4AF", edge: "#E11D48", glow: "rgba(253,164,175,0.35)", label: "#FECDD3" },
+  C: { center: "#FCD34D", edge: "#B45309", glow: "rgba(252,211,77,0.35)", label: "#FDE68A" },
 };
 
 const DEMO_TRADES: DemoTrade[] = [
@@ -91,19 +91,23 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
         grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
       });
 
-      const shadow = defs
-        .append("filter")
-        .attr("id", "demo-shadow")
-        .attr("x", "-20%")
-        .attr("y", "-20%")
-        .attr("width", "140%")
-        .attr("height", "140%");
-      shadow
-        .append("feDropShadow")
-        .attr("dx", "0")
-        .attr("dy", "2")
-        .attr("stdDeviation", "4")
-        .attr("flood-color", "rgba(0,0,0,0.1)");
+      // Neon glow filters per risk grade
+      (["A", "B", "C"] as const).forEach((grade) => {
+        const p = RISK_PALETTE[grade];
+        const glow = defs
+          .append("filter")
+          .attr("id", `demo-glow-${grade}`)
+          .attr("x", "-40%")
+          .attr("y", "-40%")
+          .attr("width", "180%")
+          .attr("height", "180%");
+        glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
+        glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
+        glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
+        const merge = glow.append("feMerge");
+        merge.append("feMergeNode").attr("in", "colored");
+        merge.append("feMergeNode").attr("in", "SourceGraphic");
+      });
     }
 
     // Radii
@@ -147,7 +151,7 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
       .attr("class", "demo-main")
       .attr("r", 0)
       .attr("fill", (d) => `url(#demo-grad-${d.risk_grade})`)
-      .attr("filter", "url(#demo-shadow)")
+      .attr("filter", (d) => `url(#demo-glow-${d.risk_grade})`)
       .transition()
       .duration(800)
       .ease(d3.easeElasticOut.amplitude(1).period(0.5))

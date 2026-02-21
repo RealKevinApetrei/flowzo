@@ -31,10 +31,10 @@ function StatItem({
 }) {
   return (
     <div className={compact ? "text-center" : ""}>
-      <p className="text-[10px] uppercase tracking-wider text-text-muted font-medium">
+      <p className="text-[9px] uppercase tracking-widest text-blue-400/60 font-medium font-mono">
         {label}
       </p>
-      <p className="text-sm font-bold text-foreground">{value}</p>
+      <p className="text-sm font-bold text-blue-50 neon-value font-mono">{value}</p>
     </div>
   );
 }
@@ -54,45 +54,55 @@ export function LenderHud({
 
   if (position === "side") {
     return (
-      <div className="absolute right-3 top-3 z-10 glass-surface rounded-2xl p-3 space-y-4 shadow-lg min-w-[80px]">
-        <p className="text-xs font-bold text-foreground">Lending</p>
-        <StatItem label="Avail" value={fmt(available)} compact />
-        <StatItem label="Locked" value={fmt(locked)} compact />
-        <StatItem label="Yield" value={fmt(yieldPence)} compact />
-        <div className="flex flex-col items-center gap-1">
-          <span className="text-[10px] text-text-muted">Auto</span>
+      <div className="absolute right-3 top-3 z-10 hud-panel hud-brackets p-3 space-y-3 min-w-[80px]">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 status-dot" />
+          <p className="text-[10px] font-bold text-blue-200 font-mono tracking-wider">LEND</p>
+        </div>
+        <StatItem label="AVAIL" value={fmt(available)} compact />
+        <StatItem label="LOCKED" value={fmt(locked)} compact />
+        <StatItem label="YIELD" value={fmt(yieldPence)} compact />
+        <div className="border-t border-blue-500/20 pt-2 flex flex-col items-center gap-1.5">
+          <span className="text-[9px] text-blue-400/60 font-mono tracking-wider">AUTO</span>
           <Switch
             checked={autoMatch}
             onCheckedChange={onAutoMatchToggle}
           />
         </div>
         {showTopUp && (
-          <button className="btn-pill bg-coral text-white text-[10px] px-2 py-1 w-full">
-            Top Up
+          <button className="w-full text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md py-1.5 hover:bg-blue-500/10 transition-colors">
+            TOP UP
           </button>
         )}
       </div>
     );
   }
 
-  // Default: top position
+  // Default: top position — cyberpunk HUD bar
   return (
-    <div className="absolute top-3 left-3 right-3 z-10 glass-surface rounded-2xl px-4 py-3 shadow-lg">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-bold text-foreground shrink-0">Lending</p>
-        <div className="flex items-center gap-4 flex-1 justify-center">
-          <StatItem label="Available" value={fmt(available)} />
-          <StatItem label="Locked" value={fmt(locked)} />
-          <StatItem label="Yield" value={fmt(yieldPence)} />
+    <div className="absolute top-3 left-3 right-3 z-10 hud-panel hud-brackets px-4 py-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 status-dot" />
+          <p className="text-[11px] font-bold text-blue-200 font-mono tracking-wider">LENDING</p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+
+        <div className="flex items-center gap-5 flex-1 justify-center">
+          <StatItem label="AVAILABLE" value={fmt(available)} />
+          <div className="w-px h-6 bg-blue-500/20" />
+          <StatItem label="LOCKED" value={fmt(locked)} />
+          <div className="w-px h-6 bg-blue-500/20" />
+          <StatItem label="YIELD" value={fmt(yieldPence)} />
+        </div>
+
+        <div className="flex items-center gap-2.5 shrink-0">
           {showTopUp && (
-            <button className="btn-pill bg-coral text-white text-xs px-3 py-1">
-              Top Up
+            <button className="text-[10px] font-bold font-mono text-blue-200 border border-blue-500/30 rounded-md px-2.5 py-1 hover:bg-blue-500/10 transition-colors">
+              TOP UP
             </button>
           )}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-text-muted">Auto</span>
+          <div className="border-l border-blue-500/20 pl-2.5 flex items-center gap-1.5">
+            <span className="text-[9px] text-blue-400/60 font-mono tracking-wider">AUTO</span>
             <Switch
               checked={autoMatch}
               onCheckedChange={onAutoMatchToggle}

@@ -123,7 +123,6 @@ body {
   animation: card-enter 0.3s ease-out both;
 }
 
-/* Stagger card animations */
 .card-monzo:nth-child(2) { animation-delay: 50ms; }
 .card-monzo:nth-child(3) { animation-delay: 100ms; }
 .card-monzo:nth-child(4) { animation-delay: 150ms; }
@@ -158,28 +157,151 @@ body {
   }
 }
 
-/* Full-viewport bubble container */
+/* ========================
+   LENDING PAGE — HIGH-TECH
+   ======================== */
+
+/* Full-viewport bubble container — always dark, immersive */
 .bubble-viewport {
   position: relative;
   width: 100%;
-  height: calc(100dvh - 4rem); /* subtract bottom nav h-16 */
+  height: calc(100dvh - 4rem);
   overflow: hidden;
+  background: #06060f;
 }
 
-/* Mobile touch improvements */
+/* Animated grid background */
+.tech-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(59, 130, 246, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(59, 130, 246, 0.07) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 50%, black 30%, transparent 100%);
+  animation: grid-breathe 6s ease-in-out infinite;
+}
+
+@keyframes grid-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+}
+
+/* Scan line */
+.scan-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(
+    transparent,
+    rgba(59, 130, 246, 0.03),
+    rgba(59, 130, 246, 0.06),
+    rgba(59, 130, 246, 0.03),
+    transparent
+  );
+  pointer-events: none;
+  animation: scan-sweep 5s linear infinite;
+}
+
+@keyframes scan-sweep {
+  0% { top: -100px; }
+  100% { top: 100%; }
+}
+
+/* HUD panel — neon-bordered cyberpunk style */
+.hud-panel {
+  background: rgba(8, 8, 20, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  box-shadow:
+    0 0 20px rgba(59, 130, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+}
+
+/* Corner bracket accents */
+.hud-brackets {
+  position: relative;
+}
+
+.hud-brackets::before,
+.hud-brackets::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+}
+
+.hud-brackets::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid rgba(59, 130, 246, 0.6);
+  border-left: 2px solid rgba(59, 130, 246, 0.6);
+  border-top-left-radius: 4px;
+}
+
+.hud-brackets::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid rgba(59, 130, 246, 0.6);
+  border-right: 2px solid rgba(59, 130, 246, 0.6);
+  border-bottom-right-radius: 4px;
+}
+
+/* Pulsing status dot */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 4px currentColor; }
+  50% { opacity: 0.5; box-shadow: 0 0 8px currentColor; }
+}
+
+.status-dot {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* Neon text glow */
+.neon-value {
+  text-shadow: 0 0 8px rgba(59, 130, 246, 0.3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Neon filter chip (for filter bar inside lending) */
+.neon-chip {
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  transition: all 150ms;
+}
+
+.neon-chip:hover {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.neon-chip-active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  color: #bfdbfe;
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+}
+
+/* ========================
+   MOBILE TOUCH
+   ======================== */
 @media (max-width: 640px) {
-  /* Ensure touch targets are at least 44px */
-  button, a[href], [role="switch"] {
+  /* 44px touch targets — exclude raw switch elements */
+  button:not([role="switch"]):not([data-slot="switch-thumb"]),
+  a[href] {
     min-height: 44px;
   }
 
-  /* Prevent text selection on interactive elements */
   button, [role="switch"] {
     -webkit-user-select: none;
     user-select: none;
   }
 
-  /* Bottom sheet modal full width on mobile */
   [data-radix-dialog-content] {
     max-width: 100% !important;
     border-radius: 24px 24px 0 0 !important;

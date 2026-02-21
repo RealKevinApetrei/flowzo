@@ -55,7 +55,6 @@ export function LenderPageClient({
   const [tooltipTrade, setTooltipTrade] = useState<BubbleTrade | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
-  // Keep modal for accessible fallback
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const selectedTrade = selectedTradeId
     ? trades.find((t) => t.id === selectedTradeId) ?? null
@@ -129,14 +128,20 @@ export function LenderPageClient({
 
   return (
     <div className="bubble-viewport">
-      {/* z-0: Bubble board or demo */}
-      <div className="absolute inset-0 z-0">
+      {/* z-0: High-tech grid background */}
+      <div className="tech-grid z-0" />
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="scan-line" />
+      </div>
+
+      {/* z-1: Bubble board or demo */}
+      <div className="absolute inset-0 z-[1]">
         {isDemo ? (
           <DemoBubbleBoard autoMatch={autoMatch} />
         ) : tradesLoading ? (
-          <div className="flex flex-col items-center justify-center h-full text-text-secondary">
+          <div className="flex flex-col items-center justify-center h-full text-blue-300/60">
             <span className="text-3xl animate-pulse">🫧</span>
-            <p className="text-sm font-medium mt-2">Loading bubbles...</p>
+            <p className="text-sm font-medium mt-2 font-mono">Loading bubbles...</p>
           </div>
         ) : (
           <BubbleBoard
@@ -177,7 +182,7 @@ export function LenderPageClient({
         onDismiss={handleDismissTooltip}
       />
 
-      {/* z-50: Trade detail modal (accessible fallback) */}
+      {/* z-50: Trade detail modal */}
       <TradeDetailModal
         trade={selectedTrade}
         open={selectedTradeId !== null}
