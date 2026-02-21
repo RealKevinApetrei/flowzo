@@ -23,12 +23,14 @@ interface YieldStats {
 interface LenderPageClientProps {
   initialPot: LendingPot | null;
   initialYieldStats: YieldStats;
+  currentApyBps: number;
   sparklineData: number[];
 }
 
 export function LenderPageClient({
   initialPot,
   initialYieldStats,
+  currentApyBps,
   sparklineData,
 }: LenderPageClientProps) {
 
@@ -42,7 +44,7 @@ export function LenderPageClient({
         />
 
         {/* Lending Pot Card */}
-        <LendingPotCard pot={initialPot} currentApyBps={initialYieldStats.avgAprBps} />
+        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} />
 
         {/* Yield Dashboard */}
         <YieldDashboard

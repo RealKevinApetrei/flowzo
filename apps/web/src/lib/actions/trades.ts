@@ -94,21 +94,62 @@ export async function cancelTrade(tradeId: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
+  // Verify ownership
+  const { data: trade } = await admin
+    .from("trades")
+    .select("id, status, borrower_id")
+    .eq("id", tradeId)
+    .eq("borrower_id", user.id)
+    .in("status", ["DRAFT", "PENDING_MATCH"])
+    .single();
+
+  if (!trade) throw new Error("Trade not found or cannot be cancelled");
+
+  // Release any RESERVED allocations back to lenders
+  const { data: reservedAllocs } = await admin
+    .from("allocations")
+    .select("id, lender_id, amount_slice")
+    .eq("trade_id", tradeId)
+    .eq("status", "RESERVED");
+
+  if (reservedAllocs && reservedAllocs.length > 0) {
+    for (const alloc of reservedAllocs) {
+      await admin.rpc("update_lending_pot", {
+        p_user_id: alloc.lender_id,
+        p_entry_type: "RELEASE",
+        p_amount: Number(alloc.amount_slice),
+        p_trade_id: tradeId,
+        p_allocation_id: alloc.id,
+        p_description: `Release funds — trade ${tradeId} cancelled`,
+        p_idempotency_key: `cancel-release-${tradeId}-${alloc.id}`,
+      });
+
+      await admin
+        .from("allocations")
+        .update({ status: "RELEASED" })
+        .eq("id", alloc.id);
+    }
+  }
+
   // Log cancellation event for audit trail
-  await supabase.from("flowzo_events").insert({
+  await admin.from("flowzo_events").insert({
     event_type: "trade.cancelled",
     entity_type: "trade",
     entity_id: tradeId,
     actor: user.id,
-    payload: { cancelled_by: "borrower" },
+    payload: {
+      cancelled_by: "borrower",
+      allocations_released: reservedAllocs?.length ?? 0,
+    },
   });
 
-  const { error } = await supabase
+  const { error } = await admin
     .from("trades")
     .update({ status: "CANCELLED" })
-    .eq("id", tradeId)
-    .eq("borrower_id", user.id)
-    .in("status", ["DRAFT", "PENDING_MATCH"]);
+    .eq("id", tradeId);
 
   if (error) throw new Error(`Failed to cancel trade: ${error.message}`);
 }

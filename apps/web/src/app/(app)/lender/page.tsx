@@ -70,6 +70,12 @@ export default async function LenderHomePage() {
         )
       : 0;
 
+  // Real-time weighted APY from LIVE trades (Issue #33)
+  const { data: currentApy } = await supabase.rpc("get_lender_current_apy", {
+    p_user_id: user.id,
+  });
+  const currentApyBps = Math.round(Number(currentApy ?? 0));
+
   // Fetch recent FEE_CREDIT entries for yield sparkline
   const { data: recentYields } = await supabase
     .from("pool_ledger")
@@ -109,6 +115,7 @@ export default async function LenderHomePage() {
             : null
         }
         initialYieldStats={yieldStats}
+        currentApyBps={currentApyBps}
         sparklineData={sparklineData}
       />
     </>
