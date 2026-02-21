@@ -13,7 +13,7 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-nav-bg border-t border-white/10 pb-safe z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-[var(--card-surface)] border-t border-cool-grey pb-safe z-50">
       <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
         {tabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href);
@@ -22,7 +22,7 @@ export function BottomNav() {
               key={tab.href}
               href={tab.href}
               className={`flex flex-col items-center gap-1 px-4 py-2 text-xs font-medium transition-colors ${
-                isActive ? "text-coral" : "text-white/60 hover:text-white/80"
+                isActive ? "text-coral" : "text-text-muted hover:text-navy"
               }`}
             >
               <span className="text-xl">{tab.icon}</span>
