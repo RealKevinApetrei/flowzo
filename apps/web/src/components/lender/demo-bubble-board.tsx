@@ -16,7 +16,7 @@ interface DemoTrade {
   risk_grade: "A" | "B" | "C";
 }
 
-interface DemoNode extends d3.SimulationNodeDatum {
+interface PhysicsNode {
   id: string;
   borrower_name: string;
   amount_pence: number;
@@ -24,16 +24,18 @@ interface DemoNode extends d3.SimulationNodeDatum {
   shift_days: number;
   risk_grade: "A" | "B" | "C";
   radius: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  bursting?: boolean;
 }
 
-// Premium 3D sphere palette — blue / rose / amber
-const RISK_PALETTE: Record<
-  string,
-  { highlight: string; base: string; deep: string }
-> = {
-  A: { highlight: "#BFDBFE", base: "#3B82F6", deep: "#1D4ED8" },
-  B: { highlight: "#FECDD3", base: "#FB7185", deep: "#E11D48" },
-  C: { highlight: "#FDE68A", base: "#F59E0B", deep: "#B45309" },
+// Soft gradient — lighter center, darker edge, no specular
+const RISK_PALETTE: Record<string, { center: string; edge: string; label: string }> = {
+  A: { center: "#60A5FA", edge: "#1D4ED8", label: "#3B82F6" },
+  B: { center: "#FDA4AF", edge: "#E11D48", label: "#FB7185" },
+  C: { center: "#FCD34D", edge: "#B45309", label: "#F59E0B" },
 };
 
 const DEMO_TRADES: DemoTrade[] = [
@@ -55,7 +57,8 @@ const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(0);
 
 export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
-  const simulationRef = useRef<d3.Simulation<DemoNode, undefined> | null>(null);
+  const rafRef = useRef<number>(0);
+  const nodesRef = useRef<PhysicsNode[]>([]);
 
   const setupSvg = useCallback(() => {
     const svg = svgRef.current;
@@ -68,195 +71,212 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
     svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
 
     const d3Svg = d3.select(svg);
+    const isMobile = width < 500;
+    const baseSpeed = isMobile ? 0.6 : 0.9;
 
-    // Define SVG defs: sphere gradients, specular, shadow
+    // SVG defs — gradients + shadow
     let defs = d3Svg.select<SVGDefsElement>("defs");
     if (defs.empty()) {
       defs = d3Svg.append("defs");
 
-      // 3D sphere gradient per risk grade
       (["A", "B", "C"] as const).forEach((grade) => {
         const p = RISK_PALETTE[grade];
         const grad = defs
           .append("radialGradient")
-          .attr("id", `demo-sphere-${grade}`)
-          .attr("cx", "35%")
-          .attr("cy", "30%")
-          .attr("r", "65%");
-        grad.append("stop").attr("offset", "0%").attr("stop-color", p.highlight).attr("stop-opacity", "0.95");
-        grad.append("stop").attr("offset", "50%").attr("stop-color", p.base).attr("stop-opacity", "1");
-        grad.append("stop").attr("offset", "100%").attr("stop-color", p.deep).attr("stop-opacity", "1");
-
-        // Stroke gradient
-        const sg = defs
-          .append("radialGradient")
-          .attr("id", `demo-stroke-${grade}`)
-          .attr("cx", "35%")
-          .attr("cy", "30%");
-        sg.append("stop").attr("offset", "0%").attr("stop-color", p.base).attr("stop-opacity", "0.2");
-        sg.append("stop").attr("offset", "100%").attr("stop-color", p.deep).attr("stop-opacity", "0.5");
+          .attr("id", `demo-grad-${grade}`)
+          .attr("cx", "45%")
+          .attr("cy", "40%")
+          .attr("r", "55%");
+        grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
+        grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
       });
 
-      // Specular highlight gradient
-      const spec = defs
-        .append("radialGradient")
-        .attr("id", "demo-specular")
-        .attr("cx", "50%")
-        .attr("cy", "50%");
-      spec.append("stop").attr("offset", "0%").attr("stop-color", "white").attr("stop-opacity", "0.75");
-      spec.append("stop").attr("offset", "100%").attr("stop-color", "white").attr("stop-opacity", "0");
-
-      // Drop shadow filter
       const shadow = defs
         .append("filter")
         .attr("id", "demo-shadow")
-        .attr("x", "-30%")
-        .attr("y", "-30%")
-        .attr("width", "160%")
-        .attr("height", "160%");
-      shadow.append("feDropShadow")
+        .attr("x", "-20%")
+        .attr("y", "-20%")
+        .attr("width", "140%")
+        .attr("height", "140%");
+      shadow
+        .append("feDropShadow")
         .attr("dx", "0")
-        .attr("dy", "3")
-        .attr("stdDeviation", "6")
-        .attr("flood-color", "rgba(0,0,0,0.12)");
+        .attr("dy", "2")
+        .attr("stdDeviation", "4")
+        .attr("flood-color", "rgba(0,0,0,0.1)");
     }
 
-    // Calculate radii
+    // Radii
     const amounts = DEMO_TRADES.map((t) => t.amount_pence);
     const minAmt = Math.min(...amounts);
     const maxAmt = Math.max(...amounts);
     const range = maxAmt - minAmt || 1;
+    const rMin = isMobile ? 22 : 30;
+    const rMax = isMobile ? 40 : 52;
 
-    const nodes: DemoNode[] = DEMO_TRADES.map((t) => {
+    // Physics nodes with random velocity directions
+    const nodes: PhysicsNode[] = DEMO_TRADES.map((t) => {
       const normalized = (t.amount_pence - minAmt) / range;
+      const radius = rMin + normalized * (rMax - rMin);
+      const angle = Math.random() * 2 * Math.PI;
+      const speed = baseSpeed * (0.5 + Math.random() * 1.0);
       return {
         ...t,
-        radius: 32 + normalized * 42,
-        x: width / 2 + (Math.random() - 0.5) * width * 0.6,
-        y: height / 2 + (Math.random() - 0.5) * height * 0.5,
+        radius,
+        x: radius + Math.random() * (width - 2 * radius),
+        y: radius + Math.random() * (height - 2 * radius),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
       };
     });
+    nodesRef.current = nodes;
 
-    // Clear previous
+    // Data join
     d3Svg.selectAll(".demo-bubble").remove();
 
     const enter = d3Svg
-      .selectAll<SVGGElement, DemoNode>(".demo-bubble")
+      .selectAll<SVGGElement, PhysicsNode>(".demo-bubble")
       .data(nodes, (d) => d.id)
       .enter()
       .append("g")
       .attr("class", "demo-bubble");
 
-    // Main sphere with 3D gradient + shadow
+    // Circle — soft gradient, drop shadow
     enter
       .append("circle")
       .attr("class", "demo-main")
       .attr("r", 0)
-      .attr("fill", (d) => `url(#demo-sphere-${d.risk_grade})`)
-      .attr("stroke", (d) => `url(#demo-stroke-${d.risk_grade})`)
-      .attr("stroke-width", 1.5)
+      .attr("fill", (d) => `url(#demo-grad-${d.risk_grade})`)
       .attr("filter", "url(#demo-shadow)")
       .transition()
       .duration(800)
       .ease(d3.easeElasticOut.amplitude(1).period(0.5))
       .attr("r", (d) => d.radius);
 
-    // Specular highlight ellipse (glass reflection)
-    enter
-      .append("ellipse")
-      .attr("class", "demo-specular")
-      .attr("cx", (d) => -d.radius * 0.2)
-      .attr("cy", (d) => -d.radius * 0.25)
-      .attr("rx", 0)
-      .attr("ry", 0)
-      .attr("fill", "url(#demo-specular)")
-      .attr("pointer-events", "none")
-      .transition()
-      .delay(400)
-      .duration(600)
-      .attr("rx", (d) => d.radius * 0.38)
-      .attr("ry", (d) => d.radius * 0.22);
-
-    // Borrower name (top)
+    // Borrower name (hidden on very small bubbles)
     enter
       .append("text")
       .attr("class", "demo-name")
       .attr("text-anchor", "middle")
-      .attr("dy", "-0.4em")
+      .attr("dy", "-0.3em")
       .attr("fill", "white")
       .attr("font-weight", "600")
-      .attr("font-size", (d) => `${Math.max(8, d.radius / 4.5)}px`)
+      .attr("font-size", (d) => `${Math.max(8, d.radius / 4)}px`)
       .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.4)")
       .style("opacity", 0)
-      .style("text-shadow", "0 1px 3px rgba(0,0,0,0.35)")
-      .text((d) => d.borrower_name)
-      .transition()
-      .delay(400)
-      .duration(400)
-      .style("opacity", "1");
-
-    // Amount label (bottom)
-    enter
-      .append("text")
-      .attr("class", "demo-amount")
-      .attr("text-anchor", "middle")
-      .attr("dy", "1em")
-      .attr("fill", "rgba(255,255,255,0.9)")
-      .attr("font-weight", "700")
-      .attr("font-size", (d) => `${Math.max(9, d.radius / 3.5)}px`)
-      .attr("pointer-events", "none")
-      .style("opacity", 0)
-      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.25)")
-      .text((d) => formatPounds(d.amount_pence))
+      .text((d) => (d.radius >= 28 ? d.borrower_name : ""))
       .transition()
       .delay(500)
       .duration(400)
       .style("opacity", "1");
 
-    const allBubbles = d3Svg.selectAll<SVGGElement, DemoNode>(".demo-bubble");
+    // Amount
+    enter
+      .append("text")
+      .attr("class", "demo-amount")
+      .attr("text-anchor", "middle")
+      .attr("dy", (d) => (d.radius >= 28 ? "0.95em" : "0.35em"))
+      .attr("fill", "rgba(255,255,255,0.9)")
+      .attr("font-weight", "700")
+      .attr("font-size", (d) => `${Math.max(9, d.radius / 3)}px`)
+      .attr("pointer-events", "none")
+      .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
+      .style("opacity", 0)
+      .text((d) => formatPounds(d.amount_pence))
+      .transition()
+      .delay(600)
+      .duration(400)
+      .style("opacity", "1");
 
-    // Force simulation — fast, lively floating
-    if (simulationRef.current) simulationRef.current.stop();
+    const allBubbles = d3Svg.selectAll<SVGGElement, PhysicsNode>(".demo-bubble");
 
-    const sim = d3
-      .forceSimulation<DemoNode>(nodes)
-      .force("center", d3.forceCenter(width / 2, height / 2).strength(0.008))
-      .force("charge", d3.forceManyBody<DemoNode>().strength(-25))
-      .force(
-        "collide",
-        d3
-          .forceCollide<DemoNode>()
-          .radius((d) => d.radius + 6)
-          .strength(0.8)
-          .iterations(2),
-      )
-      .force("x", d3.forceX(width / 2).strength(0.006))
-      .force("y", d3.forceY(height / 2).strength(0.006))
-      .alphaDecay(0.002)
-      .velocityDecay(0.1)
-      .on("tick", () => {
-        allBubbles.attr("transform", (d) => {
-          const r = d.radius;
-          d.x = Math.max(r, Math.min(width - r, d.x ?? width / 2));
-          d.y = Math.max(r, Math.min(height - r, d.y ?? height / 2));
-          return `translate(${d.x},${d.y})`;
-        });
-      });
+    // ---------- Billiard-ball physics via RAF ----------
+    let lastTime = performance.now();
 
-    simulationRef.current = sim;
+    const animate = (now: number) => {
+      const dt = Math.min((now - lastTime) / 16.67, 3);
+      lastTime = now;
+      const ns = nodesRef.current;
 
-    // Frequent, strong jiggle for lively floating
-    const jiggle = setInterval(() => {
-      sim.alpha(0.45).restart();
-      nodes.forEach((n) => {
-        n.vx = (n.vx ?? 0) + (Math.random() - 0.5) * 7;
-        n.vy = (n.vy ?? 0) + (Math.random() - 0.5) * 7;
-      });
-    }, 1500);
+      // Move
+      for (const n of ns) {
+        if (n.bursting) continue;
+        n.x += n.vx * dt;
+        n.y += n.vy * dt;
+
+        // Wall bounce
+        if (n.x - n.radius < 0) {
+          n.x = n.radius;
+          n.vx = Math.abs(n.vx);
+        }
+        if (n.x + n.radius > width) {
+          n.x = width - n.radius;
+          n.vx = -Math.abs(n.vx);
+        }
+        if (n.y - n.radius < 0) {
+          n.y = n.radius;
+          n.vy = Math.abs(n.vy);
+        }
+        if (n.y + n.radius > height) {
+          n.y = height - n.radius;
+          n.vy = -Math.abs(n.vy);
+        }
+      }
+
+      // Elastic ball-ball collision
+      for (let i = 0; i < ns.length; i++) {
+        if (ns[i].bursting) continue;
+        for (let j = i + 1; j < ns.length; j++) {
+          if (ns[j].bursting) continue;
+          const a = ns[i],
+            b = ns[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const minDist = a.radius + b.radius;
+
+          if (dist < minDist && dist > 0.01) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const dvx = a.vx - b.vx;
+            const dvy = a.vy - b.vy;
+            const dvn = dvx * nx + dvy * ny;
+
+            if (dvn > 0) {
+              const ma = a.radius * a.radius;
+              const mb = b.radius * b.radius;
+              const imp = (2 * dvn) / (ma + mb);
+
+              a.vx -= imp * mb * nx;
+              a.vy -= imp * mb * ny;
+              b.vx += imp * ma * nx;
+              b.vy += imp * ma * ny;
+
+              // Separate overlap
+              const overlap = minDist - dist;
+              const sep = overlap / 2 + 0.5;
+              a.x -= sep * nx;
+              a.y -= sep * ny;
+              b.x += sep * nx;
+              b.y += sep * ny;
+            }
+          }
+        }
+      }
+
+      // Update SVG transforms (skip bursting)
+      allBubbles
+        .filter((d) => !d.bursting)
+        .attr("transform", (d) => `translate(${d.x},${d.y})`);
+
+      rafRef.current = requestAnimationFrame(animate);
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
 
     return () => {
-      clearInterval(jiggle);
-      sim.stop();
+      cancelAnimationFrame(rafRef.current);
     };
   }, []);
 
@@ -265,7 +285,7 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
     return cleanup;
   }, [setupSvg]);
 
-  // Auto-burst mimicking click: highlight ring → pop → respawn
+  // Auto-burst with "Funded!" floating text
   useEffect(() => {
     const svg = svgRef.current;
     if (!svg) return;
@@ -274,55 +294,65 @@ export function DemoBubbleBoard({ autoMatch }: DemoBubbleBoardProps) {
     const baseInterval = autoMatch ? 1800 : 3500;
 
     const interval = setInterval(() => {
-      const bubbles = d3Svg.selectAll<SVGGElement, DemoNode>(".demo-bubble");
-      const size = bubbles.size();
+      const bubbles = d3Svg.selectAll<SVGGElement, PhysicsNode>(".demo-bubble");
+      const active = bubbles.filter((d) => !d.bursting);
+      const size = active.size();
       if (size === 0) return;
 
       const idx = Math.floor(Math.random() * size);
-      const target = d3.select<SVGGElement, DemoNode>(bubbles.nodes()[idx]!);
+      const target = d3.select<SVGGElement, PhysicsNode>(active.nodes()[idx]!);
       const data = target.datum();
+      const labelColor = RISK_PALETTE[data.risk_grade]?.label ?? "#3B82F6";
 
-      // Step 1: Flash highlight ring (mimics user tap)
-      const ring = target
-        .append("circle")
-        .attr("class", "burst-ring")
-        .attr("r", data.radius + 2)
-        .attr("fill", "none")
-        .attr("stroke", "white")
-        .attr("stroke-width", 3)
-        .attr("opacity", 0);
+      // Mark as bursting so physics skips it
+      data.bursting = true;
 
-      ring
-        .transition()
-        .duration(180)
-        .attr("opacity", 0.9)
+      // Slight scale-up → shrink to zero
+      target
         .transition()
         .duration(200)
-        .attr("r", data.radius + 12)
-        .attr("opacity", 0)
-        .remove();
+        .attr("transform", `translate(${data.x},${data.y}) scale(1.15)`)
+        .transition()
+        .duration(250)
+        .ease(d3.easeCubicIn)
+        .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
+        .style("opacity", 0)
+        .on("end", function () {
+          // Give new random direction on respawn
+          const angle = Math.random() * 2 * Math.PI;
+          const speed = 0.5 + Math.random() * 0.9;
+          data.vx = Math.cos(angle) * speed;
+          data.vy = Math.sin(angle) * speed;
 
-      // Step 2: Pop animation after ring
-      setTimeout(() => {
-        target
-          .transition()
-          .duration(280)
-          .ease(d3.easeCubicIn)
-          .attr("transform", `translate(${data.x},${data.y}) scale(1.5)`)
-          .style("opacity", 0)
-          .on("end", function () {
-            // Respawn with elastic bounce-in
-            setTimeout(() => {
-              d3.select(this)
-                .style("opacity", 1)
-                .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
-                .transition()
-                .duration(700)
-                .ease(d3.easeElasticOut.amplitude(1).period(0.4))
-                .attr("transform", `translate(${data.x},${data.y}) scale(1)`);
-            }, 400);
-          });
-      }, 220);
+          setTimeout(() => {
+            data.bursting = false;
+            d3.select(this)
+              .style("opacity", 1)
+              .attr("transform", `translate(${data.x},${data.y}) scale(0)`)
+              .transition()
+              .duration(600)
+              .ease(d3.easeElasticOut.amplitude(1).period(0.4))
+              .attr("transform", `translate(${data.x},${data.y}) scale(1)`);
+          }, 350);
+        });
+
+      // Floating "Funded!" label
+      d3Svg
+        .append("text")
+        .attr("x", data.x)
+        .attr("y", data.y)
+        .attr("text-anchor", "middle")
+        .attr("fill", labelColor)
+        .attr("font-weight", "700")
+        .attr("font-size", "13px")
+        .style("pointer-events", "none")
+        .text("Funded!")
+        .transition()
+        .duration(900)
+        .ease(d3.easeCubicOut)
+        .attr("y", data.y - 50)
+        .style("opacity", 0)
+        .remove();
     }, baseInterval + Math.random() * 800);
 
     return () => clearInterval(interval);
