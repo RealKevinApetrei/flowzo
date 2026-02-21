@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-export type HudPosition = "top" | "side" | "hidden";
 export type FilterMode = "simple" | "advanced";
 export type BubbleColorMode = "by-grade" | "unified";
 
@@ -26,9 +25,9 @@ export const BUBBLE_COLOR_PRESETS: BubbleColorPreset[] = [
 ];
 
 const BY_GRADE: Record<string, { center: string; edge: string; glow: string }> = {
-  A: { center: "#60A5FA", edge: "#1D4ED8", glow: "rgba(96,165,250,0.35)" },
-  B: { center: "#FDA4AF", edge: "#E11D48", glow: "rgba(253,164,175,0.35)" },
-  C: { center: "#FCD34D", edge: "#B45309", glow: "rgba(252,211,77,0.35)" },
+  A: { center: "#34D399", edge: "#047857", glow: "rgba(52,211,153,0.35)" },
+  B: { center: "#FCD34D", edge: "#B45309", glow: "rgba(252,211,77,0.35)" },
+  C: { center: "#FCA5A5", edge: "#DC2626", glow: "rgba(252,165,165,0.35)" },
 };
 
 export function resolveBubblePalette(
@@ -45,7 +44,6 @@ export function resolveBubblePalette(
 }
 
 interface LenderSettings {
-  hudPosition: HudPosition;
   defaultFilterMode: FilterMode;
   bubbleColorMode: BubbleColorMode;
   unifiedColorHex: string;
@@ -54,7 +52,6 @@ interface LenderSettings {
 const STORAGE_KEY = "flowzo-lender-settings";
 
 const DEFAULTS: LenderSettings = {
-  hudPosition: "top",
   defaultFilterMode: "simple",
   bubbleColorMode: "by-grade",
   unifiedColorHex: "#3B82F6",
@@ -86,14 +83,6 @@ export function useLenderSettings() {
     setSettings(readSettings());
   }, []);
 
-  const setHudPosition = useCallback((hudPosition: HudPosition) => {
-    setSettings((prev) => {
-      const next = { ...prev, hudPosition };
-      writeSettings(next);
-      return next;
-    });
-  }, []);
-
   const setDefaultFilterMode = useCallback((defaultFilterMode: FilterMode) => {
     setSettings((prev) => {
       const next = { ...prev, defaultFilterMode };
@@ -119,8 +108,6 @@ export function useLenderSettings() {
   }, []);
 
   return {
-    hudPosition: settings.hudPosition,
-    setHudPosition,
     defaultFilterMode: settings.defaultFilterMode,
     setDefaultFilterMode,
     bubbleColorMode: settings.bubbleColorMode,

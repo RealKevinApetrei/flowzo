@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@flowzo/shared";
 
 interface LendingPotCardProps {
   pot: {
@@ -11,8 +12,6 @@ interface LendingPotCardProps {
     realized_yield_pence: number;
   } | null;
 }
-
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
 export function LendingPotCard({ pot }: LendingPotCardProps) {
   const available = pot?.available_pence ?? 0;
@@ -50,7 +49,7 @@ export function LendingPotCard({ pot }: LendingPotCardProps) {
           <div>
             <p className="text-sm text-text-secondary mb-1">Available to lend</p>
             <p className="text-4xl font-extrabold text-navy tracking-tight">
-              {formatPounds(available)}
+              {formatCurrency(available)}
             </p>
           </div>
 
@@ -97,19 +96,19 @@ export function LendingPotCard({ pot }: LendingPotCardProps) {
           <StatRow
             label="Locked"
             sublabel="In active trades"
-            value={formatPounds(locked)}
+            value={formatCurrency(locked)}
             dotColor="bg-warning"
           />
           <StatRow
             label="Total deployed"
             sublabel="All time"
-            value={formatPounds(totalDeployed)}
+            value={formatCurrency(totalDeployed)}
             dotColor="bg-text-secondary"
           />
           <StatRow
             label="Yield earned"
             sublabel="Realised profit"
-            value={formatPounds(yieldEarned)}
+            value={formatCurrency(yieldEarned)}
             dotColor="bg-success"
             valueColor="text-success"
           />

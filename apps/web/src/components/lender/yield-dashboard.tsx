@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { formatCurrency } from "@flowzo/shared";
 
 interface YieldDashboardProps {
   stats: {
@@ -11,8 +12,6 @@ interface YieldDashboardProps {
     activeTrades: number;
   };
 }
-
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
 function bpsToPercent(bps: number): string {
   return (bps / 100).toFixed(2) + "%";
@@ -30,7 +29,7 @@ export function YieldDashboard({ stats }: YieldDashboardProps) {
         <Card>
           <CardContent className="p-4">
             <p className="text-2xl font-extrabold text-success tracking-tight">
-              {formatPounds(stats.totalYieldPence)}
+              {formatCurrency(stats.totalYieldPence)}
             </p>
             <p className="text-xs text-text-secondary mt-1">Total yield</p>
             {/* Mini sparkline */}

@@ -4,6 +4,7 @@ import { useRef, useEffect, useCallback } from "react";
 import * as d3 from "d3";
 import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { resolveBubblePalette } from "@/lib/hooks/use-lender-settings";
+import { formatCurrency } from "@flowzo/shared";
 
 interface DemoBubbleBoardProps {
   autoMatch: boolean;
@@ -52,7 +53,7 @@ const DEMO_TRADES: DemoTrade[] = [
   { id: "d-12", borrower_name: "Isla F.", amount_pence: 11000, fee_pence: 550, shift_days: 12, risk_grade: "B" },
 ];
 
-const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(0);
+const formatShort = (pence: number) => formatCurrency(pence).replace(/\.00$/, "");
 
 export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }: DemoBubbleBoardProps) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -77,33 +78,21 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
     d3Svg.select("defs").remove();
     const defs = d3Svg.append("defs");
 
+    // Simple drop shadow filter
+    const shadow = defs.append("filter").attr("id", "demo-shadow").attr("x", "-20%").attr("y", "-20%").attr("width", "140%").attr("height", "140%");
+    shadow.append("feDropShadow").attr("dx", "0").attr("dy", "2").attr("stdDeviation", "3").attr("flood-color", "rgba(0,0,0,0.15)");
+
     if (bubbleColorMode === "unified") {
       const p = resolveBubblePalette("A", "unified", unifiedColorHex);
       const grad = defs.append("radialGradient").attr("id", "demo-grad-unified").attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
       grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
       grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
-
-      const glow = defs.append("filter").attr("id", "demo-glow-unified").attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
-      glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
-      glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
-      glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
-      const merge = glow.append("feMerge");
-      merge.append("feMergeNode").attr("in", "colored");
-      merge.append("feMergeNode").attr("in", "SourceGraphic");
     } else {
       (["A", "B", "C"] as const).forEach((grade) => {
         const p = resolveBubblePalette(grade, "by-grade", unifiedColorHex);
         const grad = defs.append("radialGradient").attr("id", `demo-grad-${grade}`).attr("cx", "45%").attr("cy", "40%").attr("r", "55%");
         grad.append("stop").attr("offset", "0%").attr("stop-color", p.center);
         grad.append("stop").attr("offset", "100%").attr("stop-color", p.edge);
-
-        const glow = defs.append("filter").attr("id", `demo-glow-${grade}`).attr("x", "-40%").attr("y", "-40%").attr("width", "180%").attr("height", "180%");
-        glow.append("feGaussianBlur").attr("in", "SourceGraphic").attr("stdDeviation", "8").attr("result", "blur");
-        glow.append("feFlood").attr("flood-color", p.glow).attr("result", "color");
-        glow.append("feComposite").attr("in", "color").attr("in2", "blur").attr("operator", "in").attr("result", "colored");
-        const merge = glow.append("feMerge");
-        merge.append("feMergeNode").attr("in", "colored");
-        merge.append("feMergeNode").attr("in", "SourceGraphic");
       });
     }
 
@@ -112,8 +101,8 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
     const minAmt = Math.min(...amounts);
     const maxAmt = Math.max(...amounts);
     const range = maxAmt - minAmt || 1;
-    const rMin = isMobile ? 22 : 30;
-    const rMax = isMobile ? 40 : 52;
+    const rMin = isMobile ? 18 : 24;
+    const rMax = isMobile ? 32 : 42;
 
     // Physics nodes with random velocity directions
     const nodes: PhysicsNode[] = DEMO_TRADES.map((t) => {
@@ -143,7 +132,6 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       .attr("class", "demo-bubble");
 
     const gradId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#demo-grad-unified)" : `url(#demo-grad-${d.risk_grade})`;
-    const glowId = (d: PhysicsNode) => bubbleColorMode === "unified" ? "url(#demo-glow-unified)" : `url(#demo-glow-${d.risk_grade})`;
 
     // Circle — soft gradient, drop shadow
     enter
@@ -151,7 +139,7 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       .attr("class", "demo-main")
       .attr("r", 0)
       .attr("fill", gradId)
-      .attr("filter", glowId)
+      .attr("filter", "url(#demo-shadow)")
       .transition()
       .duration(800)
       .ease(d3.easeElasticOut.amplitude(1).period(0.5))
@@ -206,7 +194,7 @@ export function DemoBubbleBoard({ autoMatch, bubbleColorMode, unifiedColorHex }:
       .attr("pointer-events", "none")
       .style("text-shadow", "0 1px 2px rgba(0,0,0,0.3)")
       .style("opacity", 0)
-      .text((d) => formatPounds(d.amount_pence))
+      .text((d) => formatShort(d.amount_pence))
       .transition()
       .delay(600)
       .duration(400)

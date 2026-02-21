@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useLenderSettings, BUBBLE_COLOR_PRESETS } from "@/lib/hooks/use-lender-settings";
-import type { HudPosition, FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
+import type { FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
 import { Switch } from "@/components/ui/switch";
 
@@ -34,8 +34,6 @@ export function SettingsClient({
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const {
-    hudPosition,
-    setHudPosition,
     defaultFilterMode,
     setDefaultFilterMode,
     bubbleColorMode,
@@ -218,27 +216,6 @@ export function SettingsClient({
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
             Lender Display
           </h2>
-          <div>
-            <p className="font-medium text-navy mb-2">HUD Position</p>
-            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
-              {(["top", "side", "hidden"] as const).map((pos) => (
-                <button
-                  key={pos}
-                  onClick={() => {
-                    setHudPosition(pos);
-                    toast(`HUD position set to ${pos}`);
-                  }}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                    hudPosition === pos
-                      ? "bg-coral text-white shadow-sm"
-                      : "text-text-secondary hover:text-navy"
-                  }`}
-                >
-                  {pos}
-                </button>
-              ))}
-            </div>
-          </div>
           <div>
             <p className="font-medium text-navy mb-2">Default Filter Mode</p>
             <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
