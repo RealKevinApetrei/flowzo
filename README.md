@@ -211,7 +211,7 @@ All monetary values stored as `numeric(12,2)` in GBP.
 
 ## Team
 
-Built for a hackathon by a team of 3, targeting the **Monzo** track and **Susquehanna "Best Use of Data"** prize.
+Built for a hackathon by a team of 4, targeting the **Monzo** track and the following challenges: **Susquehanna "Best Use of Data"**, **"Best Stripe Integration**, **Best Use of Claude** and **Best Team Under 22**.
 
 ---
 
