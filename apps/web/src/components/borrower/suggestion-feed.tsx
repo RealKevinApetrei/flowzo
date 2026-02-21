@@ -41,7 +41,6 @@ function SkeletonCard() {
       <div className="mt-3 flex gap-2">
         <div className="h-9 bg-warm-grey rounded-full flex-1" />
         <div className="h-9 bg-warm-grey rounded-full flex-1" />
-        <div className="h-9 bg-warm-grey rounded-full w-16" />
       </div>
     </div>
   );
@@ -134,7 +133,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
 
       // Remove from local state
       setProposals((prev) => prev.filter((p) => p.id !== proposalId));
-      toast.success("Proposal accepted — trade created!");
+      toast.success("Proposal accepted -- trade created!");
 
       router.refresh();
     } catch (err) {
@@ -155,41 +154,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     } catch (err) {
       console.error("Failed to dismiss proposal:", err);
       toast.error("Failed to dismiss. Please try again.");
-    }
-  }
-
-  async function handleCustomise(proposalId: string) {
-    const proposal = proposals.find((p) => p.id === proposalId);
-    if (!proposal) return;
-
-    try {
-      // Create a DRAFT trade (don't submit — let user adjust fee on trade detail page)
-      const formData = new FormData();
-      formData.set("obligation_id", proposal.payload.obligation_id ?? "");
-      formData.set("original_due_date", proposal.payload.original_date);
-      formData.set("new_due_date", proposal.payload.shifted_date);
-      formData.set("amount_pence", String(proposal.payload.amount_pence));
-      formData.set("fee_pence", String(proposal.payload.fee_pence));
-
-      const trade = await createTrade(formData);
-
-      // Link proposal to the draft trade
-      await supabase
-        .from("agent_proposals")
-        .update({
-          status: "ACCEPTED",
-          trade_id: trade.id,
-          responded_at: new Date().toISOString(),
-        })
-        .eq("id", proposalId);
-
-      setProposals((prev) => prev.filter((p) => p.id !== proposalId));
-
-      // Navigate to trade detail where BidSlider + ProbabilityCurve live
-      router.push(`/borrower/trades/${trade.id}`);
-    } catch (err) {
-      console.error("Failed to customise proposal:", err);
-      toast.error("Failed to create custom trade. Please try again.");
     }
   }
 
@@ -247,7 +211,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
           dangerDayBalance={forecastMap.get(proposal.payload.original_date)}
           onAccept={handleAccept}
           onDismiss={handleDismiss}
-          onCustomise={handleCustomise}
         />
       ))}
     </div>

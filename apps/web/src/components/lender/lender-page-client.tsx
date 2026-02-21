@@ -57,19 +57,17 @@ export function LenderPageClient({
 }: LenderPageClientProps) {
   const router = useRouter();
   const { trades, loading: tradesLoading } = useBubbleBoard();
-  const { defaultFilterMode, bubbleColorMode, unifiedColorHex } =
-    useLenderSettings();
+  const { bubbleColorMode, unifiedColorHex, amountRange, termRange } = useLenderSettings();
   const [autoMatch, setAutoMatch] = useState(initialAutoMatch);
   const [withdrawalQueued, setWithdrawalQueued] = useState(
     initialWithdrawalQueued,
   );
   const [isPending, startTransition] = useTransition();
-  const [filterMode, setFilterMode] = useState(defaultFilterMode);
 
   const [filters, setFilters] = useState<FilterState>({
     riskGrades: new Set(["A", "B", "C"]),
-    amountRange: [0, 100000],
-    termRange: [1, 90],
+    amountRange,
+    termRange,
   });
 
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
@@ -155,7 +153,7 @@ export function LenderPageClient({
         await queueWithdrawal();
         setWithdrawalQueued(true);
         toast.success(
-          "Withdrawal queued — funds will auto-withdraw as trades settle",
+          "Withdrawal queued -- funds will auto-withdraw as trades settle",
         );
       } catch {
         toast.error("Failed to queue withdrawal");
@@ -208,8 +206,6 @@ export function LenderPageClient({
               <FilterBar
                 filters={filters}
                 onFiltersChange={setFilters}
-                mode={filterMode}
-                onModeChange={setFilterMode}
               />
             )}
 

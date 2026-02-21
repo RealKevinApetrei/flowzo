@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 
-export type FilterMode = "simple" | "advanced";
 export type BubbleColorMode = "by-grade" | "unified";
 
 export interface BubbleColorPreset {
@@ -44,17 +43,19 @@ export function resolveBubblePalette(
 }
 
 interface LenderSettings {
-  defaultFilterMode: FilterMode;
   bubbleColorMode: BubbleColorMode;
   unifiedColorHex: string;
+  amountRange: [number, number];
+  termRange: [number, number];
 }
 
 const STORAGE_KEY = "flowzo-lender-settings";
 
 const DEFAULTS: LenderSettings = {
-  defaultFilterMode: "simple",
   bubbleColorMode: "by-grade",
   unifiedColorHex: "#3B82F6",
+  amountRange: [0, 100000],
+  termRange: [1, 90],
 };
 
 function readSettings(): LenderSettings {
@@ -83,14 +84,6 @@ export function useLenderSettings() {
     setSettings(readSettings());
   }, []);
 
-  const setDefaultFilterMode = useCallback((defaultFilterMode: FilterMode) => {
-    setSettings((prev) => {
-      const next = { ...prev, defaultFilterMode };
-      writeSettings(next);
-      return next;
-    });
-  }, []);
-
   const setBubbleColorMode = useCallback((bubbleColorMode: BubbleColorMode) => {
     setSettings((prev) => {
       const next = { ...prev, bubbleColorMode };
@@ -107,12 +100,30 @@ export function useLenderSettings() {
     });
   }, []);
 
+  const setAmountRange = useCallback((amountRange: [number, number]) => {
+    setSettings((prev) => {
+      const next = { ...prev, amountRange };
+      writeSettings(next);
+      return next;
+    });
+  }, []);
+
+  const setTermRange = useCallback((termRange: [number, number]) => {
+    setSettings((prev) => {
+      const next = { ...prev, termRange };
+      writeSettings(next);
+      return next;
+    });
+  }, []);
+
   return {
-    defaultFilterMode: settings.defaultFilterMode,
-    setDefaultFilterMode,
     bubbleColorMode: settings.bubbleColorMode,
     setBubbleColorMode,
     unifiedColorHex: settings.unifiedColorHex,
     setUnifiedColorHex,
+    amountRange: settings.amountRange,
+    setAmountRange,
+    termRange: settings.termRange,
+    setTermRange,
   };
 }

@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
 import { useLenderSettings, BUBBLE_COLOR_PRESETS } from "@/lib/hooks/use-lender-settings";
-import type { FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
+import type { BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
 import { Switch } from "@/components/ui/switch";
 import { updateLenderPreferences } from "@/lib/actions/lending";
@@ -44,12 +44,14 @@ export function SettingsClient({
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const {
-    defaultFilterMode,
-    setDefaultFilterMode,
     bubbleColorMode,
     setBubbleColorMode,
     unifiedColorHex,
     setUnifiedColorHex,
+    amountRange,
+    setAmountRange,
+    termRange,
+    setTermRange,
   } = useLenderSettings();
   const [signingOut, setSigningOut] = useState(false);
   const [isPrefSaving, startPrefTransition] = useTransition();
@@ -64,7 +66,7 @@ export function SettingsClient({
     lenderPrefs?.auto_match_enabled ?? false,
   );
 
-  // Notification preferences — persisted to localStorage
+  // Notification preferences
   const [notifTradeUpdates, setNotifTradeUpdates] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("flowzo-notif-trade") !== "false";
@@ -72,10 +74,6 @@ export function SettingsClient({
   const [notifForecastAlerts, setNotifForecastAlerts] = useState(() => {
     if (typeof window === "undefined") return true;
     return localStorage.getItem("flowzo-notif-forecast") !== "false";
-  });
-  const [notifEmailDigest, setNotifEmailDigest] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("flowzo-notif-digest") === "true";
   });
 
   async function handleSignOut() {
@@ -113,9 +111,9 @@ export function SettingsClient({
         }
         formData.set("auto_match_enabled", String(autoMatchEnabled));
         await updateLenderPreferences(formData);
-        toast.success("Lending preferences saved");
+        toast.success("Preferences saved");
       } catch {
-        toast.error("Failed to save lending preferences");
+        toast.error("Failed to save preferences");
       }
     });
   }
@@ -124,7 +122,7 @@ export function SettingsClient({
     <div>
       <TopBar title="Settings" />
       <div className="px-4 py-6 space-y-6 max-w-lg mx-auto">
-        {/* Account Section */}
+        {/* Account */}
         <section className="card-monzo p-5 space-y-3">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
             Account
@@ -197,6 +195,188 @@ export function SettingsClient({
           </button>
         </section>
 
+        {/* Lending */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Lending
+          </h2>
+
+          {/* Auto-match */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-navy">Auto-match</p>
+              <p className="text-xs text-text-secondary">
+                Automatically fund trades matching your criteria
+              </p>
+            </div>
+            <Switch
+              checked={autoMatchEnabled}
+              onCheckedChange={setAutoMatchEnabled}
+            />
+          </div>
+
+          {/* Amount range */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-medium text-navy">Amount range</p>
+              <span className="text-sm font-bold text-coral">
+                {"\u00A3"}{(amountRange[0] / 100).toFixed(0)} – {"\u00A3"}{(amountRange[1] / 100).toFixed(0)}
+              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted w-8">Min</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={amountRange[1]}
+                  step={500}
+                  value={amountRange[0]}
+                  onChange={(e) => setAmountRange([Number(e.target.value), amountRange[1]])}
+                  className="flex-1 h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted w-8">Max</span>
+                <input
+                  type="range"
+                  min={amountRange[0]}
+                  max={100000}
+                  step={500}
+                  value={amountRange[1]}
+                  onChange={(e) => setAmountRange([amountRange[0], Number(e.target.value)])}
+                  className="flex-1 h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Term range */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-medium text-navy">Term range</p>
+              <span className="text-sm font-bold text-coral">
+                {termRange[0]}d – {termRange[1]}d
+              </span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted w-8">Min</span>
+                <input
+                  type="range"
+                  min={1}
+                  max={termRange[1]}
+                  step={1}
+                  value={termRange[0]}
+                  onChange={(e) => setTermRange([Number(e.target.value), termRange[1]])}
+                  className="flex-1 h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted w-8">Max</span>
+                <input
+                  type="range"
+                  min={termRange[0]}
+                  max={90}
+                  step={1}
+                  value={termRange[1]}
+                  onChange={(e) => setTermRange([termRange[0], Number(e.target.value)])}
+                  className="flex-1 h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Min APR */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-medium text-navy">Minimum APR</p>
+              <span className="text-sm font-bold text-coral">{minApr}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              step={0.5}
+              value={minApr}
+              onChange={(e) => setMinApr(Number(e.target.value))}
+              className="w-full h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+            />
+          </div>
+
+          {/* Risk bands */}
+          <div>
+            <p className="font-medium text-navy mb-2">Risk grades</p>
+            <div className="flex gap-2">
+              {(["A", "B", "C"] as const).map((band) => (
+                <button
+                  key={band}
+                  onClick={() => handleToggleRiskBand(band)}
+                  className={`flex-1 py-2.5 rounded-full text-sm font-bold transition-all ${
+                    riskBands.has(band)
+                      ? band === "A"
+                        ? "bg-success/15 text-success ring-1 ring-success/30"
+                        : band === "B"
+                          ? "bg-warning/15 text-warning ring-1 ring-warning/30"
+                          : "bg-danger/15 text-danger ring-1 ring-danger/30"
+                      : "bg-warm-grey text-text-muted"
+                  }`}
+                >
+                  {band}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bubble colors */}
+          <div>
+            <p className="font-medium text-navy mb-2">Bubble colors</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full mb-3">
+              {(["by-grade", "unified"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => setBubbleColorMode(mode)}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
+                    bubbleColorMode === mode
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {mode === "by-grade" ? "By Grade" : "Unified"}
+                </button>
+              ))}
+            </div>
+            {bubbleColorMode === "unified" && (
+              <div className="flex flex-wrap gap-2.5">
+                {BUBBLE_COLOR_PRESETS.map((preset) => (
+                  <button
+                    key={preset.hex}
+                    onClick={() => setUnifiedColorHex(preset.hex)}
+                    className="relative w-10 h-10 rounded-full transition-transform hover:scale-110 active:scale-95"
+                    style={{ background: preset.hex }}
+                    aria-label={preset.name}
+                  >
+                    {unifiedColorHex === preset.hex && (
+                      <svg className="absolute inset-0 m-auto w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSaveLenderPrefs}
+            disabled={isPrefSaving}
+            className="w-full bg-coral text-white font-semibold py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
+          >
+            {isPrefSaving ? "Saving..." : "Save Lending Preferences"}
+          </button>
+        </section>
+
         {/* Notifications */}
         <section className="card-monzo p-5 space-y-4">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
@@ -214,7 +394,6 @@ export function SettingsClient({
               onCheckedChange={(checked) => {
                 setNotifTradeUpdates(checked);
                 localStorage.setItem("flowzo-notif-trade", String(checked));
-                toast(checked ? "Trade updates enabled" : "Trade updates disabled");
               }}
             />
           </div>
@@ -230,23 +409,6 @@ export function SettingsClient({
               onCheckedChange={(checked) => {
                 setNotifForecastAlerts(checked);
                 localStorage.setItem("flowzo-notif-forecast", String(checked));
-                toast(checked ? "Forecast alerts enabled" : "Forecast alerts disabled");
-              }}
-            />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-navy">Weekly email digest</p>
-              <p className="text-xs text-text-secondary">
-                Summary of your activity and upcoming bills
-              </p>
-            </div>
-            <Switch
-              checked={notifEmailDigest}
-              onCheckedChange={(checked) => {
-                setNotifEmailDigest(checked);
-                localStorage.setItem("flowzo-notif-digest", String(checked));
-                toast(checked ? "Email digest enabled" : "Email digest disabled");
               }}
             />
           </div>
@@ -261,10 +423,7 @@ export function SettingsClient({
             {(["light", "system", "dark"] as const).map((option) => (
               <button
                 key={option}
-                onClick={() => {
-                  setTheme(option);
-                  toast(`Theme set to ${option}`);
-                }}
+                onClick={() => setTheme(option)}
                 className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
                   theme === option
                     ? "bg-coral text-white shadow-sm"
@@ -292,235 +451,14 @@ export function SettingsClient({
           </div>
         </section>
 
-        {/* Lender Display */}
-        <section className="card-monzo p-5 space-y-4">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-            Lender Display
-          </h2>
-          <div>
-            <p className="font-medium text-navy mb-2">Default Filter Mode</p>
-            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
-              {(["simple", "advanced"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setDefaultFilterMode(mode);
-                    toast(`Default filter mode set to ${mode}`);
-                  }}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
-                    defaultFilterMode === mode
-                      ? "bg-coral text-white shadow-sm"
-                      : "text-text-secondary hover:text-navy"
-                  }`}
-                >
-                  {mode}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <p className="font-medium text-navy mb-2">Bubble Colors</p>
-            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full mb-3">
-              {(["by-grade", "unified"] as const).map((mode) => (
-                <button
-                  key={mode}
-                  onClick={() => {
-                    setBubbleColorMode(mode);
-                    toast(`Bubble colors set to ${mode === "by-grade" ? "by grade" : "unified"}`);
-                  }}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                    bubbleColorMode === mode
-                      ? "bg-coral text-white shadow-sm"
-                      : "text-text-secondary hover:text-navy"
-                  }`}
-                >
-                  {mode === "by-grade" ? "By Grade" : "Unified"}
-                </button>
-              ))}
-            </div>
-            {bubbleColorMode === "unified" && (
-              <div className="flex flex-wrap gap-2.5">
-                {BUBBLE_COLOR_PRESETS.map((preset) => (
-                  <button
-                    key={preset.hex}
-                    onClick={() => {
-                      setUnifiedColorHex(preset.hex);
-                      toast(`Bubble color set to ${preset.name}`);
-                    }}
-                    className="relative w-10 h-10 rounded-full transition-transform hover:scale-110 active:scale-95"
-                    style={{ background: preset.hex }}
-                    aria-label={preset.name}
-                  >
-                    {unifiedColorHex === preset.hex && (
-                      <svg className="absolute inset-0 m-auto w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Lending Preferences */}
-        <section className="card-monzo p-5 space-y-4">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-            Lending Preferences
-          </h2>
-
-          {/* Auto-match */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-navy">Auto-match</p>
-              <p className="text-xs text-text-secondary">
-                Automatically fund trades matching your criteria
-              </p>
-            </div>
-            <Switch
-              checked={autoMatchEnabled}
-              onCheckedChange={setAutoMatchEnabled}
-            />
-          </div>
-
-          {/* Min APR */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="font-medium text-navy">Minimum APR</p>
-              <span className="text-sm font-bold text-coral">{minApr}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={20}
-              step={0.5}
-              value={minApr}
-              onChange={(e) => setMinApr(Number(e.target.value))}
-              className="w-full h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
-            />
-            <div className="flex justify-between text-[10px] text-text-muted mt-1">
-              <span>0%</span>
-              <span>20%</span>
-            </div>
-          </div>
-
-          {/* Max shift days */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <p className="font-medium text-navy">Max shift days</p>
-              <span className="text-sm font-bold text-coral">{maxShiftDays} days</span>
-            </div>
-            <input
-              type="range"
-              min={1}
-              max={90}
-              step={1}
-              value={maxShiftDays}
-              onChange={(e) => setMaxShiftDays(Number(e.target.value))}
-              className="w-full h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
-            />
-            <div className="flex justify-between text-[10px] text-text-muted mt-1">
-              <span>1 day</span>
-              <span>90 days</span>
-            </div>
-          </div>
-
-          {/* Risk bands */}
-          <div>
-            <p className="font-medium text-navy mb-2">Accepted risk grades</p>
-            <div className="flex gap-2">
-              {(["A", "B", "C"] as const).map((band) => (
-                <button
-                  key={band}
-                  onClick={() => handleToggleRiskBand(band)}
-                  className={`flex-1 py-2.5 rounded-full text-sm font-bold transition-all ${
-                    riskBands.has(band)
-                      ? band === "A"
-                        ? "bg-success/15 text-success ring-1 ring-success/30"
-                        : band === "B"
-                          ? "bg-warning/15 text-warning ring-1 ring-warning/30"
-                          : "bg-danger/15 text-danger ring-1 ring-danger/30"
-                      : "bg-warm-grey text-text-muted"
-                  }`}
-                >
-                  {band}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Save button */}
-          <button
-            onClick={handleSaveLenderPrefs}
-            disabled={isPrefSaving}
-            className="w-full bg-coral text-white font-semibold py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            {isPrefSaving ? "Saving..." : "Save Lending Preferences"}
-          </button>
-        </section>
-
-        {/* Preferences */}
-        <section className="card-monzo p-5 space-y-4">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-            Preferences
-          </h2>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-navy">Role Preference</p>
-              <p className="text-xs text-text-secondary">
-                How you primarily use Flowzo
-              </p>
-            </div>
-            <span className="text-sm font-medium text-coral capitalize">
-              {rolePreference === "borrower" ? "Borrower" : rolePreference === "lender" ? "Lender" : rolePreference === "both" ? "Both" : rolePreference}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-navy">Onboarding</p>
-              <p className="text-xs text-text-secondary">Setup status</p>
-            </div>
-            <span
-              className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                onboardingCompleted
-                  ? "bg-success/10 text-success"
-                  : "bg-warning/10 text-warning"
-              }`}
-            >
-              {onboardingCompleted ? "Complete" : "Incomplete"}
-            </span>
-          </div>
-        </section>
-
-        {/* Legal */}
-        <section className="card-monzo p-5 space-y-2">
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-            Legal
-          </h2>
-          <a href="/terms" className="block text-sm text-navy hover:text-coral transition-colors py-1">
-            Terms of Service
-          </a>
-          <a href="/privacy" className="block text-sm text-navy hover:text-coral transition-colors py-1">
-            Privacy Policy
-          </a>
-          <a href="/fca-disclaimer" className="block text-sm text-navy hover:text-coral transition-colors py-1">
-            FCA Disclaimer
-          </a>
-        </section>
-
         {/* Sign Out */}
-        <section className="card-monzo p-5 space-y-3 border border-danger/20">
-          <h2 className="text-xs font-semibold text-danger uppercase tracking-wider">
-            Danger Zone
-          </h2>
-          <button
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="w-full border border-danger text-danger font-semibold py-2.5 rounded-full hover:bg-danger hover:text-white transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            {signingOut ? "Signing out..." : "Sign Out"}
-          </button>
-        </section>
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="w-full border border-danger text-danger font-semibold py-2.5 rounded-full hover:bg-danger hover:text-white transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          {signingOut ? "Signing out..." : "Sign Out"}
+        </button>
 
         {/* App version */}
         <p className="text-center text-xs text-text-muted">

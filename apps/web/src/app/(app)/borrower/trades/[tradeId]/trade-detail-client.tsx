@@ -1,75 +1,68 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { BidSlider } from "@/components/borrower/bid-slider";
-import { ProbabilityCurve } from "@/components/borrower/probability-curve";
+import { Button } from "@/components/ui/button";
 
 interface TradeDetailClientProps {
   trade: {
     id: string;
-    amount_pence: number;
     fee_pence: number;
-    shift_days: number;
-    risk_grade: string;
   };
+  status: "DRAFT" | "PENDING_MATCH";
 }
 
-export function TradeDetailClient({ trade }: TradeDetailClientProps) {
-  const [currentFeePence, setCurrentFeePence] = useState(trade.fee_pence);
+export function TradeDetailClient({ trade, status }: TradeDetailClientProps) {
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
 
-  const handleSliderChange = useCallback((feePence: number) => {
-    setCurrentFeePence(feePence);
-  }, []);
+  async function handleConfirm() {
+    setSubmitting(true);
+    try {
+      const response = await fetch(`/api/trades/${trade.id}/bid`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fee_pence: trade.fee_pence }),
+      });
 
-  const handleSubmit = useCallback(
-    async (feePence: number) => {
-      try {
-        // Update the trade fee and submit it
-        const response = await fetch(`/api/trades/${trade.id}/bid`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fee_pence: feePence }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to place bid");
-        }
-
-        toast.success("Bid placed successfully!");
-        router.refresh();
-      } catch (err) {
-        console.error("Failed to place bid:", err);
-        toast.error("Failed to place bid. Please try again.");
+      if (!response.ok) {
+        throw new Error("Failed to confirm shift");
       }
-    },
-    [trade.id, router],
-  );
 
+      toast.success("Shift confirmed! Finding a lender...");
+      router.refresh();
+    } catch (err) {
+      console.error("Failed to confirm shift:", err);
+      toast.error("Failed to confirm. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (status === "DRAFT") {
+    return (
+      <Button
+        onClick={handleConfirm}
+        disabled={submitting}
+        className="w-full"
+        size="lg"
+      >
+        {submitting ? "Confirming..." : "Confirm this shift"}
+      </Button>
+    );
+  }
+
+  // PENDING_MATCH — show waiting state
   return (
-    <div className="space-y-6">
-      <BidSlider
-        trade={{
-          amount_pence: trade.amount_pence,
-          fee_pence: trade.fee_pence,
-          shift_days: trade.shift_days,
-          risk_grade: trade.risk_grade,
-        }}
-        onChange={handleSliderChange}
-        onSubmit={(feePence) => {
-          setCurrentFeePence(feePence);
-          handleSubmit(feePence);
-        }}
-      />
-
-      <ProbabilityCurve
-        currentFeePence={currentFeePence}
-        agentFeePence={trade.fee_pence}
-        amountPence={trade.amount_pence}
-        riskGrade={trade.risk_grade}
-      />
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 text-center">
+      <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center mx-auto mb-3">
+        <div className="w-5 h-5 border-2 border-coral border-t-transparent rounded-full animate-spin" />
+      </div>
+      <h3 className="text-base font-bold text-navy">Finding a lender...</h3>
+      <p className="text-sm text-text-secondary mt-1">
+        This usually takes less than a minute.
+      </p>
     </div>
   );
 }

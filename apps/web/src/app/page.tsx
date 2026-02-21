@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { LandingPreviews } from "@/components/landing/landing-previews";
 
 export default async function LandingPage() {
   const supabase = await createClient();
@@ -21,90 +22,57 @@ export default async function LandingPage() {
               Dashboard
             </Link>
           ) : (
-            <>
-              <Link href="/login" className="text-sm font-medium text-navy hover:text-coral transition-colors">
-                Log in
-              </Link>
-              <Link
-                href="/signup"
-                className="text-sm font-semibold bg-coral text-white px-5 py-2 rounded-full hover:bg-coral-dark transition-colors"
-              >
-                Sign up
-              </Link>
-            </>
+            <Link href="/login" className="text-sm font-medium text-navy hover:text-coral transition-colors">
+              Log in
+            </Link>
           )}
         </nav>
       </header>
 
-      {/* Hero */}
-      <section className="px-6 pt-16 pb-20 text-center max-w-3xl mx-auto">
-        <p className="text-sm font-semibold text-coral uppercase tracking-wider mb-4">
-          Powered by Open Banking
-        </p>
+      {/* Hero — problem-first */}
+      <section className="px-6 pt-16 pb-12 text-center max-w-3xl mx-auto">
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-navy leading-tight">
-          Your bills, shifted.{" "}
-          <span className="text-coral">Your money, safe.</span>
+          Bills land before payday?
         </h1>
-        <p className="mt-6 text-lg sm:text-xl text-text-secondary max-w-xl mx-auto leading-relaxed">
-          Flowzo uses AI to predict cash flow shortfalls and automatically shifts your bills to safer dates — backed by P2P micro-lending so you never hit overdraft.
+        <p className="mt-3 text-3xl sm:text-4xl font-extrabold text-coral">
+          We move them.
         </p>
-        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+        <p className="mt-6 text-lg text-text-secondary max-w-xl mx-auto leading-relaxed">
+          Flowzo predicts your cash flow 30 days ahead and shifts bills to safer dates — no overdraft needed.
+        </p>
+        <div className="mt-10">
           <Link
             href={user ? "/borrower" : "/signup"}
-            className="w-full sm:w-auto bg-coral text-white font-semibold px-8 py-3.5 rounded-full text-lg hover:bg-coral-dark transition-colors active:scale-95 transition-transform"
+            className="inline-block bg-coral text-white font-semibold px-10 py-4 rounded-full text-lg hover:bg-coral-dark transition-colors active:scale-95"
           >
-            {user ? "Go to Dashboard" : "Get Started Free"}
+            {user ? "Go to Dashboard" : "Try the Demo"}
           </Link>
-          <a
-            href="#how-it-works"
-            className="w-full sm:w-auto border-2 border-navy text-navy font-semibold px-8 py-3.5 rounded-full text-lg hover:bg-navy hover:text-white transition-colors"
-          >
-            See how it works
-          </a>
         </div>
       </section>
 
-      {/* App Preview Mockup */}
-      <section className="px-6 pb-16 max-w-4xl mx-auto">
-        <div className="bg-[var(--card-surface)] rounded-3xl shadow-lg p-6 sm:p-10 border border-cool-grey/50">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
-            <div className="space-y-2">
-              <div className="text-3xl font-extrabold text-coral">30-day</div>
-              <p className="text-sm text-text-secondary">Cash flow forecast with AI confidence bands</p>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl font-extrabold text-success">&lt; 10s</div>
-              <p className="text-sm text-text-secondary">From bank sync to actionable bill shift proposals</p>
-            </div>
-            <div className="space-y-2">
-              <div className="text-3xl font-extrabold text-navy">A/B/C</div>
-              <p className="text-sm text-text-secondary">Dynamic risk grades driving transparent fee pricing</p>
-            </div>
-          </div>
-        </div>
+      {/* Live App Previews */}
+      <section className="px-6 pb-16 max-w-5xl mx-auto">
+        <LandingPreviews />
       </section>
 
       {/* How It Works */}
       <section id="how-it-works" className="px-6 py-16 bg-[var(--card-surface)]">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center text-navy mb-4">
-            How Flowzo works
+          <h2 className="text-2xl sm:text-3xl font-bold text-center text-navy mb-12">
+            How it works
           </h2>
-          <p className="text-center text-text-secondary mb-12 max-w-lg mx-auto">
-            Three steps from bank connection to financial peace of mind.
-          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
             {/* Step 1 */}
             <div className="card-monzo text-center p-8">
               <div className="w-14 h-14 bg-coral/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-7 h-7 text-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                 </svg>
               </div>
               <div className="text-xs font-bold text-coral uppercase tracking-wider mb-2">Step 1</div>
-              <h3 className="text-lg font-bold text-navy mb-2">Smart Forecasting</h3>
+              <h3 className="text-lg font-bold text-navy mb-2">Connect your bank</h3>
               <p className="text-sm text-text-secondary leading-relaxed">
-                Connect your bank via Open Banking. Our AI analyses income and spending patterns to predict cash flow 30 days ahead.
+                5 seconds via Open Banking. Read-only access, revoke any time.
               </p>
             </div>
 
@@ -112,13 +80,13 @@ export default async function LandingPage() {
             <div className="card-monzo text-center p-8">
               <div className="w-14 h-14 bg-coral/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-7 h-7 text-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
                 </svg>
               </div>
               <div className="text-xs font-bold text-coral uppercase tracking-wider mb-2">Step 2</div>
-              <h3 className="text-lg font-bold text-navy mb-2">Bill Shifting</h3>
+              <h3 className="text-lg font-bold text-navy mb-2">We spot the danger days</h3>
               <p className="text-sm text-text-secondary leading-relaxed">
-                When bills clash with low balances, Flowzo proposes a safer payment date and covers the gap through P2P micro-lending.
+                AI forecasts when bills will clash with low balances and flags the risk.
               </p>
             </div>
 
@@ -126,13 +94,13 @@ export default async function LandingPage() {
             <div className="card-monzo text-center p-8">
               <div className="w-14 h-14 bg-coral/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <svg className="w-7 h-7 text-coral" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                 </svg>
               </div>
               <div className="text-xs font-bold text-coral uppercase tracking-wider mb-2">Step 3</div>
-              <h3 className="text-lg font-bold text-navy mb-2">Earn Returns</h3>
+              <h3 className="text-lg font-bold text-navy mb-2">Bills get shifted automatically</h3>
               <p className="text-sm text-text-secondary leading-relaxed">
-                Lend spare cash to help others shift bills. Earn competitive micro-returns on idle money with full risk transparency.
+                Accept the shift with one tap. P2P micro-lending covers the gap until payday.
               </p>
             </div>
           </div>
