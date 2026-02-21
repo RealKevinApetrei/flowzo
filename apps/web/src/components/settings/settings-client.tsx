@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
 import { useTheme } from "@/components/providers/theme-provider";
+import { useLenderSettings } from "@/lib/hooks/use-lender-settings";
+import type { HudPosition, FilterMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
 
 interface SettingsClientProps {
@@ -30,6 +32,12 @@ export function SettingsClient({
   const supabase = useSupabase();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
+  const {
+    hudPosition,
+    setHudPosition,
+    defaultFilterMode,
+    setDefaultFilterMode,
+  } = useLenderSettings();
   const [signingOut, setSigningOut] = useState(false);
 
   // Notification preferences (UI only — no backend wiring)
@@ -227,6 +235,55 @@ export function SettingsClient({
                 {option === "light" ? "☀️ Light" : option === "dark" ? "🌙 Dark" : "💻 System"}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Lender Display */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Lender Display
+          </h2>
+          <div>
+            <p className="font-medium text-navy mb-2">HUD Position</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
+              {(["top", "side", "hidden"] as const).map((pos) => (
+                <button
+                  key={pos}
+                  onClick={() => {
+                    setHudPosition(pos);
+                    toast(`HUD position set to ${pos}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    hudPosition === pos
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {pos}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-medium text-navy mb-2">Default Filter Mode</p>
+            <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
+              {(["simple", "advanced"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  onClick={() => {
+                    setDefaultFilterMode(mode);
+                    toast(`Default filter mode set to ${mode}`);
+                  }}
+                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all capitalize ${
+                    defaultFilterMode === mode
+                      ? "bg-coral text-white shadow-sm"
+                      : "text-text-secondary hover:text-navy"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
           </div>
         </section>
 

@@ -135,6 +135,37 @@ body {
   to { stroke-dashoffset: 0; }
 }
 
+/* Glass surface utility */
+.glass-surface {
+  background: color-mix(in srgb, var(--card-surface) 75%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.dark .glass-surface {
+  background: color-mix(in srgb, var(--card-surface) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+/* Charging ring animation for long-press */
+@keyframes charge-fill {
+  from {
+    stroke-dashoffset: var(--circumference);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Full-viewport bubble container */
+.bubble-viewport {
+  position: relative;
+  width: 100%;
+  height: calc(100dvh - 4rem); /* subtract bottom nav h-16 */
+  overflow: hidden;
+}
+
 /* Mobile touch improvements */
 @media (max-width: 640px) {
   /* Ensure touch targets are at least 44px */
