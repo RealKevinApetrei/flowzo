@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useSupabase } from "@/lib/hooks/use-supabase";
@@ -9,6 +9,14 @@ import { useLenderSettings, BUBBLE_COLOR_PRESETS } from "@/lib/hooks/use-lender-
 import type { HudPosition, FilterMode, BubbleColorMode } from "@/lib/hooks/use-lender-settings";
 import { TopBar } from "@/components/layout/top-bar";
 import { Switch } from "@/components/ui/switch";
+import { updateLenderPreferences } from "@/lib/actions/lending";
+
+interface LenderPrefs {
+  min_apr: number;
+  max_shift_days: number;
+  risk_bands: string[];
+  auto_match_enabled: boolean;
+}
 
 interface SettingsClientProps {
   email: string;
@@ -21,6 +29,7 @@ interface SettingsClientProps {
     last_synced_at: string | null;
   }>;
   onboardingCompleted: boolean;
+  lenderPrefs?: LenderPrefs;
 }
 
 export function SettingsClient({
@@ -29,6 +38,7 @@ export function SettingsClient({
   rolePreference,
   connections,
   onboardingCompleted,
+  lenderPrefs,
 }: SettingsClientProps) {
   const supabase = useSupabase();
   const router = useRouter();
@@ -44,6 +54,17 @@ export function SettingsClient({
     setUnifiedColorHex,
   } = useLenderSettings();
   const [signingOut, setSigningOut] = useState(false);
+  const [isPrefSaving, startPrefTransition] = useTransition();
+
+  // Lender preference state
+  const [minApr, setMinApr] = useState(lenderPrefs?.min_apr ?? 5);
+  const [maxShiftDays, setMaxShiftDays] = useState(lenderPrefs?.max_shift_days ?? 14);
+  const [riskBands, setRiskBands] = useState<Set<string>>(
+    new Set(lenderPrefs?.risk_bands ?? ["A", "B", "C"]),
+  );
+  const [autoMatchEnabled, setAutoMatchEnabled] = useState(
+    lenderPrefs?.auto_match_enabled ?? false,
+  );
 
   // Notification preferences (UI only — no backend wiring)
   const [notifTradeUpdates, setNotifTradeUpdates] = useState(true);
@@ -60,6 +81,36 @@ export function SettingsClient({
 
   function handleConnectBank() {
     window.location.href = "/api/truelayer/auth";
+  }
+
+  function handleToggleRiskBand(band: string) {
+    setRiskBands((prev) => {
+      const next = new Set(prev);
+      if (next.has(band)) {
+        if (next.size > 1) next.delete(band);
+      } else {
+        next.add(band);
+      }
+      return next;
+    });
+  }
+
+  function handleSaveLenderPrefs() {
+    startPrefTransition(async () => {
+      try {
+        const formData = new FormData();
+        formData.set("min_apr", String(minApr));
+        formData.set("max_shift_days", String(maxShiftDays));
+        for (const band of riskBands) {
+          formData.append("risk_bands", band);
+        }
+        formData.set("auto_match_enabled", String(autoMatchEnabled));
+        await updateLenderPreferences(formData);
+        toast.success("Lending preferences saved");
+      } catch {
+        toast.error("Failed to save lending preferences");
+      }
+    });
   }
 
   return (
@@ -303,6 +354,102 @@ export function SettingsClient({
               </div>
             )}
           </div>
+        </section>
+
+        {/* Lending Preferences */}
+        <section className="card-monzo p-5 space-y-4">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Lending Preferences
+          </h2>
+
+          {/* Auto-match */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-navy">Auto-match</p>
+              <p className="text-xs text-text-secondary">
+                Automatically fund trades matching your criteria
+              </p>
+            </div>
+            <Switch
+              checked={autoMatchEnabled}
+              onCheckedChange={setAutoMatchEnabled}
+            />
+          </div>
+
+          {/* Min APR */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-medium text-navy">Minimum APR</p>
+              <span className="text-sm font-bold text-coral">{minApr}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              step={0.5}
+              value={minApr}
+              onChange={(e) => setMinApr(Number(e.target.value))}
+              className="w-full h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+            />
+            <div className="flex justify-between text-[10px] text-text-muted mt-1">
+              <span>0%</span>
+              <span>20%</span>
+            </div>
+          </div>
+
+          {/* Max shift days */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <p className="font-medium text-navy">Max shift days</p>
+              <span className="text-sm font-bold text-coral">{maxShiftDays} days</span>
+            </div>
+            <input
+              type="range"
+              min={1}
+              max={90}
+              step={1}
+              value={maxShiftDays}
+              onChange={(e) => setMaxShiftDays(Number(e.target.value))}
+              className="w-full h-1.5 bg-warm-grey rounded-full appearance-none cursor-pointer accent-coral"
+            />
+            <div className="flex justify-between text-[10px] text-text-muted mt-1">
+              <span>1 day</span>
+              <span>90 days</span>
+            </div>
+          </div>
+
+          {/* Risk bands */}
+          <div>
+            <p className="font-medium text-navy mb-2">Accepted risk grades</p>
+            <div className="flex gap-2">
+              {(["A", "B", "C"] as const).map((band) => (
+                <button
+                  key={band}
+                  onClick={() => handleToggleRiskBand(band)}
+                  className={`flex-1 py-2.5 rounded-full text-sm font-bold transition-all ${
+                    riskBands.has(band)
+                      ? band === "A"
+                        ? "bg-success/15 text-success ring-1 ring-success/30"
+                        : band === "B"
+                          ? "bg-warning/15 text-warning ring-1 ring-warning/30"
+                          : "bg-danger/15 text-danger ring-1 ring-danger/30"
+                      : "bg-warm-grey text-text-muted"
+                  }`}
+                >
+                  {band}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSaveLenderPrefs}
+            disabled={isPrefSaving}
+            className="w-full bg-coral text-white font-semibold py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm disabled:opacity-50 active:scale-95 transition-transform"
+          >
+            {isPrefSaving ? "Saving..." : "Save Lending Preferences"}
+          </button>
         </section>
 
         {/* Preferences */}

@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 interface LendingPotCardProps {
   pot: {
@@ -10,11 +12,17 @@ interface LendingPotCardProps {
     total_deployed_pence: number;
     realized_yield_pence: number;
   } | null;
+  onPotUpdated?: () => void;
 }
 
 const formatPounds = (pence: number) => "\u00A3" + (pence / 100).toFixed(2);
 
-export function LendingPotCard({ pot }: LendingPotCardProps) {
+const TOP_UP_AMOUNTS = [1000, 5000, 10000, 50000]; // pence
+
+export function LendingPotCard({ pot, onPotUpdated }: LendingPotCardProps) {
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const available = pot?.available_pence ?? 0;
   const locked = pot?.locked_pence ?? 0;
   const totalDeployed = pot?.total_deployed_pence ?? 0;
@@ -30,6 +38,30 @@ export function LendingPotCard({ pot }: LendingPotCardProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - utilization);
+
+  async function handleTopUp(amountPence: number) {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/payments/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_pence: amountPence }),
+      });
+
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error ?? "Top-up failed");
+      }
+
+      toast.success(`Topped up ${formatPounds(amountPence)}`);
+      setShowTopUp(false);
+      onPotUpdated?.();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Top-up failed");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <Card>
@@ -115,10 +147,42 @@ export function LendingPotCard({ pot }: LendingPotCardProps) {
           />
         </div>
 
-        {/* Top Up button */}
-        <Button variant="outline" className="w-full" size="lg">
-          Top Up Pot
-        </Button>
+        {/* Top Up section */}
+        {showTopUp ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-navy">Select amount</p>
+            <div className="grid grid-cols-2 gap-2">
+              {TOP_UP_AMOUNTS.map((amount) => (
+                <Button
+                  key={amount}
+                  variant="outline"
+                  size="sm"
+                  disabled={loading}
+                  onClick={() => handleTopUp(amount)}
+                >
+                  {formatPounds(amount)}
+                </Button>
+              ))}
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full"
+              onClick={() => setShowTopUp(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
+            onClick={() => setShowTopUp(true)}
+          >
+            Top Up Pot
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

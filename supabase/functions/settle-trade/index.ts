@@ -2,6 +2,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createAdminClient } from "../_shared/supabase.ts";
 
+/** Grace period (days) after new_due_date before a LIVE trade is marked DEFAULTED. */
+const GRACE_PERIOD_DAYS = 3;
+
 function isoDate(d: Date): string {
   return d.toISOString().split("T")[0];
 }
@@ -21,6 +24,7 @@ serve(async (req: Request) => {
     const results = {
       disbursed: [] as string[],
       repaid: [] as string[],
+      defaulted: [] as string[],
       errors: [] as string[],
     };
 
@@ -262,15 +266,133 @@ serve(async (req: Request) => {
       }
     }
 
+    // ---------------------------------------------------------------
+    // PHASE 3: LIVE -> DEFAULTED
+    // Trades past new_due_date + grace period without repayment
+    // ---------------------------------------------------------------
+    {
+      const defaultCutoff = new Date();
+      defaultCutoff.setDate(defaultCutoff.getDate() - GRACE_PERIOD_DAYS);
+      const cutoffDate = isoDate(defaultCutoff);
+
+      let query = supabase
+        .from("trades")
+        .select("*")
+        .eq("status", "LIVE")
+        .lt("new_due_date", cutoffDate);
+
+      if (tradeId) {
+        query = query.eq("id", tradeId);
+      }
+
+      const { data: overdueTrades, error: odErr } = await query;
+
+      if (odErr) {
+        throw new Error(
+          `Failed to fetch overdue trades: ${odErr.message}`,
+        );
+      }
+
+      for (const trade of overdueTrades ?? []) {
+        try {
+          // Fetch active allocations
+          const { data: allocations } = await supabase
+            .from("allocations")
+            .select("*")
+            .eq("trade_id", trade.id)
+            .eq("status", "ACTIVE");
+
+          // Release locked funds back to lenders (principal loss — no fee)
+          for (const alloc of allocations ?? []) {
+            const principal = Number(alloc.amount_slice);
+
+            const { error: releaseErr } = await supabase.rpc(
+              "update_lending_pot",
+              {
+                p_user_id: alloc.lender_id,
+                p_entry_type: "RELEASE",
+                p_amount: principal,
+                p_trade_id: trade.id,
+                p_allocation_id: alloc.id,
+                p_description: `Default release for trade ${trade.id}`,
+                p_idempotency_key: `default-release-${trade.id}-${alloc.lender_id}`,
+              },
+            );
+
+            if (releaseErr) {
+              console.error(
+                `Default release failed for allocation ${alloc.id}:`,
+                releaseErr,
+              );
+              results.errors.push(
+                `Default release failed for allocation ${alloc.id}: ${releaseErr.message}`,
+              );
+              continue;
+            }
+
+            // Mark allocation as DEFAULTED
+            await supabase
+              .from("allocations")
+              .update({
+                status: "DEFAULTED",
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", alloc.id);
+          }
+
+          // Update trade status to DEFAULTED
+          const { error: statusErr } = await supabase
+            .from("trades")
+            .update({
+              status: "DEFAULTED",
+              defaulted_at: new Date().toISOString(),
+            })
+            .eq("id", trade.id);
+
+          if (statusErr) {
+            results.errors.push(
+              `Default status update failed for ${trade.id}: ${statusErr.message}`,
+            );
+            continue;
+          }
+
+          // Log event
+          await supabase.from("flowzo_events").insert({
+            event_type: "trade.defaulted",
+            entity_type: "trade",
+            entity_id: trade.id,
+            actor: "system",
+            payload: {
+              amount: trade.amount,
+              fee: trade.fee,
+              new_due_date: trade.new_due_date,
+              grace_period_days: GRACE_PERIOD_DAYS,
+              allocations_count: (allocations ?? []).length,
+            },
+          });
+
+          results.defaulted.push(trade.id as string);
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error(`Default error for trade ${trade.id}:`, msg);
+          results.errors.push(
+            `Default error for trade ${trade.id}: ${msg}`,
+          );
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: results.errors.length === 0,
         settled_at: new Date().toISOString(),
         disbursed_count: results.disbursed.length,
         repaid_count: results.repaid.length,
+        defaulted_count: results.defaulted.length,
         error_count: results.errors.length,
         disbursed_trade_ids: results.disbursed,
         repaid_trade_ids: results.repaid,
+        defaulted_trade_ids: results.defaulted,
         errors: results.errors.length > 0 ? results.errors : undefined,
       }),
       {

@@ -21,6 +21,13 @@ export default async function SettingsPage() {
     .eq("id", user?.id ?? "")
     .single();
 
+  // Fetch lender preferences
+  const { data: lenderPrefs } = await supabase
+    .from("lender_preferences")
+    .select("min_apr, max_shift_days, risk_bands, auto_match_enabled")
+    .eq("user_id", user?.id ?? "")
+    .single();
+
   return (
     <SettingsClient
       email={user?.email ?? ""}
@@ -28,6 +35,7 @@ export default async function SettingsPage() {
       rolePreference={profile?.role_preference ?? "both"}
       connections={connections ?? []}
       onboardingCompleted={profile?.onboarding_completed ?? false}
+      lenderPrefs={lenderPrefs ?? undefined}
     />
   );
 }

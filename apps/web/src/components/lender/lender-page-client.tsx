@@ -55,12 +55,39 @@ export function LenderPageClient({
   const [tooltipTrade, setTooltipTrade] = useState<BubbleTrade | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
+  const [pot, setPot] = useState<LendingPot | null>(initialPot);
   const [selectedTradeId, setSelectedTradeId] = useState<string | null>(null);
   const selectedTrade = selectedTradeId
     ? trades.find((t) => t.id === selectedTradeId) ?? null
     : null;
 
   const isDemo = initialPot === null;
+
+  const handleTopUp = useCallback(async () => {
+    const amount = prompt("Enter top-up amount in pounds (e.g. 50):");
+    if (!amount) return;
+    const amountPence = Math.round(parseFloat(amount) * 100);
+    if (isNaN(amountPence) || amountPence <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+    try {
+      const res = await fetch("/api/payments/topup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount_pence: amountPence }),
+      });
+      if (!res.ok) {
+        const { error } = await res.json();
+        throw new Error(error ?? "Top-up failed");
+      }
+      const { pot: updatedPot } = await res.json();
+      if (updatedPot) setPot(updatedPot);
+      toast.success(`Topped up \u00A3${(amountPence / 100).toFixed(2)}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Top-up failed");
+    }
+  }, []);
 
   const handleAutoMatchToggle = useCallback(
     (enabled: boolean) => {
@@ -158,9 +185,10 @@ export function LenderPageClient({
 
       {/* z-10: HUD */}
       <LenderHud
-        pot={initialPot}
+        pot={pot}
         autoMatch={autoMatch}
         onAutoMatchToggle={handleAutoMatchToggle}
+        onTopUp={handleTopUp}
         position={hudPosition}
       />
 
