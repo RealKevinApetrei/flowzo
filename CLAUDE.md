@@ -111,8 +111,9 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
 - Production: set `TRUELAYER_ENV=production` to switch to real banks (uk-ob-all uk-oauth-all)
 
 ### Known Issues / Tech Debt
-- `fundTrade()` in `lib/actions/lending.ts` bypasses `update_lending_pot()` RPC — manipulates pot columns directly (race condition risk)
-- `ShiftProposalPayload` type mismatch between Edge Function fields and shared types
+- settle-trade processes allocations in a loop (not atomic) — if a step fails mid-loop, ledger/allocation mismatch possible
+- N+1 query pattern in match-trade lender scoring (fetches each lender's exposure individually)
+- CORS wildcard (`*`) on Edge Functions — should restrict to app domain in production
 
 ### Team Unblock Status
 - **Member B (Data Science):** UNBLOCKED — seed data in DB, pipeline works, can start backtest/EDA pages

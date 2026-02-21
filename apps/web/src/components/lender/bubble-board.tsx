@@ -15,8 +15,10 @@ const formatShort = (pence: number) => formatCurrency(pence).replace(/\.00$/, ""
 
 interface BubbleBoardProps {
   trades: BubbleTrade[];
+  onQuickTap?: (trade: BubbleTrade, position: { x: number; y: number }) => void;
   onLongPress: (tradeId: string) => void;
   filters: FilterState;
+  hudPosition?: string;
   bubbleColorMode: BubbleColorMode;
   unifiedColorHex: string;
 }
@@ -55,6 +57,7 @@ function applyFilters(trades: BubbleTrade[], filters: FilterState): BubbleTrade[
 
 export function BubbleBoard({
   trades,
+  onQuickTap,
   onLongPress,
   filters,
   bubbleColorMode,
@@ -65,6 +68,10 @@ export function BubbleBoard({
   const nodesRef = useRef<PhysicsNode[]>([]);
   const chargingRef = useRef<string | null>(null);
   const chargeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onQuickTapRef = useRef(onQuickTap);
+  useEffect(() => {
+    onQuickTapRef.current = onQuickTap;
+  }, [onQuickTap]);
 
   const getRadius = useCallback(
     (amountPence: number, allAmounts: number[], isMobile: boolean) => {
@@ -244,7 +251,8 @@ export function BubbleBoard({
             onLongPressRef.current(d.id);
           }, CHARGE_DURATION);
         })
-        .on("pointerup pointercancel pointerleave", function () {
+        .on("pointerup pointercancel pointerleave", function (event: PointerEvent) {
+          const wasCharging = chargingRef.current !== null;
           if (chargeTimerRef.current) {
             clearTimeout(chargeTimerRef.current);
             chargeTimerRef.current = null;
@@ -252,6 +260,19 @@ export function BubbleBoard({
           chargingRef.current = null;
           // Snap clip-circle back to 0
           group.select(".clip-circle").interrupt().attr("r", 0);
+
+          // Quick tap: if was charging (pointerdown fired) and released quickly
+          if (wasCharging && event.type === "pointerup" && onQuickTapRef.current) {
+            const d = d3.select<SVGGElement, PhysicsNode>(this).datum();
+            const trade = trades.find((t) => t.id === d.id);
+            if (trade) {
+              const svgRect = svg.getBoundingClientRect();
+              onQuickTapRef.current(trade, {
+                x: svgRect.left + d.x,
+                y: svgRect.top + d.y,
+              });
+            }
+          }
         });
     });
 
