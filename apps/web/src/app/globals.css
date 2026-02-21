@@ -7,6 +7,7 @@
   --coral-dark: #e04449;
   --navy: #1b1b3a;
   --navy-light: #2d2d5e;
+  --navy-bg: #1b1b3a;
   --soft-white: #fafafa;
   --warm-grey: #f0f0f0;
   --cool-grey: #e5e5e5;
@@ -31,20 +32,21 @@
   --coral: #ff6b70;
   --coral-light: #ff9a9e;
   --coral-dark: #e04449;
-  --navy: #e8e8f0;
-  --navy-light: #c8c8e0;
-  --soft-white: #0f0f1a;
-  --warm-grey: #1a1a2e;
+  --navy: #f0f0f8;
+  --navy-light: #d0d0e8;
+  --navy-bg: #12121f;
+  --soft-white: #0a0a14;
+  --warm-grey: #1c1c2e;
   --cool-grey: #2a2a3e;
-  --text-primary: #e8e8f0;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
+  --text-primary: #f0f0f8;
+  --text-secondary: #a0a0b8;
+  --text-muted: #6b6b80;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
-  --background: #0f0f1a;
-  --foreground: #e8e8f0;
-  --card-surface: #1a1a2e;
+  --background: #0a0a14;
+  --foreground: #f0f0f8;
+  --card-surface: #161625;
 }
 
 @theme inline {
@@ -55,6 +57,7 @@
   --color-coral-dark: var(--coral-dark);
   --color-navy: var(--navy);
   --color-navy-light: var(--navy-light);
+  --color-navy-bg: var(--navy-bg);
   --color-soft-white: var(--soft-white);
   --color-warm-grey: var(--warm-grey);
   --color-cool-grey: var(--cool-grey);
@@ -87,6 +90,10 @@ body {
   border-radius: var(--radius-card);
   padding: 1rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.dark .card-monzo {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 /* Pill button style */

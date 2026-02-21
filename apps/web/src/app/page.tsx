@@ -66,7 +66,7 @@ export default async function LandingPage() {
 
       {/* App Preview Mockup */}
       <section className="px-6 pb-16 max-w-4xl mx-auto">
-        <div className="bg-white rounded-3xl shadow-lg p-6 sm:p-10 border border-cool-grey/50">
+        <div className="bg-[var(--card-surface)] rounded-3xl shadow-lg p-6 sm:p-10 border border-cool-grey/50">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 text-center">
             <div className="space-y-2">
               <div className="text-3xl font-extrabold text-coral">30-day</div>
@@ -85,7 +85,7 @@ export default async function LandingPage() {
       </section>
 
       {/* How It Works */}
-      <section id="how-it-works" className="px-6 py-16 bg-white">
+      <section id="how-it-works" className="px-6 py-16 bg-[var(--card-surface)]">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center text-navy mb-4">
             How Flowzo works
@@ -140,7 +140,7 @@ export default async function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="px-6 py-12 bg-navy text-white">
+      <footer className="px-6 py-12 bg-navy-bg text-white">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
             <span className="text-xl font-bold">Flowzo</span>

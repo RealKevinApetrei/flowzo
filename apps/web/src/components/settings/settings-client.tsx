@@ -210,7 +210,7 @@ export function SettingsClient({
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
             Appearance
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-warm-grey p-1 rounded-full">
             {(["light", "system", "dark"] as const).map((option) => (
               <button
                 key={option}
@@ -220,11 +220,11 @@ export function SettingsClient({
                 }}
                 className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
                   theme === option
-                    ? "bg-coral text-white"
-                    : "bg-warm-grey text-text-secondary hover:bg-cool-grey"
+                    ? "bg-coral text-white shadow-sm"
+                    : "text-text-secondary hover:text-navy"
                 }`}
               >
-                {option === "light" ? "Light" : option === "dark" ? "Dark" : "System"}
+                {option === "light" ? "☀️ Light" : option === "dark" ? "🌙 Dark" : "💻 System"}
               </button>
             ))}
           </div>

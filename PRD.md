@@ -236,7 +236,9 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 | Notification toggle switches in settings (trade updates, forecast alerts, email digest) | P2 | 30m | DONE |
 | Add app preview stats section to landing page (30-day forecast, <10s pipeline, risk grades) | P0 | 30m | DONE |
 | Add active:scale-95 press feedback to all buttons | P2 | 15m | DONE |
-| End-to-end visual QA pass for dark mode across all pages | P1 | 1h | SUGGESTED |
+| End-to-end visual QA pass for dark mode across all pages | P1 | 1h | IN-PROGRESS |
+| Fix dark mode: separate navy-bg from navy text, improve contrast, fix hardcoded bg-white | P0 | 30m | DONE |
+| Segmented theme toggle UI (pill container with emoji labels) | P1 | 15m | DONE |
 | Add page transition animations between routes (ViewTransitions API or framer-motion) | P2 | 2h | SUGGESTED |
 | A/B landing page variants for demo vs investor pitch | P2 | 2h | SUGGESTED |
 | Accessibility audit (ARIA labels, keyboard nav, contrast ratios) | P1 | 2h | SUGGESTED |
