@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-soft-white">
+    <div className="min-h-screen bg-background">
       <div className="max-w-2xl mx-auto px-6 py-12">
         <Link href="/" className="text-coral font-medium text-sm hover:text-coral-dark transition-colors">
           &larr; Back to Flowzo

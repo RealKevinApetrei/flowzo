@@ -1,6 +1,6 @@
 export default function AuthLoading() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-soft-white">
+    <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="w-full max-w-sm space-y-6 px-4">
         <div className="text-center">
           <div className="h-8 w-24 bg-warm-grey rounded-lg animate-pulse mx-auto" />

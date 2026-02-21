@@ -42,7 +42,7 @@ export function BidSlider({ trade, onSubmit, onChange }: BidSliderProps) {
   }
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm p-5">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
       <h2 className="text-lg font-bold text-navy mb-1">Set Your Fee</h2>
       <p className="text-sm text-text-secondary mb-5">
         Choose how much you&apos;re willing to pay a lender

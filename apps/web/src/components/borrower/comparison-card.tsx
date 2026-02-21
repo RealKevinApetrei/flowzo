@@ -26,7 +26,7 @@ export function ComparisonCard({ withoutFlowzo, withFlowzo }: ComparisonProps) {
   const withWidth = Math.round((totalWith / maxValue) * 100);
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm p-5">
+    <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
       <h2 className="text-lg font-bold text-navy mb-4">Your Forecast</h2>
 
       <div className="grid grid-cols-2 gap-4">

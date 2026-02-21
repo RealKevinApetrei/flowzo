@@ -36,7 +36,7 @@ export function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-navy mb-1">
+        <label htmlFor="email" className="block text-sm font-medium text-foreground mb-1">
           Email
         </label>
         <input
@@ -45,12 +45,12 @@ export function LoginForm() {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          className="w-full px-4 py-3 rounded-xl border border-warm-grey bg-white focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition-colors"
+          className="w-full px-4 py-3 rounded-xl border border-cool-grey bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition-colors"
           placeholder="you@example.com"
         />
       </div>
       <div>
-        <label htmlFor="password" className="block text-sm font-medium text-navy mb-1">
+        <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
           Password
         </label>
         <input
@@ -60,12 +60,12 @@ export function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
           required
           minLength={6}
-          className="w-full px-4 py-3 rounded-xl border border-warm-grey bg-white focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition-colors"
+          className="w-full px-4 py-3 rounded-xl border border-cool-grey bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-coral/50 focus:border-coral transition-colors"
           placeholder="••••••••"
         />
       </div>
       {error && (
-        <p className="text-sm text-red-500 bg-red-50 px-3 py-2 rounded-lg">{error}</p>
+        <p className="text-sm text-danger bg-danger/10 px-3 py-2 rounded-lg">{error}</p>
       )}
       <button
         type="submit"
