@@ -24,6 +24,29 @@ export async function createTrade(formData: FormData) {
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
 
+  // Credit eligibility pre-check (DB trigger also enforces, but this gives better UX)
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("eligible_to_borrow, max_trade_amount, max_active_trades, credit_score")
+    .eq("id", user.id)
+    .single();
+
+  const amountGBP = input.amount_pence / 100;
+
+  if (!profile?.eligible_to_borrow) {
+    throw new Error(
+      profile?.credit_score != null
+        ? `Credit score ${profile.credit_score} is below the minimum threshold (500). Improve your financial health to become eligible.`
+        : "You must be scored before creating a trade. Please connect your bank account first."
+    );
+  }
+
+  if (amountGBP > (profile.max_trade_amount ?? 75)) {
+    throw new Error(
+      `Trade amount £${amountGBP.toFixed(2)} exceeds your credit limit of £${Number(profile.max_trade_amount).toFixed(2)}`
+    );
+  }
+
   // Verify obligation ownership if provided
   if (input.obligation_id) {
     const { data: obl, error: oblErr } = await admin

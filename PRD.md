@@ -137,6 +137,38 @@ Member B built a standalone XGBoost ML pipeline (`quant_analysis/`) with FastAPI
 
 **Integration:** match-trade optionally calls the Quant API for real-time PD scoring. Graceful degradation -- falls back to DB-level `risk_grade` if the API is unavailable.
 
+### Credit Risk Framework (Production-Level)
+
+Flowzo implements a multi-layered credit risk system that goes beyond simple grade classification:
+
+**Eligibility Gate:**
+- Minimum credit score of **500** required to borrow — enforced at database level via trigger
+- Borrowers below threshold are automatically excluded; proposals are not generated for ineligible users
+- Score persisted on profile and updated on every bank data sync
+
+**Grade-Based Credit Limits (Enforced):**
+| Grade | Score Range | Max Amount | Max Active Trades | Max Shift Days |
+|-------|-----------|------------|-------------------|----------------|
+| A | 700-850 | £500 | 5 | 14 |
+| B | 600-699 | £200 | 3 | 10 |
+| C | 500-599 | £75 | 1 | 7 |
+| Ineligible | <500 | **Blocked** | 0 | 0 |
+
+**Continuous Score-Adjusted Pricing:**
+- Within each grade, borrowers pay different APRs based on exact credit score
+- Linear interpolation: score 850 (Grade A) gets 0.8x multiplier; score 700 gets 1.2x
+- Result: a 15-20% APR difference between best and worst borrowers within the same grade
+- Combined with term premium (+15% per 14-day period) for time-value-of-risk pricing
+
+**Future Inflow Confidence:**
+- Credit limits scaled by income regularity (primary_bank_health_score: 0-1)
+- Erratic income (score 0.5) → 50% of grade limit; stable income (score 0.9) → 90%
+- Prevents over-lending to borrowers with unpredictable cash flows
+
+**Default History Penalty:**
+- `borrower_track_record` view tracks personal default rate and last default date
+- >20% default rate → 50% limit reduction; 2+ recent defaults → borrowing disabled
+
 ### Lending Pot Top-Up
 
 Lending pot top-up is now fully functional:
