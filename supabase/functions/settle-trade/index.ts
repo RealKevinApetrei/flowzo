@@ -300,6 +300,26 @@ serve(async (req: Request) => {
             continue;
           }
 
+          // Record platform fee income (junior tranche revenue)
+          const tradePlatformFee = Number(trade.platform_fee ?? 0);
+          if (tradePlatformFee > 0) {
+            const { error: revenueErr } = await supabase
+              .from("platform_revenue")
+              .insert({
+                entry_type: "FEE_INCOME",
+                amount: tradePlatformFee,
+                trade_id: trade.id,
+                description: `Platform fee: ${tradePlatformFee} GBP from trade ${trade.id}`,
+              });
+
+            if (revenueErr) {
+              console.error(
+                `Platform revenue insert failed for trade ${trade.id}:`,
+                revenueErr,
+              );
+            }
+          }
+
           // Log event
           await supabase.from("flowzo_events").insert({
             event_type: "trade.repaid",
@@ -309,6 +329,7 @@ serve(async (req: Request) => {
             payload: {
               amount: trade.amount,
               fee: trade.fee,
+              platform_fee: tradePlatformFee,
               new_due_date: trade.new_due_date,
               allocations_count: (allocations ?? []).length,
             },
@@ -425,6 +446,24 @@ serve(async (req: Request) => {
             continue;
           }
 
+          // Record platform default loss (junior tranche absorbs first loss)
+          const defaultAmount = Number(trade.amount);
+          const { error: lossErr } = await supabase
+            .from("platform_revenue")
+            .insert({
+              entry_type: "DEFAULT_LOSS",
+              amount: -defaultAmount,
+              trade_id: trade.id,
+              description: `Default loss absorbed (junior tranche): trade ${trade.id}`,
+            });
+
+          if (lossErr) {
+            console.error(
+              `Platform default loss insert failed for trade ${trade.id}:`,
+              lossErr,
+            );
+          }
+
           // Log event
           await supabase.from("flowzo_events").insert({
             event_type: "trade.defaulted",
@@ -434,6 +473,7 @@ serve(async (req: Request) => {
             payload: {
               amount: trade.amount,
               fee: trade.fee,
+              default_loss: defaultAmount,
               new_due_date: trade.new_due_date,
               grace_period_days: GRACE_PERIOD_DAYS,
               allocations_count: (allocations ?? []).length,

@@ -81,6 +81,7 @@ export function useLenderSettings() {
   const [settings, setSettings] = useState<LenderSettings>(DEFAULTS);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time initialization from localStorage
     setSettings(readSettings());
   }, []);
 

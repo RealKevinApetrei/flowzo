@@ -13,6 +13,7 @@ export function FirstVisitBanner({ storageKey, message }: FirstVisitBannerProps)
   useEffect(() => {
     const seen = localStorage.getItem(storageKey);
     if (!seen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time initialization from localStorage
       setVisible(true);
     }
   }, [storageKey]);

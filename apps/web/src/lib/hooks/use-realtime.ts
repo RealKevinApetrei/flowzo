@@ -48,5 +48,6 @@ export function useRealtime<T extends object>(
     return () => {
       supabase.removeChannel(channel);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omitting callback refs to avoid resubscription
   }, [supabase, table, options.filter]);
 }

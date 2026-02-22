@@ -217,6 +217,7 @@ async function cleanup() {
         FROM public.trades WHERE borrower_id = ANY(demo_ids);
 
         IF trade_ids IS NOT NULL THEN
+          DELETE FROM public.platform_revenue WHERE trade_id = ANY(trade_ids);
           DELETE FROM public.flowzo_events WHERE entity_id = ANY(trade_ids);
           DELETE FROM public.payment_orders WHERE trade_id = ANY(trade_ids);
           DELETE FROM public.pool_ledger WHERE trade_id = ANY(trade_ids);
@@ -358,6 +359,7 @@ async function createUsers(): Promise<SeedUser[]> {
       .in("borrower_id", demoIds);
     if (demoTrades && demoTrades.length > 0) {
       const tradeIds = demoTrades.map((t) => t.id);
+      await supabase.from("platform_revenue").delete().in("trade_id", tradeIds);
       await supabase.from("pool_ledger").delete().in("trade_id", tradeIds);
       await supabase.from("trade_state_transitions").delete().in("trade_id", tradeIds);
       await supabase.from("allocations").delete().in("trade_id", tradeIds);
@@ -818,6 +820,10 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
       }
     }
 
+    // Senior/Junior tranche fee split: 20% platform, 80% lenders
+    const platformFee = Math.round(fee * 0.20 * 100) / 100;
+    const lenderFee = Math.round((fee - platformFee) * 100) / 100;
+
     trades.push({
       id: tradeId,
       borrower_id: borrower.id,
@@ -828,6 +834,8 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
       new_due_date: isoDate(newDueDate),
       fee,
       fee_rate: Number(feeRate.toFixed(4)),
+      platform_fee: platformFee,
+      lender_fee: lenderFee,
       risk_grade: borrower.riskGrade,
       status,
       matched_at: matchedAt,
@@ -901,7 +909,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
         trade_id: tradeId,
         lender_id: lender.id,
         amount_slice: amount,
-        fee_slice: fee,
+        fee_slice: lenderFee, // Lenders get 80% (senior tranche)
         status: allocStatus,
         created_at: matchedAt,
         updated_at: defaultedAt ?? repaidAt ?? liveAt ?? matchedAt,
@@ -1247,6 +1255,62 @@ async function createForecasts(
 }
 
 // ---------------------------------------------------------------------------
+// Step 6c: Create Platform Revenue Entries
+// ---------------------------------------------------------------------------
+
+async function createPlatformRevenue() {
+  console.log("Creating platform revenue entries...");
+
+  // Fetch all seeded REPAID and DEFAULTED trades
+  const { data: repaidTrades } = await supabase
+    .from("trades")
+    .select("id, platform_fee, amount, repaid_at")
+    .eq("status", "REPAID")
+    .gt("platform_fee", 0);
+
+  const { data: defaultedTrades } = await supabase
+    .from("trades")
+    .select("id, amount, defaulted_at")
+    .eq("status", "DEFAULTED");
+
+  const revenueRows: Record<string, unknown>[] = [];
+
+  // FEE_INCOME entries for repaid trades
+  for (const t of repaidTrades ?? []) {
+    revenueRows.push({
+      entry_type: "FEE_INCOME",
+      amount: Number(t.platform_fee),
+      trade_id: t.id,
+      description: `Platform fee from trade ${t.id}`,
+      created_at: t.repaid_at,
+    });
+  }
+
+  // DEFAULT_LOSS entries for defaulted trades (negative amount)
+  for (const t of defaultedTrades ?? []) {
+    revenueRows.push({
+      entry_type: "DEFAULT_LOSS",
+      amount: -Number(t.amount),
+      trade_id: t.id,
+      description: `Default loss absorbed (junior tranche): trade ${t.id}`,
+      created_at: t.defaulted_at,
+    });
+  }
+
+  // Insert in batches
+  for (let i = 0; i < revenueRows.length; i += 50) {
+    const { error } = await supabase
+      .from("platform_revenue")
+      .insert(revenueRows.slice(i, i + 50));
+    if (error) console.error(`  Revenue insert error (batch ${i}):`, error.message);
+  }
+
+  console.log(`  ${(repaidTrades ?? []).length} FEE_INCOME entries created.`);
+  console.log(`  ${(defaultedTrades ?? []).length} DEFAULT_LOSS entries created.`);
+  console.log(`  ${revenueRows.length} total platform revenue entries.`);
+}
+
+// ---------------------------------------------------------------------------
 // Step 7: Reconcile Lending Pots
 // ---------------------------------------------------------------------------
 
@@ -1436,6 +1500,9 @@ async function validate() {
     supabase
       .from("forecast_snapshots")
       .select("id", { count: "exact", head: true }),
+    supabase
+      .from("platform_revenue")
+      .select("id", { count: "exact", head: true }),
   ]);
 
   const labels = [
@@ -1452,6 +1519,7 @@ async function validate() {
     "Accounts",
     "Forecasts",
     "Forecast Snapshots",
+    "Platform Revenue",
   ];
 
   for (let i = 0; i < labels.length; i++) {
@@ -1523,6 +1591,7 @@ async function main() {
   await createTrades(users, lenders, obligationsMap);
   await createProposals(users, obligationsMap);
   await createForecasts(users, seedAccounts, obligationsMap);
+  await createPlatformRevenue();
   await reconcileLendingPots(lenders);
   await validate();
 

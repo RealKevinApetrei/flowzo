@@ -12,7 +12,7 @@ const slides = [
       <div className="w-full max-w-4xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Problem</p>
         <h1 className="text-5xl sm:text-7xl font-extrabold text-white leading-tight mb-10">
-          Your bills don't care<br />
+          Your bills don&apos;t care<br />
           <span className="text-coral">when you get paid.</span>
         </h1>
         <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-10">
@@ -39,7 +39,7 @@ const slides = [
           <span className="text-coral">An overdraft price.</span>
         </h1>
         <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-10">
-          It's not a debt problem. It's a <span className="text-coral font-semibold">cashflow timing problem</span> — but banks charge full overdraft rates regardless.
+          It&apos;s not a debt problem. It&apos;s a <span className="text-coral font-semibold">cashflow timing problem</span> — but banks charge full overdraft rates regardless.
         </p>
         <div className="text-center">
           <div className="text-5xl sm:text-6xl font-extrabold text-coral">~40%</div>

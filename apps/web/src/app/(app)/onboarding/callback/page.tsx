@@ -15,6 +15,7 @@ export default function OnboardingCallbackPage() {
     const error = searchParams.get("error");
 
     if (success === "true") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time initialization from URL params
       setStatus("success");
       setMessage("Bank connected successfully!");
       toast.success("Bank connected!");

@@ -29,3 +29,10 @@ export function calculateImpliedAPR(feePence: number, amountPence: number, shift
   if (amountPence <= 0 || shiftDays <= 0) return 0;
   return (feePence / amountPence) * (365 / shiftDays) * 100;
 }
+
+/** Split total borrower fee into lender (senior) and platform (junior) tranches */
+export function splitFee(totalFeePence: number): { lenderFee: number; platformFee: number } {
+  const platformFee = Math.round(totalFeePence * FEE_CONFIG.platformFeePercent);
+  const lenderFee = totalFeePence - platformFee;
+  return { lenderFee, platformFee };
+}

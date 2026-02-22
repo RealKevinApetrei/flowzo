@@ -97,6 +97,22 @@ interface PendingTrade {
   created_at: string;
 }
 
+interface RevenueSummary {
+  total_fee_income: number;
+  total_default_losses: number;
+  net_revenue: number;
+  fee_transactions: number;
+  default_events: number;
+}
+
+interface RevenueMonthlyRow {
+  month: string;
+  fee_income: number;
+  default_losses: number;
+  net_revenue: number;
+  trade_count: number;
+}
+
 interface DataPageClientProps {
   poolHealth: PoolHealth | null;
   riskDist: RiskRow[];
@@ -107,6 +123,8 @@ interface DataPageClientProps {
   yieldTrends: YieldTrendRow[];
   lenderConcentration: LenderConcRow[];
   pendingTrades: PendingTrade[];
+  revenueSummary: RevenueSummary | null;
+  revenueMonthly: RevenueMonthlyRow[];
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -122,6 +140,7 @@ const TABS = [
   { id: "orderbook", label: "Order Book" },
   { id: "performance", label: "Performance" },
   { id: "yield", label: "Yield" },
+  { id: "revenue", label: "Revenue" },
   { id: "lenders", label: "Lenders" },
   { id: "quant", label: "ML / Quant" },
 ] as const;
@@ -140,6 +159,8 @@ export function DataPageClient({
   yieldTrends,
   lenderConcentration,
   pendingTrades,
+  revenueSummary,
+  revenueMonthly,
 }: DataPageClientProps) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
 
@@ -177,6 +198,9 @@ export function DataPageClient({
         <PerformanceTab matchSpeed={matchSpeed} settlement={settlement} />
       )}
       {activeTab === "yield" && <YieldTab yieldTrends={yieldTrends} />}
+      {activeTab === "revenue" && (
+        <RevenueTab summary={revenueSummary} monthly={revenueMonthly} />
+      )}
       {activeTab === "lenders" && (
         <LendersTab
           lenders={lenderConcentration}
@@ -740,11 +764,11 @@ function PerformanceTab({
 
 function YieldTab({ yieldTrends }: { yieldTrends: YieldTrendRow[] }) {
   // Compute cumulative yield
-  let cumulative = 0;
-  const withCumulative = yieldTrends.map((row) => {
-    cumulative += Number(row.total_fees);
-    return { ...row, cumulative_fees: cumulative };
-  });
+  const withCumulative = yieldTrends.reduce<(YieldTrendRow & { cumulative_fees: number })[]>((acc, row) => {
+    const prev = acc.length > 0 ? acc[acc.length - 1].cumulative_fees : 0;
+    acc.push({ ...row, cumulative_fees: prev + Number(row.total_fees) });
+    return acc;
+  }, []);
 
   // Sparkline for yield %
   const yieldValues = yieldTrends.map((r) => Number(r.yield_pct));
@@ -962,7 +986,275 @@ function LendersTab({
   );
 }
 
-// ── Tab 6: ML / Quant ────────────────────────────────────────────────────────
+// ── Tab 6: Revenue ──────────────────────────────────────────────────────────
+
+function RevenueTab({
+  summary,
+  monthly,
+}: {
+  summary: RevenueSummary | null;
+  monthly: RevenueMonthlyRow[];
+}) {
+  const feeIncome = summary?.total_fee_income ?? 0;
+  const defaultLosses = Math.abs(summary?.total_default_losses ?? 0);
+  const netRevenue = summary?.net_revenue ?? 0;
+  const lossRatio = feeIncome > 0 ? (defaultLosses / feeIncome) * 100 : 0;
+
+  // Chart dimensions
+  const chartW = 360;
+  const chartH = 140;
+  const padL = 50;
+  const padR = 10;
+  const padT = 10;
+  const padB = 30;
+  const plotW = chartW - padL - padR;
+  const plotH = chartH - padT - padB;
+
+  // Compute chart scales
+  const maxIncome = Math.max(...monthly.map((m) => m.fee_income), 0.01);
+  const maxLoss = Math.max(...monthly.map((m) => Math.abs(m.default_losses)), 0.01);
+  const maxVal = Math.max(maxIncome, maxLoss);
+  const barW = monthly.length > 0 ? Math.min(plotW / monthly.length - 2, 24) : 20;
+
+  return (
+    <div className="space-y-4">
+      {/* Hero Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard
+          label="Fee Income"
+          value={fmtK(feeIncome)}
+          subtitle={`${summary?.fee_transactions ?? 0} trades`}
+          variant="success"
+        />
+        <StatCard
+          label="Default Losses"
+          value={fmtK(defaultLosses)}
+          subtitle={`${summary?.default_events ?? 0} defaults`}
+          variant="danger"
+        />
+        <StatCard
+          label="Net Revenue"
+          value={fmtK(netRevenue)}
+          subtitle="Fee income - losses"
+          variant={netRevenue >= 0 ? "success" : "danger"}
+        />
+        <StatCard
+          label="Loss Ratio"
+          value={`${lossRatio.toFixed(1)}%`}
+          subtitle="Losses / Income"
+          variant={lossRatio > 20 ? "danger" : lossRatio > 10 ? "warning" : "success"}
+        />
+      </div>
+
+      {/* Fee Split Waterfall */}
+      <section className="card-monzo p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Fee Structure (Senior / Junior Tranche)
+        </h2>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="w-24 text-text-secondary">Borrower Fee</span>
+            <div className="flex-1 h-6 rounded-full bg-warm-grey/30 overflow-hidden flex">
+              <div
+                className="h-full bg-success/60 flex items-center justify-center text-[10px] font-semibold text-success"
+                style={{ width: "80%" }}
+              >
+                80% Lender
+              </div>
+              <div
+                className="h-full bg-coral/60 flex items-center justify-center text-[10px] font-semibold text-coral"
+                style={{ width: "20%" }}
+              >
+                20% Platform
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-4 text-[10px] text-text-muted">
+            <span>Lenders = Senior Secured (paid first, protected on default)</span>
+          </div>
+          <div className="flex gap-4 text-[10px] text-text-muted">
+            <span>Platform = Junior Unsecured (takes spread, absorbs first loss)</span>
+          </div>
+        </div>
+      </section>
+
+      {/* Monthly Revenue Chart */}
+      {monthly.length > 0 && (
+        <section className="card-monzo p-5 space-y-3">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Monthly Revenue
+          </h2>
+          <svg
+            viewBox={`0 0 ${chartW} ${chartH}`}
+            className="w-full"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            {/* Grid lines */}
+            {[0, 0.25, 0.5, 0.75, 1].map((pct) => {
+              const y = padT + plotH * (1 - pct);
+              return (
+                <g key={pct}>
+                  <line
+                    x1={padL}
+                    y1={y}
+                    x2={chartW - padR}
+                    y2={y}
+                    style={{ stroke: "var(--warm-grey)" }}
+                    strokeWidth="0.5"
+                    strokeDasharray={pct === 0 ? "none" : "2,2"}
+                  />
+                  <text
+                    x={padL - 4}
+                    y={y + 3}
+                    textAnchor="end"
+                    className="text-[8px]"
+                    fill="var(--text-muted)"
+                  >
+                    {fmtK(maxVal * pct)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Bars */}
+            {monthly.map((m, i) => {
+              const x =
+                padL +
+                (i / monthly.length) * plotW +
+                (plotW / monthly.length - barW) / 2;
+              const incomeH = (m.fee_income / maxVal) * plotH;
+              const lossH = (Math.abs(m.default_losses) / maxVal) * plotH;
+
+              return (
+                <g key={m.month}>
+                  {/* Income bar (green, up from baseline) */}
+                  <rect
+                    x={x}
+                    y={padT + plotH - incomeH}
+                    width={barW / 2 - 1}
+                    height={incomeH}
+                    fill="#10B981"
+                    rx={2}
+                    opacity={0.8}
+                  />
+                  {/* Loss bar (red, up from baseline) */}
+                  <rect
+                    x={x + barW / 2}
+                    y={padT + plotH - lossH}
+                    width={barW / 2 - 1}
+                    height={lossH}
+                    fill="#EF4444"
+                    rx={2}
+                    opacity={0.8}
+                  />
+                  {/* Month label */}
+                  <text
+                    x={x + barW / 2}
+                    y={chartH - 4}
+                    textAnchor="middle"
+                    className="text-[7px]"
+                    fill="var(--text-muted)"
+                  >
+                    {m.month.slice(5)}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Net revenue line */}
+            {monthly.length >= 2 && (
+              <polyline
+                fill="none"
+                style={{ stroke: "var(--navy)" }}
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                points={monthly
+                  .map((m, i) => {
+                    const x =
+                      padL +
+                      (i / monthly.length) * plotW +
+                      plotW / monthly.length / 2;
+                    const netH =
+                      (Math.max(m.net_revenue, 0) / maxVal) * plotH;
+                    return `${x},${padT + plotH - netH}`;
+                  })
+                  .join(" ")}
+              />
+            )}
+          </svg>
+          <div className="flex gap-4 text-[10px] text-text-muted justify-center">
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-success" /> Fee Income
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-danger" /> Default Losses
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2 h-2 rounded-sm bg-navy" /> Net Revenue
+            </span>
+          </div>
+        </section>
+      )}
+
+      {/* Monthly Revenue Table */}
+      <section className="card-monzo p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Monthly Breakdown
+        </h2>
+        <DataTable
+          columns={[
+            {
+              key: "month",
+              header: "Month",
+              render: (r: RevenueMonthlyRow) => (
+                <span className="text-navy font-medium">{r.month}</span>
+              ),
+            },
+            {
+              key: "income",
+              header: "Income",
+              align: "right" as const,
+              render: (r: RevenueMonthlyRow) => (
+                <span className="text-success">{fmt(r.fee_income)}</span>
+              ),
+            },
+            {
+              key: "losses",
+              header: "Losses",
+              align: "right" as const,
+              render: (r: RevenueMonthlyRow) => (
+                <span className="text-danger">
+                  {fmt(Math.abs(r.default_losses))}
+                </span>
+              ),
+            },
+            {
+              key: "net",
+              header: "Net",
+              align: "right" as const,
+              render: (r: RevenueMonthlyRow) => (
+                <span className={r.net_revenue >= 0 ? "text-success font-bold" : "text-danger font-bold"}>
+                  {fmt(r.net_revenue)}
+                </span>
+              ),
+            },
+            {
+              key: "trades",
+              header: "Trades",
+              align: "right" as const,
+              render: (r: RevenueMonthlyRow) => r.trade_count,
+            },
+          ]}
+          data={monthly}
+          emptyMessage="No revenue data yet."
+        />
+      </section>
+    </div>
+  );
+}
+
+// ── Tab 7: ML / Quant ────────────────────────────────────────────────────────
 
 function QuantTab() {
   return (
