@@ -756,12 +756,27 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const tradeId = uuid();
     const shiftDays = randomInt(1, 14);
     const amount = randomFloat(10, 500);
-    const feeRate = 0.049 * (borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2);
-    // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
-    const fee = Math.max(
-      0.01,
-      Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
-    );
+    // For PENDING_MATCH trades, use wider APR spread to populate depth chart
+    // Grade A: 3-8% APR, Grade B: 8-15% APR, Grade C: 15-30% APR
+    const baseFeeRate = 0.049 * (borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2);
+    let fee: number;
+    let feeRate = baseFeeRate;
+    if (status === "PENDING_MATCH") {
+      const aprRange = borrower.riskGrade === "A"
+        ? { min: 0.03, max: 0.08 }
+        : borrower.riskGrade === "B"
+          ? { min: 0.08, max: 0.15 }
+          : { min: 0.15, max: 0.30 };
+      const targetApr = aprRange.min + Math.random() * (aprRange.max - aprRange.min);
+      fee = Math.max(0.01, Math.round(amount * targetApr * (shiftDays / 365) * 100) / 100);
+      feeRate = targetApr;
+    } else {
+      // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
+      fee = Math.max(
+        0.01,
+        Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
+      );
+    }
 
     let originalDueDate: Date;
     let createdAt: Date;

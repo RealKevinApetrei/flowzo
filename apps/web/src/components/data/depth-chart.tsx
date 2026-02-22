@@ -37,7 +37,7 @@ const GRADE_COLORS: Record<string, { fill: string; stroke: string; label: string
 
 const BID_COLOR = { fill: "rgba(59, 130, 246, 0.2)", stroke: "#3B82F6" };
 
-const BUCKET_WIDTH = 50; // 50% APR buckets
+const BUCKET_WIDTH = 5; // 5% APR buckets for granular visibility
 
 export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps) {
   const [hoveredBucket, setHoveredBucket] = useState<{
