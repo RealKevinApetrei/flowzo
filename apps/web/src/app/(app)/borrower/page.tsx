@@ -7,6 +7,7 @@ import { DangerSummary } from "@/components/borrower/danger-summary";
 import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/upcoming-transactions";
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
+import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -96,6 +97,16 @@ export default async function BorrowerHomePage() {
     .single();
 
   const displayName = profile?.display_name ?? "there";
+
+  // Check for syncing bank connections
+  const { data: syncingConnections } = await supabase
+    .from("bank_connections")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("status", "syncing")
+    .limit(1);
+
+  const syncingConnectionId = syncingConnections?.[0]?.id ?? null;
 
   // Fetch primary account balance
   const { data: account } = await supabase
@@ -316,6 +327,10 @@ export default async function BorrowerHomePage() {
             Here&apos;s what needs your attention
           </p>
         </div>
+
+        {syncingConnectionId && (
+          <SyncStatusBanner connectionId={syncingConnectionId} />
+        )}
 
         <FirstVisitBanner
           storageKey="flowzo-bills-intro-seen"
