@@ -1,5 +1,17 @@
 "use client";
 
+import { useEffect } from "react";
+
+function isChunkLoadError(error: Error): boolean {
+  const msg = error.message || "";
+  return (
+    msg.includes("Failed to load chunk") ||
+    msg.includes("Loading chunk") ||
+    msg.includes("ChunkLoadError") ||
+    msg.includes("from module")
+  );
+}
+
 export default function AppError({
   error,
   reset,
@@ -7,6 +19,20 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    if (isChunkLoadError(error)) {
+      // Auto-reload once on chunk errors (stale deployment)
+      const key = "flowzo-chunk-reload";
+      const lastReload = sessionStorage.getItem(key);
+      const now = Date.now();
+      // Only auto-reload if we haven't reloaded in the last 10 seconds
+      if (!lastReload || now - Number(lastReload) > 10000) {
+        sessionStorage.setItem(key, String(now));
+        window.location.reload();
+      }
+    }
+  }, [error]);
+
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
       <div className="text-center space-y-4 max-w-sm">
@@ -17,13 +43,21 @@ export default function AppError({
         </div>
         <h2 className="text-xl font-bold text-navy">Something went wrong</h2>
         <p className="text-sm text-text-secondary">
-          {error.message || "An unexpected error occurred. Please try again."}
+          {isChunkLoadError(error)
+            ? "A new version is available. Reloading..."
+            : error.message || "An unexpected error occurred. Please try again."}
         </p>
         <button
-          onClick={reset}
+          onClick={() => {
+            if (isChunkLoadError(error)) {
+              window.location.reload();
+            } else {
+              reset();
+            }
+          }}
           className="bg-coral text-white font-semibold px-6 py-2.5 rounded-full hover:bg-coral-dark transition-colors text-sm"
         >
-          Try again
+          {isChunkLoadError(error) ? "Reload" : "Try again"}
         </button>
       </div>
     </div>
