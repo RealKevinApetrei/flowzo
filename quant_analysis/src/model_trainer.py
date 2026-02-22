@@ -7,6 +7,7 @@ otherwise trains from CSV (slower, ~30s).
 
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
@@ -23,15 +24,13 @@ def _load_pretrained() -> XGBClassifier | None:
     """Load pre-trained model from joblib if available."""
     model_path = MODELS_DIR / "xgboost_model.joblib"
     if model_path.exists():
-        import joblib
-
         print(f"Loading pre-trained model from {model_path}")
         return joblib.load(model_path)
     return None
 
 
 def _train_model() -> XGBClassifier:
-    """Train from CSV — fallback when no pre-trained model exists."""
+    """Train from CSV — fallback when no pre-trained model exists. Saves model on completion."""
     print("No pre-trained model found, training from CSV...")
     df = load_data()
     X = df[FEATURE_NAMES]
@@ -52,6 +51,13 @@ def _train_model() -> XGBClassifier:
         n_jobs=-1,
     )
     model.fit(X_train, y_train)
+
+    # Save immediately so the next process load skips retraining
+    MODELS_DIR.mkdir(exist_ok=True)
+    model_path = MODELS_DIR / "xgboost_model.joblib"
+    joblib.dump(model, model_path, compress=3)
+    print(f"Model saved to {model_path}")
+
     return model
 
 

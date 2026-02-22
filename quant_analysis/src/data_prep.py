@@ -1,8 +1,8 @@
 """
-data_prep.py — Data loading, sampling (50k rows), and proxy column mapping.
+data_prep.py — Data loading and proxy column mapping.
 
 Loads from pre-serialized models/sample_data.joblib if available,
-otherwise loads from CSV (slower, requires 166MB file).
+otherwise loads the full CSV (300k+ rows, slower on first run).
 """
 
 from pathlib import Path
@@ -47,8 +47,6 @@ def _load_from_csv() -> pd.DataFrame:
     """Load and process from the full CSV — fallback path."""
     print(f"Loading from CSV: {DATA_PATH}")
     df = pd.read_csv(DATA_PATH)
-
-    df = df.sample(n=min(50_000, len(df)), random_state=42).reset_index(drop=True)
 
     cols = ["TARGET"] + FEATURE_COLUMNS
     df = df[cols].copy()
