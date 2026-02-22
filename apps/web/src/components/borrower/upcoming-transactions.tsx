@@ -29,12 +29,6 @@ function formatShortDate(dateStr: string): string {
   }).format(date);
 }
 
-function confidenceColor(confidence: number): string {
-  if (confidence >= 0.85) return "text-success bg-success/10";
-  if (confidence >= 0.65) return "text-warning bg-warning/10";
-  return "text-danger bg-danger/10";
-}
-
 function frequencyLabel(freq: string): string {
   switch (freq) {
     case "WEEKLY": return "Weekly";
@@ -143,22 +137,6 @@ export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
               {item.type === "income" ? "+" : "-"}{formatCurrency(item.amount_pence)}
             </p>
 
-            {/* Badge: confidence for bills, locked for repayments */}
-            {item.type === "bill" && item.confidence != null && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${confidenceColor(item.confidence)}`}>
-                {Math.round(item.confidence * 100)}%
-              </span>
-            )}
-            {item.type === "repayment" && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-coral bg-coral/10">
-                Locked
-              </span>
-            )}
-            {item.type === "income" && (
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-success bg-success/10">
-                Salary
-              </span>
-            )}
           </div>
         ))}
       </div>
