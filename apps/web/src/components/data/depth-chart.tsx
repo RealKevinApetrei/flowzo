@@ -37,7 +37,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     cumVolume: number;
   } | null>(null);
 
-  const { buckets, cumulativeByGrade, maxCumVolume, aprRange, aprStats } = useMemo(() => {
+  const { cumulativeByGrade, maxCumVolume, aprRange, aprStats } = useMemo(() => {
     // Group trades into APR buckets by grade
     const bucketMap = new Map<string, DepthBucket>();
 

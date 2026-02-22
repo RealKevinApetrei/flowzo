@@ -45,9 +45,11 @@ export function TradeDetailModal({ trade, open, onClose, onFund }: TradeDetailMo
   const [confirming, setConfirming] = useState(false);
 
   // Reset confirming state when trade changes
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setConfirming(false);
   }, [trade?.id]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Prevent body scroll when modal open
   useEffect(() => {

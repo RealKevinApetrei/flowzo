@@ -112,7 +112,7 @@ export default async function BorrowerHomePage() {
     .lte("forecast_date", thirtyDaysLater.toISOString().split("T")[0])
     .order("forecast_date", { ascending: true });
 
-  // Map to the heatmap component's expected prop shape (DB stores GBP -> convert to pence)
+  // Map to the heatmap component&apos;s expected prop shape (DB stores GBP -> convert to pence)
   const forecasts = (rawForecasts ?? []).map((f) => ({
     forecast_date: f.forecast_date,
     projected_balance_pence: Math.round(Number(f.projected_balance) * 100),

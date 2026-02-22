@@ -92,6 +92,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetching pattern
     fetchProposals();
   }, [fetchProposals]);
 

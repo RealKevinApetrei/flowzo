@@ -4,4 +4,6 @@ export const FEE_CONFIG = {
   maxFeePercent: 0.05,
   maxFeeAbsolute: 1000,
   minFee: 1,
+  /** Platform takes 20% of borrower fee (junior tranche); lenders get 80% (senior tranche) */
+  platformFeePercent: 0.20,
 } as const;
