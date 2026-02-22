@@ -323,17 +323,45 @@ export function CalendarHeatmap({
                 </div>
               )}
 
-              {/* Outgoings */}
-              {selectedForecast.forecast.outgoings_expected_pence > 0 && (
-                <div className="mt-1 flex items-center gap-2 text-xs">
-                  <span className="w-2 h-2 rounded-full bg-danger/50" />
-                  <span className="text-text-secondary">
-                    Expected outgoings:{" "}
-                    {formatCurrency(
-                      selectedForecast.forecast.outgoings_expected_pence,
+              {/* Outgoings — split into bills + everyday spending */}
+              {selectedForecast.forecast.outgoings_expected_pence > 0 && (() => {
+                const billsPence = selectedDayObligations.reduce((sum, o) => sum + o.amount_pence, 0);
+                const irregularPence = Math.max(0, selectedForecast.forecast.outgoings_expected_pence - billsPence);
+                return (
+                  <>
+                    {billsPence > 0 && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-warning" />
+                        <span className="text-text-secondary">
+                          Bills due: -{formatCurrency(billsPence)}
+                        </span>
+                      </div>
                     )}
-                  </span>
-                </div>
+                    {irregularPence > 0 && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-danger/50" />
+                        <span className="text-text-secondary">
+                          Everyday spending: -{formatCurrency(irregularPence)}
+                        </span>
+                      </div>
+                    )}
+                    {billsPence === 0 && irregularPence === 0 && (
+                      <div className="mt-1 flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-danger/50" />
+                        <span className="text-text-secondary">
+                          Expected outgoings: -{formatCurrency(selectedForecast.forecast.outgoings_expected_pence)}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* Confidence band */}
+              {selectedForecast.forecast.confidence_low_pence !== selectedForecast.forecast.confidence_high_pence && (
+                <p className="mt-2 text-[10px] text-text-muted italic">
+                  Balance could range {formatCurrency(selectedForecast.forecast.confidence_low_pence)} – {formatCurrency(selectedForecast.forecast.confidence_high_pence)}
+                </p>
               )}
             </>
           )}
