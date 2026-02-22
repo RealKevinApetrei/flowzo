@@ -91,7 +91,7 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
                     ──► Member D (needs working demo for script + video)
 ```
 
-## Pipeline Status (Member A — Updated 2026-02-21 16:30)
+## Pipeline Status (Member A — Updated 2026-02-22 02:00)
 
 ### P0 Complete — All Critical Path DONE
 - [x] Migration 013 applied (RLS bubble board, obligations constraint, forecast_snapshots.completed_at)
@@ -101,10 +101,19 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
 - [x] TrueLayer callback fires pipeline async, redirects to `/borrower`
 - [x] Auto-match wired in `submitTrade()` — invokes `match-trade` Edge Function
 - [x] Cron routes: `/api/cron/forecast` (6am UTC), `/api/cron/settlement` (7am UTC)
-- [x] Seed data: ~425 users, ~1,050 trades, ~500 proposals in DB
+- [x] Seed data: ~425 users, ~1,050 trades, ~500 proposals, ~1,400 obligations, 600 forecasts
 - [x] Edge Function secrets: TRUELAYER_ENV, CLIENT_ID, CLIENT_SECRET set
 - [x] Token refresh: sync-banking-data retries with refreshed token on 401
 - [x] Build: Fixed missing `@radix-ui/react-slider` dependency
+
+### Bills Page Pipeline (PR #58, closes #54)
+- [x] Seed obligations: 20 UK bill templates, 3-8 per borrower, `next_expected` dates across 30 days
+- [x] Seed bank accounts: 250 borrowers with risk-grade-based balances
+- [x] Seed forecasts: 30-day pre-generated for first 20 demo borrowers with payday income pattern
+- [x] Link obligations to trades (~50% of MATCHED/LIVE) and proposals (real merchant names/IDs)
+- [x] Forecast Edge Function: trade repayment outflows on `new_due_date`
+- [x] Forecast Edge Function: payday pattern detection (replaces flat daily income average)
+- [x] `exec_sql` RPC created for seed script cleanup
 
 ### TrueLayer Sandbox Notes
 - Sandbox Mock bank only accepts credentials: **john** / **doe**
@@ -118,8 +127,8 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
 - CORS wildcard (`*`) on Edge Functions — should restrict to app domain in production
 
 ### Team Unblock Status
-- **Member B (Data Science):** UNBLOCKED — seed data in DB, pipeline works, can start backtest/EDA pages
-- **Member C (Frontend):** DONE — all UI complete, build passes
+- **Member B (Data Science):** UNBLOCKED — seed data in DB (obligations, forecasts, trades with obligation links), see issue #60
+- **Member C (Frontend):** Bills page data pipeline ready — verify UI displays seeded data, see issue #59
 - **Member D (Infra/Pitch):** UNBLOCKED — working demo exists, can write demo script + pitch deck
 
 ### Handoff Reminders
