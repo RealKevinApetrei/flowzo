@@ -10,6 +10,12 @@ import { createClient } from "@/lib/supabase/server";
  * 3. Current demand pressure (pending trades competing)
  */
 export async function GET(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(request.url);
 
   const feePence = Number(searchParams.get("fee_pence") ?? 0);
@@ -22,8 +28,6 @@ export async function GET(request: Request) {
   }
 
   const impliedAPR = (feePence / amountPence) * (365 / shiftDays) * 100;
-
-  const supabase = await createClient();
 
   // Fetch market rates for this grade
   const { data: marketRate } = await supabase

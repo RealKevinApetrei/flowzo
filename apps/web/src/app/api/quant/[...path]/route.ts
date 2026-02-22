@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 const QUANT_API_URL = process.env.QUANT_API_URL;
 
 async function proxyRequest(request: Request, params: { path: string[] }) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
   if (!QUANT_API_URL) {
     return NextResponse.json(
       { error: "QUANT_API_URL not configured" },
