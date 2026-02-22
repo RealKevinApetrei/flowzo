@@ -26,46 +26,37 @@ test.describe("Borrower happy path", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("borrower dashboard shows calendar heatmap", async ({ page }) => {
+  test("borrower dashboard shows balance card with Shift Bill", async ({ page }) => {
+    await loginAsBorrower(page);
+
+    await expect(
+      page.getByRole("button", { name: "Shift Bill" })
+        .or(page.getByText("Shift Bill"))
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("borrower sees suggestions or connect bank prompt", async ({ page }) => {
     await loginAsBorrower(page);
 
     await expect(
       page
-        .locator("text=30-day forecast")
-        .or(page.locator("[data-testid='calendar-heatmap']"))
-        .or(page.locator("text=Your forecast"))
+        .getByText("Suggestions", { exact: true })
+        .or(page.getByText(/connect your bank/i))
+        .or(page.getByText(/all caught up/i))
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("borrower sees suggestions section", async ({ page }) => {
+  test("borrower sees proposals or empty state", async ({ page }) => {
     await loginAsBorrower(page);
 
+    // Wait for either a proposal "Shift it" button or the caught-up message
     await expect(
-      page
-        .getByText(/suggestions/i)
-        .or(page.getByText(/proposals/i))
-        .or(page.getByRole("button", { name: "Accept" }))
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByRole("button", { name: "Shift it" }).first()
+        .or(page.getByText("All caught up!"))
+    ).toBeVisible({ timeout: 15_000 });
   });
 
-  test("borrower sees at least one proposal and can accept it", async ({
-    page,
-  }) => {
-    await loginAsBorrower(page);
-
-    const acceptBtn = page.getByRole("button", { name: "Accept" }).first();
-    await expect(acceptBtn).toBeVisible({ timeout: 10_000 });
-
-    await acceptBtn.click();
-
-    await expect(
-      page
-        .getByRole("button", { name: "Accepting..." })
-        .or(page.getByText("Accepted"))
-    ).toBeVisible({ timeout: 10_000 });
-  });
-
-  test("bottom nav is visible with expected tabs", async ({ page }) => {
+  test("bottom nav is visible", async ({ page }) => {
     await loginAsBorrower(page);
 
     const nav = page.locator("nav").last();

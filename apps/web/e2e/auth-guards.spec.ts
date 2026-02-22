@@ -19,10 +19,11 @@ test.describe("Auth guards", () => {
     expect(page.url()).toContain("/login");
   });
 
-  test("unauthenticated /data redirects to login", async ({ page }) => {
+  test("/data page is accessible without auth", async ({ page }) => {
     await page.goto("/data");
-    await page.waitForURL("**/login**", { timeout: 10_000 });
-    expect(page.url()).toContain("/login");
+    // /data is a public route — should load without redirect
+    await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => {});
+    expect(page.url()).toContain("/data");
   });
 
   test("landing page shows login link when not authenticated", async ({

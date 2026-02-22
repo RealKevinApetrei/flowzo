@@ -10,72 +10,70 @@ test.describe("Data analytics page", () => {
 
   test("page loads with title", async ({ page }) => {
     await expect(
-      page
-        .getByText(/analytics/i)
-        .or(page.getByText(/data/i))
-        .or(page.getByText(/platform/i))
+      page.getByRole("heading", { name: "Data & Analytics" })
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("section nav pills are visible", async ({ page }) => {
+  test("tab navigation pills are visible", async ({ page }) => {
     await expect(
-      page
-        .getByRole("button", { name: "Pool" })
-        .or(page.getByRole("button", { name: "Trades" }))
+      page.getByRole("button", { name: "Overview" })
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("pool summary section shows stat cards", async ({ page }) => {
-    const poolSection = page.locator("#pool-summary");
-    await expect(poolSection).toBeVisible({ timeout: 10_000 });
+  test("overview tab shows pool stats", async ({ page }) => {
+    await expect(
+      page.getByText("TOTAL POOL").or(page.getByText("UTILIZATION")).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("trade summary section shows status breakdown", async ({ page }) => {
-    const tradeSection = page.locator("#trade-summary");
-    await expect(tradeSection).toBeVisible({ timeout: 10_000 });
+  test("overview tab shows trade pipeline", async ({ page }) => {
+    await expect(
+      page.getByText("Pending", { exact: true }).first()
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("order book tab shows grade data", async ({ page }) => {
+    await page.getByRole("button", { name: "Order Book" }).click();
+    await page.waitForTimeout(1000);
 
     await expect(
-      page
-        .getByText(/live/i)
-        .or(page.getByText(/repaid/i))
-        .or(page.getByText(/pending/i))
-    ).toBeVisible();
+      page.getByText(/demand/i).or(page.getByText(/supply/i)).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("order book table shows grade data", async ({ page }) => {
-    const orderBook = page.locator("#order-book");
-    await expect(orderBook).toBeVisible({ timeout: 10_000 });
-
-    // Should show grade badges (A, B, C)
-    await expect(
-      orderBook.getByText("A").or(orderBook.getByText("B")).or(orderBook.getByText("C"))
-    ).toBeVisible();
-  });
-
-  test("performance table shows APR data", async ({ page }) => {
-    const perf = page.locator("#performance");
-    await expect(perf).toBeVisible({ timeout: 10_000 });
+  test("performance tab shows settlement data", async ({ page }) => {
+    await page.getByRole("button", { name: "Performance" }).click();
+    await page.waitForTimeout(1000);
 
     await expect(
-      perf
-        .getByText(/apr/i)
-        .or(perf.getByText(/default/i))
-        .or(perf.getByText(/%/))
-    ).toBeVisible();
+      page.getByText("Match Speed").or(page.getByText("Settlement Performance")).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("yield curve section is visible", async ({ page }) => {
-    const yieldCurve = page.locator("#yield-curve");
-    await expect(yieldCurve).toBeVisible({ timeout: 10_000 });
+  test("yield tab is visible", async ({ page }) => {
+    await page.getByRole("button", { name: "Yield" }).click();
+    await page.waitForTimeout(1000);
+
+    await expect(
+      page.getByText("Monthly Yield").or(page.getByText("Yield Trend")).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("lenders leaderboard shows data", async ({ page }) => {
-    const lenders = page.locator("#lenders");
-    await expect(lenders).toBeVisible({ timeout: 10_000 });
+  test("revenue tab shows fee data", async ({ page }) => {
+    await page.getByRole("button", { name: "Revenue" }).click();
+    await page.waitForTimeout(1000);
+
+    await expect(
+      page.getByText("FEE INCOME").or(page.getByText("NET REVENUE")).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("risk distribution section is visible", async ({ page }) => {
-    const risk = page.locator("#risk-distribution");
-    await expect(risk).toBeVisible({ timeout: 10_000 });
+  test("lenders tab shows data", async ({ page }) => {
+    await page.getByRole("button", { name: "Lenders" }).click();
+    await page.waitForTimeout(1000);
+
+    await expect(
+      page.getByText("HHI").or(page.getByText("TOP LENDER")).first()
+    ).toBeVisible({ timeout: 10_000 });
   });
 });

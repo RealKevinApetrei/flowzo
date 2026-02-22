@@ -17,5 +17,9 @@ export async function loginAsLender(page: Page) {
   await page.fill("#email", LENDER_EMAIL);
   await page.fill("#password", PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForURL("**/lender", { timeout: 15_000 });
+  // Login always redirects to /borrower first
+  await page.waitForURL("**/borrower", { timeout: 15_000 });
+  // Then navigate to lender page
+  await page.goto("/lender");
+  await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {});
 }

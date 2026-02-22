@@ -17,22 +17,25 @@ test.describe("Error states", () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  test("signup form has required field validation", async ({ page }) => {
+  test("signup form validates passwords match", async ({ page }) => {
     await page.goto("/signup");
 
-    // Try submitting empty form
-    const submitBtn = page
-      .getByRole("button", { name: /sign up/i })
-      .or(page.getByRole("button", { name: /create/i }));
+    const createBtn = page
+      .getByRole("button", { name: /create account/i })
+      .or(page.getByRole("button", { name: /sign up/i }));
 
-    if (await submitBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-      await submitBtn.click();
+    if (await createBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
+      // Fill in mismatched passwords
+      await page.fill("#email", "test@example.com");
+      await page.fill("#password", "TestPass123!");
+      await page.fill("#confirmPassword", "DifferentPass!");
+      await createBtn.click();
 
-      // Browser should show validation or app should show error
+      // Should show password mismatch error or browser validation
       await expect(
         page
-          .getByText(/required/i)
-          .or(page.getByText(/valid email/i))
+          .getByText(/match/i)
+          .or(page.getByText(/required/i))
           .or(page.locator(":invalid"))
       ).toBeVisible({ timeout: 5_000 });
     }
