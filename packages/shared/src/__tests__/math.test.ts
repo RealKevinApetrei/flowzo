@@ -4,20 +4,20 @@ import { calculateFee, calculateFillProbability, calculateImpliedAPR } from "../
 describe("calculateFee", () => {
   it("applies Grade A risk multiplier (1.0)", () => {
     const { fee } = calculateFee(10000, 7, "A");
-    // 0.0005 * 10000 * 7 * 1.0 * 1.0 = 35 pence
-    expect(fee).toBe(35);
+    // APR = 6.5*1.0 + 0.15*7 = 7.55%; fee = 10000 * 0.0755 * 7/365 ≈ 14
+    expect(fee).toBe(14);
   });
 
-  it("applies Grade B risk multiplier (1.5)", () => {
+  it("applies Grade B risk multiplier (1.8)", () => {
     const { fee } = calculateFee(10000, 7, "B");
-    // 0.0005 * 10000 * 7 * 1.5 * 1.0 = 52.5 → rounded = 53
-    expect(fee).toBe(53);
+    // APR = 6.5*1.8 + 0.15*7 = 12.75%; fee = 10000 * 0.1275 * 7/365 ≈ 24
+    expect(fee).toBe(24);
   });
 
-  it("applies Grade C risk multiplier (2.5)", () => {
+  it("applies Grade C risk multiplier (2.8)", () => {
     const { fee } = calculateFee(10000, 7, "C");
-    // 0.0005 * 10000 * 7 * 2.5 * 1.0 = 87.5 → rounded = 88
-    expect(fee).toBe(88);
+    // APR = 6.5*2.8 + 0.15*7 = 19.25%; fee = 10000 * 0.1925 * 7/365 ≈ 37
+    expect(fee).toBe(37);
   });
 
   it("enforces minimum fee of 1 pence", () => {
@@ -31,9 +31,9 @@ describe("calculateFee", () => {
     expect(fee).toBeLessThanOrEqual(amount * 0.05);
   });
 
-  it("caps fee at absolute maximum of 1000 pence", () => {
+  it("caps fee at absolute maximum of 2000 pence (£20)", () => {
     const { fee } = calculateFee(10_000_000, 365, "C");
-    expect(fee).toBeLessThanOrEqual(1000);
+    expect(fee).toBeLessThanOrEqual(2000);
   });
 
   it("returns a positive annualizedRate", () => {
