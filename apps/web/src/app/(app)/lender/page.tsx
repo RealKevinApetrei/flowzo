@@ -26,7 +26,7 @@ export default async function LenderHomePage() {
   const { data: allocations } = await supabase
     .from("allocations")
     .select(
-      "trade_id, amount_slice, fee_slice, status, trades(amount, fee, shift_days, status)",
+      "trade_id, amount_slice, fee_slice, status, trades(amount, fee, shift_days, status, new_due_date, obligation_id, obligations(name))",
     )
     .eq("lender_id", user.id);
 
@@ -202,6 +202,29 @@ export default async function LenderHomePage() {
     essentialBills: essentialCount,
   };
 
+  // Build upcoming repayments for lender (active trades with repay dates)
+  const upcomingRepayments = (allocations ?? [])
+    .filter((a) => {
+      const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+      return trade && ["MATCHED", "LIVE"].includes(trade.status as string);
+    })
+    .map((a) => {
+      const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+      const obligation = trade?.obligations
+        ? (Array.isArray(trade.obligations) ? trade.obligations[0] : trade.obligations)
+        : null;
+      return {
+        trade_id: a.trade_id,
+        obligation_name: obligation?.name ?? "Trade",
+        amount_pence: Math.round(Number(a.amount_slice) * 100),
+        fee_pence: Math.round(Number(a.fee_slice) * 100),
+        new_due_date: trade?.new_due_date as string,
+        status: trade?.status as string,
+      };
+    })
+    .filter((r) => r.new_due_date)
+    .sort((a, b) => a.new_due_date.localeCompare(b.new_due_date));
+
   return (
     <>
       <LenderPageClient
@@ -227,6 +250,7 @@ export default async function LenderHomePage() {
         impactStats={impactStats}
         withdrawalQueued={!!pot?.withdrawal_queued}
         usingMarketAvg={usingMarketAvg}
+        upcomingRepayments={upcomingRepayments}
       />
     </>
   );

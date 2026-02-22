@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@flowzo/shared";
 import { toast } from "sonner";
-import { withdrawAllAvailable, queueWithdrawal, cancelQueuedWithdrawal } from "@/lib/actions/lending";
+import { withdrawFromPot, queueWithdrawal, cancelQueuedWithdrawal } from "@/lib/actions/lending";
 
 interface LendingPotCardProps {
   pot: {
@@ -28,6 +28,8 @@ function bpsToPercent(bps: number): string {
 export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, onPotUpdated }: LendingPotCardProps) {
   const [loading, setLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
+  const [showWithdraw, setShowWithdraw] = useState(false);
+  const [withdrawPence, setWithdrawPence] = useState(0);
 
   const available = pot?.available_pence ?? 0;
   const locked = pot?.locked_pence ?? 0;
@@ -217,27 +219,87 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
         {/* Withdraw + Stop Lending */}
         {pot && (
           <div className="space-y-3 pt-3 border-t border-warm-grey">
-            {/* Withdraw available */}
-            {available > 0 && (
+            {/* Withdraw */}
+            {available > 0 && !showWithdraw && (
               <Button
                 variant="outline"
                 className="w-full"
                 disabled={loading}
-                onClick={async () => {
-                  setLoading(true);
-                  try {
-                    await withdrawAllAvailable();
-                    toast.success(`Withdrew ${formatCurrency(available)}`);
-                    onPotUpdated?.();
-                  } catch (err) {
-                    toast.error(err instanceof Error ? err.message : "Withdrawal failed");
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
+                onClick={() => { setWithdrawPence(available); setShowWithdraw(true); }}
               >
-                Withdraw {formatCurrency(available)}
+                Withdraw
               </Button>
+            )}
+
+            {showWithdraw && available > 0 && (
+              <div className="rounded-xl bg-soft-white p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-navy">Withdraw amount</p>
+                  <button onClick={() => setShowWithdraw(false)} className="text-xs text-text-muted hover:text-navy">Cancel</button>
+                </div>
+
+                {/* Slider */}
+                <div className="relative h-8 flex items-center">
+                  <div className="absolute inset-x-0 h-2 rounded-full bg-warm-grey" />
+                  <div
+                    className="absolute left-0 h-2 rounded-full bg-coral transition-all"
+                    style={{ width: `${((withdrawPence - 100) / Math.max(available - 100, 1)) * 100}%` }}
+                  />
+                  <input
+                    type="range"
+                    min={100}
+                    max={available}
+                    step={100}
+                    value={withdrawPence}
+                    onChange={(e) => setWithdrawPence(Number(e.target.value))}
+                    className="relative w-full h-2 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-coral [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-coral [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
+                  />
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted font-medium">£</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={available / 100}
+                      step={1}
+                      value={(withdrawPence / 100).toFixed(0)}
+                      onChange={(e) => {
+                        const pence = Math.round(Number(e.target.value) * 100);
+                        setWithdrawPence(Math.max(100, Math.min(pence, available)));
+                      }}
+                      className="w-full h-10 pl-7 pr-3 rounded-full border-2 border-cool-grey bg-[var(--card-surface)] text-sm font-medium text-navy focus:border-coral focus:outline-none transition-colors"
+                    />
+                  </div>
+                  <button
+                    onClick={() => setWithdrawPence(available)}
+                    className="text-xs font-semibold text-coral hover:underline whitespace-nowrap"
+                  >
+                    Max
+                  </button>
+                </div>
+
+                <Button
+                  className="w-full"
+                  disabled={loading || withdrawPence <= 0}
+                  onClick={async () => {
+                    setLoading(true);
+                    try {
+                      await withdrawFromPot(withdrawPence);
+                      toast.success(`Withdrew ${formatCurrency(withdrawPence)}`);
+                      setShowWithdraw(false);
+                      onPotUpdated?.();
+                    } catch (err) {
+                      toast.error(err instanceof Error ? err.message : "Withdrawal failed");
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                >
+                  Confirm Withdraw {formatCurrency(withdrawPence)}
+                </Button>
+              </div>
             )}
 
             {/* Stop lending / resume lending */}
