@@ -72,10 +72,13 @@ export async function fundTrade(tradeId: string) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  const { createAdminClient } = await import("@/lib/supabase/admin");
+  const admin = createAdminClient();
+
   // Get the trade to fund
-  const { data: trade, error: tradeErr } = await supabase
+  const { data: trade, error: tradeErr } = await admin
     .from("trades")
-    .select("id, amount, fee, status")
+    .select("id, amount, fee, status, borrower_id")
     .eq("id", tradeId)
     .eq("status", "PENDING_MATCH")
     .single();
@@ -84,14 +87,37 @@ export async function fundTrade(tradeId: string) {
     throw new Error("Trade not found or not available for funding");
   }
 
-  // Create allocation
-  const { data: allocation, error: allocErr } = await supabase
+  // Prevent self-dealing
+  if (trade.borrower_id === user.id) {
+    throw new Error("Cannot fund your own trade");
+  }
+
+  // Guard: check for existing allocations (prevents double-funding + race with auto-match)
+  const { data: existingAllocs } = await admin
+    .from("allocations")
+    .select("id")
+    .eq("trade_id", tradeId)
+    .in("status", ["RESERVED", "ACTIVE"])
+    .limit(1);
+
+  if (existingAllocs && existingAllocs.length > 0) {
+    throw new Error("Trade already has funding — refresh to see updated status");
+  }
+
+  // Calculate 80/20 fee split (matches match-trade Edge Function logic)
+  const { FEE_CONFIG } = await import("@flowzo/shared");
+  const tradeFee = Number(trade.fee);
+  const platformFee = Math.round(tradeFee * FEE_CONFIG.platformFeePercent * 100) / 100;
+  const lenderFee = Math.round((tradeFee - platformFee) * 100) / 100;
+
+  // Create allocation with lender's fee share only
+  const { data: allocation, error: allocErr } = await admin
     .from("allocations")
     .insert({
       trade_id: tradeId,
       lender_id: user.id,
       amount_slice: trade.amount,
-      fee_slice: trade.fee,
+      fee_slice: lenderFee,
       status: "RESERVED",
     })
     .select("id")
@@ -113,51 +139,26 @@ export async function fundTrade(tradeId: string) {
   });
 
   if (potErr) {
-    // Rollback allocation if pot update fails — retry to prevent orphans
-    let rollbackSuccess = false;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const { error: deleteErr } = await supabase
-        .from("allocations")
-        .delete()
-        .eq("id", allocation.id);
-
-      if (!deleteErr) {
-        rollbackSuccess = true;
-        break;
-      }
-      // Brief delay before retry
-      await new Promise((r) => setTimeout(r, 100 * (attempt + 1)));
-    }
-
-    if (!rollbackSuccess) {
-      // Flag as orphan via status so it can be cleaned up
-      await supabase
-        .from("allocations")
-        .update({ status: "RELEASED" })
-        .eq("id", allocation.id);
-
-      // Log to events for audit trail
-      await supabase.from("flowzo_events").insert({
-        event_type: "allocation.orphaned",
-        entity_type: "allocation",
-        entity_id: allocation.id,
-        actor: user.id,
-        payload: {
-          trade_id: tradeId,
-          reason: "rollback_delete_failed",
-          pot_error: potErr.message,
-        },
-      });
-    }
+    // Rollback allocation if pot update fails
+    await admin
+      .from("allocations")
+      .delete()
+      .eq("id", allocation.id);
 
     throw new Error(`Insufficient funds or pot error: ${potErr.message}`);
   }
 
-  // Update trade status to MATCHED
-  const { error: updateErr } = await supabase
+  // Update trade status to MATCHED with fee split
+  const { error: updateErr } = await admin
     .from("trades")
-    .update({ status: "MATCHED", matched_at: new Date().toISOString() })
-    .eq("id", tradeId);
+    .update({
+      status: "MATCHED",
+      matched_at: new Date().toISOString(),
+      platform_fee: platformFee,
+      lender_fee: lenderFee,
+    })
+    .eq("id", tradeId)
+    .eq("status", "PENDING_MATCH");
 
   if (updateErr) throw new Error(`Failed to update trade: ${updateErr.message}`);
 }
@@ -231,6 +232,31 @@ export async function queueWithdrawal() {
     .eq("user_id", user.id);
 
   if (error) throw new Error(`Failed to queue withdrawal: ${error.message}`);
+
+  // If no locked funds, withdraw immediately instead of waiting for repayment
+  const { data: pot } = await supabase
+    .from("lending_pots")
+    .select("available, locked")
+    .eq("user_id", user.id)
+    .single();
+
+  if (pot && Number(pot.locked) === 0 && Number(pot.available) > 0) {
+    const amountGBP = Number(pot.available);
+    await supabase.rpc("update_lending_pot", {
+      p_user_id: user.id,
+      p_entry_type: "WITHDRAW",
+      p_amount: amountGBP,
+      p_trade_id: null,
+      p_allocation_id: null,
+      p_description: `Immediate withdrawal (no locked funds): £${amountGBP.toFixed(2)}`,
+      p_idempotency_key: `imm-withdraw-${user.id}-${Date.now()}`,
+    });
+
+    await supabase
+      .from("lending_pots")
+      .update({ withdrawal_queued: false })
+      .eq("user_id", user.id);
+  }
 }
 
 export async function cancelQueuedWithdrawal() {

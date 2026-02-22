@@ -131,23 +131,8 @@ export async function cancelTrade(tradeId: string) {
 
   if (!trade) throw new Error("Trade not found or cannot be cancelled");
 
-  // Release any RESERVED allocations back to lenders
-  const { releaseTradeAllocations } = await import("@/lib/allocations");
-  const { released, errors } = await releaseTradeAllocations(
-    admin,
-    tradeId,
-    "cancel-release",
-  );
-
-  if (errors.length > 0) {
-    console.error(`cancelTrade ${tradeId}: allocation release errors:`, errors);
-    throw new Error(
-      `Failed to release allocations: ${errors[0]}`,
-    );
-  }
-
-  // Cancel the trade with status guard to prevent race with match-trade
-  const { error, count } = await admin
+  // Cancel the trade FIRST with status guard — prevents race with match-trade
+  const { data: cancelled, error } = await admin
     .from("trades")
     .update({ status: "CANCELLED" })
     .eq("id", tradeId)
@@ -156,12 +141,23 @@ export async function cancelTrade(tradeId: string) {
 
   if (error) throw new Error(`Failed to cancel trade: ${error.message}`);
 
-  // If count is 0, the trade status changed between our check and update (race)
-  if (count === 0) {
-    console.warn(`cancelTrade ${tradeId}: trade status changed during cancel (possible race with match-trade)`);
+  if (!cancelled || cancelled.length === 0) {
+    throw new Error("Trade status changed (likely matched) — cannot cancel");
   }
 
-  // Log cancellation event AFTER trade is actually cancelled
+  // THEN release any RESERVED allocations back to lenders (trade is safely CANCELLED)
+  const { releaseTradeAllocations } = await import("@/lib/allocations");
+  const { released, errors: releaseErrors } = await releaseTradeAllocations(
+    admin,
+    tradeId,
+    "cancel-release",
+  );
+
+  if (releaseErrors.length > 0) {
+    console.error(`cancelTrade ${tradeId}: allocation release errors (trade already CANCELLED):`, releaseErrors);
+  }
+
+  // Log cancellation event
   await admin.from("flowzo_events").insert({
     event_type: "trade.cancelled",
     entity_type: "trade",

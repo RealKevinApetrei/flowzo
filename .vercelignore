@@ -1,0 +1,5 @@
+.claude/worktrees
+.turbo/cache
+quant_analysis/.venv
+quant_analysis/data
+apps/web/.next/dev

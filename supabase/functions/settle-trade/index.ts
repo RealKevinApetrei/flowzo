@@ -53,19 +53,6 @@ serve(async (req: Request) => {
 
       for (const trade of matchedTrades ?? []) {
         try {
-          // Update status to LIVE
-          const { error: statusErr } = await supabase
-            .from("trades")
-            .update({ status: "LIVE" })
-            .eq("id", trade.id);
-
-          if (statusErr) {
-            results.errors.push(
-              `Disburse status update failed for ${trade.id}: ${statusErr.message}`,
-            );
-            continue;
-          }
-
           // Fetch allocations for this trade
           const { data: allocations } = await supabase
             .from("allocations")
@@ -74,6 +61,7 @@ serve(async (req: Request) => {
             .eq("status", "RESERVED");
 
           // Create DISBURSE ledger entries for each allocation
+          let allAllocsProcessed = true;
           for (const alloc of allocations ?? []) {
             const { error: disbErr } = await supabase.rpc(
               "update_lending_pot",
@@ -96,6 +84,7 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Disburse ledger failed for allocation ${alloc.id}: ${disbErr.message}`,
               );
+              allAllocsProcessed = false;
               continue;
             }
 
@@ -113,7 +102,28 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Allocation ACTIVE status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
               );
+              allAllocsProcessed = false;
             }
+          }
+
+          // Only update trade status if ALL allocations processed successfully
+          if (!allAllocsProcessed) {
+            results.errors.push(
+              `Skipping LIVE status for trade ${trade.id}: not all allocations processed`,
+            );
+            continue;
+          }
+
+          const { error: statusErr } = await supabase
+            .from("trades")
+            .update({ status: "LIVE" })
+            .eq("id", trade.id);
+
+          if (statusErr) {
+            results.errors.push(
+              `Disburse status update failed for ${trade.id}: ${statusErr.message}`,
+            );
+            continue;
           }
 
           // Log event
@@ -173,6 +183,7 @@ serve(async (req: Request) => {
             .eq("status", "ACTIVE");
 
           // Repay each lender: principal + fee_share
+          let allAllocsRepaid = true;
           for (const alloc of allocations ?? []) {
             const principal = Number(alloc.amount_slice);
             const feeShare = Number(alloc.fee_slice);
@@ -199,7 +210,7 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Repay principal failed for allocation ${alloc.id}: ${repayErr.message}`,
               );
-              // Skip status update — ledger and allocation must stay in sync
+              allAllocsRepaid = false;
               continue;
             }
 
@@ -228,6 +239,7 @@ serve(async (req: Request) => {
                   `Fee credit failed for allocation ${alloc.id}: ${feeErr.message}`,
                 );
                 feeSuccess = false;
+                allAllocsRepaid = false;
               }
             }
 
@@ -249,6 +261,7 @@ serve(async (req: Request) => {
                 results.errors.push(
                   `Allocation REPAID status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
                 );
+                allAllocsRepaid = false;
               }
 
               // Auto-withdraw for lenders with queued withdrawal
@@ -287,7 +300,14 @@ serve(async (req: Request) => {
             }
           }
 
-          // Update trade status to REPAID
+          // Only update trade status if ALL allocations repaid successfully
+          if (!allAllocsRepaid) {
+            results.errors.push(
+              `Skipping REPAID status for trade ${trade.id}: not all allocations processed (will retry next cron)`,
+            );
+            continue;
+          }
+
           const { error: statusErr } = await supabase
             .from("trades")
             .update({ status: "REPAID" })
@@ -382,7 +402,8 @@ serve(async (req: Request) => {
             .eq("trade_id", trade.id)
             .eq("status", "ACTIVE");
 
-          // Release locked funds back to lenders (principal loss — no fee)
+          // Release locked funds back to lenders (principal returned — no fee)
+          let allAllocsDefaulted = true;
           for (const alloc of allocations ?? []) {
             const principal = Number(alloc.amount_slice);
 
@@ -407,6 +428,7 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Default release failed for allocation ${alloc.id}: ${releaseErr.message}`,
               );
+              allAllocsDefaulted = false;
               continue;
             }
 
@@ -427,10 +449,18 @@ serve(async (req: Request) => {
               results.errors.push(
                 `Allocation DEFAULTED status update failed for ${alloc.id}: ${allocUpdateErr.message}`,
               );
+              allAllocsDefaulted = false;
             }
           }
 
-          // Update trade status to DEFAULTED
+          // Only update trade status if ALL allocations defaulted successfully
+          if (!allAllocsDefaulted) {
+            results.errors.push(
+              `Skipping DEFAULTED status for trade ${trade.id}: not all allocations processed (will retry next cron)`,
+            );
+            continue;
+          }
+
           const { error: statusErr } = await supabase
             .from("trades")
             .update({
