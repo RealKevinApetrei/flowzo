@@ -61,7 +61,7 @@ def _load_from_csv() -> pd.DataFrame:
     # Median imputation for all feature columns
     for col in FEATURE_NAMES:
         if df[col].isna().any():
-            df[col].fillna(df[col].median(), inplace=True)
+            df[col] = df[col].fillna(df[col].median())
 
     return df
 
