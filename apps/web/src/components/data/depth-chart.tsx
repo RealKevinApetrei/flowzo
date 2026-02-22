@@ -224,7 +224,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
                 y1={yScale(tick)}
                 x2={W - PAD.right}
                 y2={yScale(tick)}
-                stroke="#E5E7EB"
+                style={{ stroke: "var(--warm-grey)" }}
                 strokeWidth="0.5"
                 strokeDasharray="2,2"
               />
@@ -273,7 +273,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
               y={PAD.top}
               width={Math.max(0, xScale(aprStats.q3) - xScale(aprStats.q1))}
               height={plotH}
-              fill="rgba(27, 27, 58, 0.06)"
+              style={{ fill: "var(--navy)", opacity: 0.08 }}
               rx="2"
             />
           )}
@@ -286,7 +286,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
                 y1={PAD.top}
                 x2={xScale(aprStats.median)}
                 y2={PAD.top + plotH}
-                stroke="#1B1B3A"
+                style={{ stroke: "var(--navy)" }}
                 strokeWidth="1"
                 strokeDasharray="4,3"
               />
@@ -350,7 +350,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
         {/* Tooltip */}
         {hoveredBucket && (
           <div
-            className="absolute pointer-events-none bg-navy text-white text-[10px] rounded-lg px-2.5 py-1.5 shadow-lg z-10"
+            className="absolute pointer-events-none bg-navy-bg text-white text-[10px] rounded-lg px-2.5 py-1.5 shadow-lg z-10"
             style={{
               left: `${hoveredBucket.x}px`,
               top: `${hoveredBucket.y - 10}px`,

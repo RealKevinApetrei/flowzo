@@ -809,9 +809,9 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
 
     const newDueDate = addDays(originalDueDate, shiftDays);
 
-    // Link ~50% of MATCHED/LIVE trades to an obligation
+    // Link MATCHED/LIVE trades to an obligation so Active Shifts shows real names
     let obligationId: string | null = null;
-    if (["MATCHED", "LIVE"].includes(status) && Math.random() < 0.5) {
+    if (["MATCHED", "LIVE"].includes(status)) {
       const userObls = obligationsMap.get(borrower.id);
       if (userObls && userObls.length > 0) {
         obligationId = pick(userObls).id;
