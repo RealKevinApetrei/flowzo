@@ -62,7 +62,7 @@ const slides = [
         </h1>
         <div className="text-center mb-10">
           <div className="text-5xl sm:text-6xl font-extrabold text-coral">0</div>
-          <p className="text-sm text-white/50 mt-3">Financial products built specifically for cashflow timing</p>
+          <p className="text-sm text-white/50 mt-3">Products using Open Banking data to predict and prevent overdrafts via P2P lending</p>
         </div>
         <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed">
           Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity.
@@ -82,38 +82,36 @@ const slides = [
           Bank data in.<br />
           <span className="text-coral">Actionable insight out.</span>
         </h1>
-        <p className="text-lg text-text-secondary mb-10 max-w-xl mx-auto">
+        <p className="text-lg text-text-secondary mb-3 max-w-xl mx-auto">
           Three steps from raw transactions to a personalised bill-shift proposal — in under 10 seconds.
-          <span className="block mt-1 text-sm text-text-muted">For SIG: this is feature engineering from noisy data → signal extraction → execution. Same discipline, different asset class.</span>
+        </p>
+        <p className="text-base text-coral font-semibold mb-10 max-w-xl mx-auto">
+          Feature engineering from noisy data → signal extraction → execution. Same discipline as quant finance, different asset class.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
           {[
             {
               step: "01",
-              icon: "🔗",
               title: "Connect",
               subtitle: "TrueLayer Open Banking",
               desc: "User connects their bank. We pull 90 days of real transaction history in seconds.",
             },
             {
               step: "02",
-              icon: "🔍",
               title: "Analyse",
               subtitle: "Feature Engineering",
               desc: "We detect recurring bills, classify income patterns, measure balance volatility, and flag danger days on a 30-day forecast.",
             },
             {
               step: "03",
-              icon: "🎯",
               title: "Score & Propose",
               subtitle: "AI Decision Engine",
               desc: "An A/B/C risk grade is assigned and APR calculated accordingly. Claude AI generates a plain-English bill-shift proposal.",
             },
-          ].map(({ step, icon, title, subtitle, desc }) => (
+          ].map(({ step, title, subtitle, desc }) => (
             <div key={title} className="card-monzo p-6 text-left">
-              <div className="flex items-center gap-3 mb-3">
+              <div className="mb-3">
                 <span className="text-coral text-xs font-extrabold uppercase tracking-widest">{step}</span>
-                <span className="text-2xl">{icon}</span>
               </div>
               <div className="font-extrabold text-navy text-lg">{title}</div>
               <div className="text-coral text-sm font-semibold mb-2">{subtitle}</div>
@@ -154,7 +152,7 @@ const slides = [
         <div className="grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
           {[
             { stat: "< 10s", label: "Sync → forecast → proposal" },
-            { stat: "MAPE < 15%", label: "Forecast accuracy target" },
+            { stat: "85%+", label: "30-day balance forecast accuracy" },
             { stat: "< 30s", label: "Auto-match after proposal accepted" },
           ].map(({ stat, label }) => (
             <div key={stat} className="text-center">
@@ -232,14 +230,17 @@ const slides = [
         <p className="text-xl text-white/70 max-w-2xl mx-auto mb-8 leading-relaxed">
           Flowzo risk grades backtested on LendingClub data. Grade A predicts defaults better than FICO alone.
         </p>
-        <div className="grid grid-cols-3 gap-6 w-full max-w-2xl mx-auto mb-8">
+        <div className="text-center mb-8">
+          <div className="text-5xl sm:text-7xl font-extrabold text-coral">£1.20</div>
+          <p className="text-lg text-white/60 mt-2">average Flowzo fee vs <span className="text-white font-bold">£45</span> overdraft charge — <span className="text-coral font-bold">37x cheaper</span></p>
+        </div>
+        <div className="grid grid-cols-2 gap-8 w-full max-w-md mx-auto mb-8">
           {[
-            { stat: "Grade A", label: "Default rate < Grade B < Grade C", color: "text-success" },
-            { stat: "> 80%", label: "Trades auto-matched within 30s", color: "text-coral" },
-            { stat: "£1.20", label: "Avg fee vs £45 overdraft charge", color: "text-warning" },
+            { stat: "Grade A", label: "Default rate < B < C on backtest", color: "text-success" },
+            { stat: "> 80%", label: "Auto-matched within 30 seconds", color: "text-white" },
           ].map(({ stat, label, color }) => (
             <div key={stat} className="text-center">
-              <div className={`text-3xl sm:text-4xl font-extrabold ${color}`}>{stat}</div>
+              <div className={`text-2xl sm:text-3xl font-extrabold ${color}`}>{stat}</div>
               <p className="text-xs text-white/50 mt-2 leading-snug">{label}</p>
             </div>
           ))}
@@ -256,7 +257,8 @@ const slides = [
             <p className="text-white/50 text-xs mt-1">TrueLayer · Real sandbox · Monzo design system</p>
           </div>
         </div>
-        <p className="mt-8 text-white/30 text-sm font-semibold tracking-wide">flowzo.vercel.app</p>
+        <p className="mt-8 text-white text-lg font-bold tracking-wide">The pipeline is live. Try it now.</p>
+        <p className="mt-2 text-coral text-sm font-extrabold tracking-widest">flowzo.vercel.app</p>
       </div>
     ),
   },
