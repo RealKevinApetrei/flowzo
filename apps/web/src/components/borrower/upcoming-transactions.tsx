@@ -3,22 +3,25 @@
 import { useState } from "react";
 import { formatCurrency } from "@flowzo/shared";
 
-interface UpcomingObligation {
+// Unified cashflow item — bills, income, and repayments all in one timeline
+export interface CashflowItem {
   id: string;
   name: string;
   amount_pence: number;
-  frequency: string;
-  next_expected: string;
-  confidence: number;
-  is_essential: boolean;
-  category: string | null;
+  date: string;            // YYYY-MM-DD
+  type: "bill" | "income" | "repayment";
+  frequency?: string;      // for bills
+  confidence?: number;     // for bills
+  is_essential?: boolean;  // for bills
+  category?: string | null;
+  locked?: boolean;        // for repayments (can't reschedule)
 }
 
 interface UpcomingTransactionsProps {
-  obligations: UpcomingObligation[];
+  items: CashflowItem[];
 }
 
-const MAX_VISIBLE = 5;
+const MAX_VISIBLE = 8;
 
 function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -41,59 +44,108 @@ function frequencyLabel(freq: string): string {
     case "MONTHLY": return "Monthly";
     case "QUARTERLY": return "Quarterly";
     case "ANNUAL": return "Annual";
-    default: return "Irregular";
+    default: return freq;
   }
 }
 
-export function UpcomingTransactions({ obligations }: UpcomingTransactionsProps) {
+function typeIcon(type: CashflowItem["type"]) {
+  if (type === "income") {
+    return (
+      <div className="w-7 h-7 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-success">
+          <path fillRule="evenodd" d="M10 17a.75.75 0 01-.75-.75V5.612L5.29 9.77a.75.75 0 01-1.08-1.04l5.25-5.5a.75.75 0 011.08 0l5.25 5.5a.75.75 0 11-1.08 1.04l-3.96-4.158V16.25A.75.75 0 0110 17z" clipRule="evenodd" />
+        </svg>
+      </div>
+    );
+  }
+  if (type === "repayment") {
+    return (
+      <div className="w-7 h-7 rounded-full bg-coral/10 flex items-center justify-center shrink-0">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-coral">
+          <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+        </svg>
+      </div>
+    );
+  }
+  // bill
+  return (
+    <div className="w-7 h-7 rounded-full bg-warning/10 flex items-center justify-center shrink-0">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-warning">
+        <path fillRule="evenodd" d="M10 3a.75.75 0 01.75.75V15.388l3.96-4.158a.75.75 0 111.08 1.04l-5.25 5.5a.75.75 0 01-1.08 0l-5.25-5.5a.75.75 0 111.08-1.04l3.96 4.158V3.75A.75.75 0 0110 3z" clipRule="evenodd" />
+      </svg>
+    </div>
+  );
+}
+
+export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
   const [showAll, setShowAll] = useState(false);
 
-  if (obligations.length === 0) return null;
+  if (items.length === 0) return null;
 
-  const visible = showAll ? obligations : obligations.slice(0, MAX_VISIBLE);
-  const hasMore = obligations.length > MAX_VISIBLE;
+  const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+  const visible = showAll ? sorted : sorted.slice(0, MAX_VISIBLE);
+  const hasMore = sorted.length > MAX_VISIBLE;
 
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base font-bold text-navy">Upcoming</h2>
         <span className="text-xs text-text-muted">
-          Next 14 days
+          Next 30 days
         </span>
       </div>
 
-      <div className="space-y-1">
-        {visible.map((o) => (
+      <div className="space-y-0.5">
+        {visible.map((item) => (
           <div
-            key={o.id}
+            key={item.id}
             className="flex items-center gap-3 py-2.5 border-b border-warm-grey last:border-0"
           >
             {/* Date */}
             <div className="w-12 text-center shrink-0">
               <p className="text-xs font-bold text-navy leading-tight">
-                {formatShortDate(o.next_expected)}
+                {formatShortDate(item.date)}
               </p>
             </div>
 
-            {/* Name + frequency */}
+            {/* Type icon */}
+            {typeIcon(item.type)}
+
+            {/* Name + subtitle */}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-navy truncate">
-                {o.name}
+                {item.name}
               </p>
               <p className="text-[10px] text-text-muted">
-                {frequencyLabel(o.frequency)}
+                {item.type === "income" && "Income"}
+                {item.type === "repayment" && "Auto-repayment"}
+                {item.type === "bill" && frequencyLabel(item.frequency ?? "MONTHLY")}
               </p>
             </div>
 
             {/* Amount */}
-            <p className="text-sm font-bold text-navy shrink-0">
-              {formatCurrency(o.amount_pence)}
+            <p className={`text-sm font-bold shrink-0 ${
+              item.type === "income" ? "text-success" : item.type === "repayment" ? "text-coral" : "text-navy"
+            }`}>
+              {item.type === "income" ? "+" : "-"}{formatCurrency(item.amount_pence)}
             </p>
 
-            {/* Confidence badge */}
-            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${confidenceColor(o.confidence)}`}>
-              {Math.round(o.confidence * 100)}%
-            </span>
+            {/* Badge: confidence for bills, locked for repayments */}
+            {item.type === "bill" && item.confidence != null && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${confidenceColor(item.confidence)}`}>
+                {Math.round(item.confidence * 100)}%
+              </span>
+            )}
+            {item.type === "repayment" && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-coral bg-coral/10">
+                Locked
+              </span>
+            )}
+            {item.type === "income" && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full shrink-0 text-success bg-success/10">
+                Salary
+              </span>
+            )}
           </div>
         ))}
       </div>
@@ -103,7 +155,7 @@ export function UpcomingTransactions({ obligations }: UpcomingTransactionsProps)
           onClick={() => setShowAll(!showAll)}
           className="w-full text-center text-xs font-medium text-coral mt-3 py-1 hover:text-coral-dark transition-colors"
         >
-          {showAll ? "Show less" : `See all ${obligations.length} transactions`}
+          {showAll ? "Show less" : `See all ${sorted.length} cashflows`}
         </button>
       )}
     </div>

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
 import { SuggestionFeed } from "@/components/borrower/suggestion-feed";
 import { DangerSummary } from "@/components/borrower/danger-summary";
-import { UpcomingTransactions } from "@/components/borrower/upcoming-transactions";
+import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/upcoming-transactions";
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
@@ -180,6 +180,49 @@ export default async function BorrowerHomePage() {
   const displayObligations = upcomingObligations.length > 0 ? upcomingObligations : buildDemoObligations();
   const displayShifts = activeShifts.length > 0 ? activeShifts : buildDemoShifts();
 
+  // Build unified cashflow timeline: bills + income + repayments
+  const cashflows: CashflowItem[] = [];
+
+  // Bills (obligations)
+  for (const o of displayObligations) {
+    cashflows.push({
+      id: o.id,
+      name: o.name,
+      amount_pence: o.amount_pence,
+      date: o.next_expected,
+      type: "bill",
+      frequency: o.frequency,
+      confidence: o.confidence,
+      is_essential: o.is_essential,
+      category: o.category,
+    });
+  }
+
+  // Income days (from forecasts where income > 0)
+  for (const f of displayForecasts) {
+    if (f.income_expected_pence > 0) {
+      cashflows.push({
+        id: `income-${f.forecast_date}`,
+        name: "Salary",
+        amount_pence: f.income_expected_pence,
+        date: f.forecast_date,
+        type: "income",
+      });
+    }
+  }
+
+  // Repayments (active shifts — locked auto-repayments)
+  for (const s of displayShifts) {
+    cashflows.push({
+      id: `repay-${s.id}`,
+      name: s.obligation_name,
+      amount_pence: s.amount_pence + s.fee_pence,
+      date: s.new_due_date,
+      type: "repayment",
+      locked: true,
+    });
+  }
+
   const dangerCount = displayForecasts.filter((f) => f.is_danger).length;
   const hasData = displayForecasts.length > 0;
 
@@ -241,10 +284,10 @@ export default async function BorrowerHomePage() {
           <ActiveShifts shifts={displayShifts} />
         )}
 
-        {/* Upcoming Transactions */}
-        {displayObligations.length > 0 && (
+        {/* Upcoming Cashflows */}
+        {cashflows.length > 0 && (
           <section>
-            <UpcomingTransactions obligations={displayObligations} />
+            <UpcomingTransactions items={cashflows} />
           </section>
         )}
 
