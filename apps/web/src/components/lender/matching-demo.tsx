@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { formatCurrency } from "@flowzo/shared";
 
 // Simulated data matching the real match-trade Edge Function logic
@@ -53,6 +53,7 @@ const STEP_LABELS = [
 export function MatchingDemo() {
   const [currentStep, setCurrentStep] = useState<Step>(0);
   const [isPlaying, setIsPlaying] = useState(false);
+  const bottomRef = useRef<HTMLDivElement>(null);
   // Compute scored lenders based on demo data
   const scoredLenders = useMemo(() => {
     const trade = DEMO_TRADE;
@@ -114,6 +115,16 @@ export function MatchingDemo() {
 
     return results;
   }, []);
+
+  // Auto-scroll to latest step
+  useEffect(() => {
+    if (currentStep > 0) {
+      const id = setTimeout(() => {
+        bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 100);
+      return () => clearTimeout(id);
+    }
+  }, [currentStep]);
 
   // Auto-play logic
   useEffect(() => {
@@ -430,6 +441,7 @@ export function MatchingDemo() {
               </div>
             </div>
           )}
+          <div ref={bottomRef} />
         </div>
       </div>
     </section>
