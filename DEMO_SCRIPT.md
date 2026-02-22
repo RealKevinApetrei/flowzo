@@ -20,8 +20,10 @@
 
 **Open the pitch deck at `/pitch`**
 
-> "20 million UK adults are credit-invisible. They have bank accounts, regular income, years of payment history — but Experian can't see any of it. So when a bill clashes with a low balance, their only options are an expensive overdraft or a payday loan."
-
+> "Last month my council tax and car insurance landed on the same day — three days before payday. I had the money coming in. I had years of never missing a payment. But the system didn't care."
+>
+> "20 million UK adults are in exactly the same boat as me — credit-invisible. The only options? A £35 overdraft fee or a payday loan at 1,000% APR."
+>
 > "Flowzo fixes this using the data that's already there — Open Banking transactions."
 
 **Advance to Slide 2 and 3**
