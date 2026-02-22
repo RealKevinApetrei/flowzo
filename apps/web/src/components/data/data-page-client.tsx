@@ -4,6 +4,7 @@ import { useState } from "react";
 import { StatCard } from "./stat-card";
 import { DataTable, GradeBadge } from "./data-table";
 import { QuantDashboard } from "./quant-dashboard";
+import { DepthChart } from "./depth-chart";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -398,6 +399,11 @@ function OrderBookTab({
 
   return (
     <div className="space-y-4">
+      {/* Depth Chart */}
+      <section className="card-monzo p-5 space-y-3">
+        <DepthChart pendingTrades={pendingTrades} />
+      </section>
+
       {/* Summary by Grade */}
       <section className="card-monzo p-5 space-y-3">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">

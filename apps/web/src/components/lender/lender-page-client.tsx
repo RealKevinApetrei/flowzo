@@ -56,6 +56,7 @@ interface LenderPageClientProps {
   initialMaxShiftDays: number;
   impactStats: ImpactStats;
   withdrawalQueued: boolean;
+  usingMarketAvg?: boolean;
   upcomingRepayments: UpcomingRepayment[];
 }
 
@@ -68,6 +69,7 @@ export function LenderPageClient({
   initialMaxShiftDays,
   impactStats,
   withdrawalQueued,
+  usingMarketAvg,
   upcomingRepayments,
 }: LenderPageClientProps) {
   const router = useRouter();
@@ -93,6 +95,7 @@ export function LenderPageClient({
           potAvailablePence={initialPot?.available_pence}
           potLockedPence={initialPot?.locked_pence}
           sparklineData={sparklineData}
+          usingMarketAvg={usingMarketAvg}
         />
 
         {/* Upcoming Repayments */}

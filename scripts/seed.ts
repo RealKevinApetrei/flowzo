@@ -418,12 +418,14 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
   const transitions: Record<string, unknown>[] = [];
   const events: Record<string, unknown>[] = [];
 
-  // Distribution: 70% REPAID, 15% LIVE, 10% MATCHED, 5% PENDING_MATCH
+  // Distribution: 55% REPAID, 15% LIVE, 10% MATCHED, 10% PENDING_MATCH, 7% DEFAULTED, 3% CANCELLED
   const statusDistribution = [
-    ...Array(Math.round(TRADE_COUNT * 0.7)).fill("REPAID"),
+    ...Array(Math.round(TRADE_COUNT * 0.55)).fill("REPAID"),
     ...Array(Math.round(TRADE_COUNT * 0.15)).fill("LIVE"),
     ...Array(Math.round(TRADE_COUNT * 0.1)).fill("MATCHED"),
-    ...Array(Math.round(TRADE_COUNT * 0.05)).fill("PENDING_MATCH"),
+    ...Array(Math.round(TRADE_COUNT * 0.1)).fill("PENDING_MATCH"),
+    ...Array(Math.round(TRADE_COUNT * 0.07)).fill("DEFAULTED"),
+    ...Array(Math.round(TRADE_COUNT * 0.03)).fill("CANCELLED"),
   ];
 
   for (let i = 0; i < statusDistribution.length; i++) {
@@ -446,6 +448,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
     let matchedAt: string | null = null;
     let liveAt: string | null = null;
     let repaidAt: string | null = null;
+    let defaultedAt: string | null = null;
 
     switch (status) {
       case "REPAID": {
@@ -456,6 +459,16 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
         matchedAt = addDays(createdAt, randomInt(0, 3)).toISOString();
         liveAt = originalDueDate.toISOString();
         repaidAt = addDays(originalDueDate, shiftDays).toISOString();
+        break;
+      }
+      case "DEFAULTED": {
+        // Original due date 30-90 days ago, defaulted after grace period
+        const daysAgo = randomInt(30, 90);
+        originalDueDate = addDays(now, -daysAgo);
+        createdAt = addDays(originalDueDate, -randomInt(3, 14));
+        matchedAt = addDays(createdAt, randomInt(0, 3)).toISOString();
+        liveAt = originalDueDate.toISOString();
+        defaultedAt = addDays(originalDueDate, shiftDays + 3).toISOString(); // 3-day grace
         break;
       }
       case "LIVE": {
@@ -472,6 +485,11 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
         originalDueDate = addDays(now, randomInt(1, 30));
         createdAt = addDays(now, -randomInt(1, 10));
         matchedAt = addDays(createdAt, randomInt(0, 2)).toISOString();
+        break;
+      }
+      case "CANCELLED": {
+        originalDueDate = addDays(now, randomInt(-10, 20));
+        createdAt = addDays(now, -randomInt(5, 20));
         break;
       }
       case "PENDING_MATCH": {
@@ -500,8 +518,9 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
       matched_at: matchedAt,
       live_at: liveAt,
       repaid_at: repaidAt,
+      defaulted_at: defaultedAt,
       created_at: createdAt.toISOString(),
-      updated_at: (repaidAt ?? liveAt ?? matchedAt ?? createdAt.toISOString()),
+      updated_at: (defaultedAt ?? repaidAt ?? liveAt ?? matchedAt ?? createdAt.toISOString()),
     });
 
     // --- Trade State Transitions ---
@@ -522,12 +541,8 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
 
     addTransition(null, "DRAFT", createdAt.toISOString());
 
-    if (
-      status === "PENDING_MATCH" ||
-      status === "MATCHED" ||
-      status === "LIVE" ||
-      status === "REPAID"
-    ) {
+    const needsSubmit = ["PENDING_MATCH", "MATCHED", "LIVE", "REPAID", "DEFAULTED"].includes(status);
+    if (needsSubmit) {
       addTransition(
         "DRAFT",
         "PENDING_MATCH",
@@ -535,11 +550,11 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
       );
     }
 
-    if (status === "MATCHED" || status === "LIVE" || status === "REPAID") {
+    if (["MATCHED", "LIVE", "REPAID", "DEFAULTED"].includes(status)) {
       addTransition("PENDING_MATCH", "MATCHED", matchedAt!);
     }
 
-    if (status === "LIVE" || status === "REPAID") {
+    if (["LIVE", "REPAID", "DEFAULTED"].includes(status)) {
       addTransition("MATCHED", "LIVE", liveAt!);
     }
 
@@ -547,15 +562,25 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
       addTransition("LIVE", "REPAID", repaidAt!);
     }
 
-    // --- Allocations (one per MATCHED/LIVE/REPAID trade) ---
-    if (status !== "PENDING_MATCH") {
+    if (status === "DEFAULTED") {
+      addTransition("LIVE", "DEFAULTED", defaultedAt!);
+    }
+
+    if (status === "CANCELLED") {
+      addTransition("DRAFT", "CANCELLED", addDays(createdAt, randomInt(0, 2)).toISOString());
+    }
+
+    // --- Allocations (one per MATCHED/LIVE/REPAID/DEFAULTED trade) ---
+    if (["MATCHED", "LIVE", "REPAID", "DEFAULTED"].includes(status)) {
       const lender = pick(lenders);
       const allocStatus =
         status === "REPAID"
           ? "REPAID"
-          : status === "LIVE"
-            ? "ACTIVE"
-            : "RESERVED";
+          : status === "DEFAULTED"
+            ? "DEFAULTED"
+            : status === "LIVE"
+              ? "ACTIVE"
+              : "RESERVED";
 
       allocations.push({
         trade_id: tradeId,
@@ -564,7 +589,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
         fee_slice: fee,
         status: allocStatus,
         created_at: matchedAt,
-        updated_at: repaidAt ?? liveAt ?? matchedAt,
+        updated_at: defaultedAt ?? repaidAt ?? liveAt ?? matchedAt,
       });
     }
 
@@ -599,6 +624,17 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
         actor: "system",
         payload: { amount, fee },
         created_at: repaidAt,
+      });
+    }
+
+    if (defaultedAt) {
+      events.push({
+        event_type: "trade.defaulted",
+        entity_type: "trade",
+        entity_id: tradeId,
+        actor: "system",
+        payload: { amount, fee, grace_days: 3 },
+        created_at: defaultedAt,
       });
     }
   }
@@ -757,13 +793,15 @@ async function createProposals(users: SeedUser[]) {
 // ---------------------------------------------------------------------------
 
 async function reconcileLendingPots(lenders: SeedUser[]) {
-  console.log("Reconciling lending pots from allocation states...");
+  console.log("Reconciling lending pots and creating pool ledger entries...");
+
+  const ledgerEntries: Record<string, unknown>[] = [];
 
   for (const lender of lenders) {
-    // Get all allocations for this lender
+    // Get all allocations for this lender with trade details
     const { data: allocs } = await supabase
       .from("allocations")
-      .select("amount_slice, fee_slice, status")
+      .select("id, trade_id, amount_slice, fee_slice, status, created_at, updated_at")
       .eq("lender_id", lender.id);
 
     if (!allocs || allocs.length === 0) continue;
@@ -776,16 +814,94 @@ async function reconcileLendingPots(lenders: SeedUser[]) {
       const amount = Number(a.amount_slice);
       const fee = Number(a.fee_slice);
 
+      // Create ledger entries matching each allocation lifecycle
+      // RESERVE entry (for all allocations)
+      ledgerEntries.push({
+        user_id: lender.id,
+        entry_type: "RESERVE",
+        amount: amount,
+        trade_id: a.trade_id,
+        allocation_id: a.id,
+        description: `Reserved for trade`,
+        idempotency_key: `seed-reserve-${a.id}`,
+        created_at: a.created_at,
+      });
+
       switch (a.status) {
         case "RESERVED":
           locked += amount;
           break;
         case "ACTIVE":
           deployed += amount;
+          // DISBURSE entry
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "DISBURSE",
+            amount: amount,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Disbursed to borrower`,
+            idempotency_key: `seed-disburse-${a.id}`,
+            created_at: a.updated_at,
+          });
           break;
         case "REPAID":
           deployed += amount;
           yield_ += fee;
+          // DISBURSE + REPAY + FEE_CREDIT entries
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "DISBURSE",
+            amount: amount,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Disbursed to borrower`,
+            idempotency_key: `seed-disburse-${a.id}`,
+            created_at: a.created_at,
+          });
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "REPAY",
+            amount: amount,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Principal repaid`,
+            idempotency_key: `seed-repay-${a.id}`,
+            created_at: a.updated_at,
+          });
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "FEE_CREDIT",
+            amount: fee,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Fee earned`,
+            idempotency_key: `seed-fee-${a.id}`,
+            created_at: a.updated_at,
+          });
+          break;
+        case "DEFAULTED":
+          // DISBURSE + RELEASE (lost principal)
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "DISBURSE",
+            amount: amount,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Disbursed to borrower`,
+            idempotency_key: `seed-disburse-${a.id}`,
+            created_at: a.created_at,
+          });
+          ledgerEntries.push({
+            user_id: lender.id,
+            entry_type: "RELEASE",
+            amount: amount,
+            trade_id: a.trade_id,
+            allocation_id: a.id,
+            description: `Default - principal lost`,
+            idempotency_key: `seed-release-${a.id}`,
+            created_at: a.updated_at,
+          });
           break;
       }
     }
@@ -818,7 +934,17 @@ async function reconcileLendingPots(lenders: SeedUser[]) {
       .eq("user_id", lender.id);
   }
 
-  console.log("  Lending pots reconciled.");
+  // Insert pool ledger entries in batches
+  console.log(`  Inserting ${ledgerEntries.length} pool ledger entries...`);
+  for (let i = 0; i < ledgerEntries.length; i += 50) {
+    const { error } = await supabase
+      .from("pool_ledger")
+      .insert(ledgerEntries.slice(i, i + 50));
+    if (error)
+      console.error(`  Ledger insert error (batch ${i}):`, error.message);
+  }
+
+  console.log("  Lending pots reconciled and ledger entries created.");
 }
 
 // ---------------------------------------------------------------------------

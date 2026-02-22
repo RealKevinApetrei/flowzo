@@ -74,7 +74,33 @@ export default async function LenderHomePage() {
   const { data: currentApy } = await supabase.rpc("get_lender_current_apy", {
     p_user_id: user.id,
   });
-  const currentApyBps = Math.round(Number(currentApy ?? 0)) || avgAprBps;
+  let currentApyBps = Math.round(Number(currentApy ?? 0)) || avgAprBps;
+
+  // Fallback to platform-wide market average APR if lender has no personal trades
+  let usingMarketAvg = false;
+  if (currentApyBps === 0) {
+    const { data: marketAvg } = await supabase
+      .from("trade_analytics")
+      .select("avg_fee, avg_amount, avg_shift_days")
+      .in("status", ["LIVE", "REPAID", "MATCHED"]);
+
+    if (marketAvg && marketAvg.length > 0) {
+      const totalWeightedApr = marketAvg.reduce((sum, row) => {
+        const amount = Number(row.avg_amount ?? 0);
+        const fee = Number(row.avg_fee ?? 0);
+        const days = Number(row.avg_shift_days ?? 0);
+        if (amount > 0 && days > 0) {
+          return sum + (fee / amount) * (365 / days) * 10000;
+        }
+        return sum;
+      }, 0);
+      const avgBps = Math.round(totalWeightedApr / marketAvg.length);
+      if (avgBps > 0) {
+        currentApyBps = avgBps;
+        usingMarketAvg = true;
+      }
+    }
+  }
 
   // Fetch recent FEE_CREDIT entries for yield sparkline
   const { data: recentYields } = await supabase
@@ -223,6 +249,7 @@ export default async function LenderHomePage() {
         initialMaxShiftDays={initialMaxShiftDays}
         impactStats={impactStats}
         withdrawalQueued={!!pot?.withdrawal_queued}
+        usingMarketAvg={usingMarketAvg}
         upcomingRepayments={upcomingRepayments}
       />
     </>

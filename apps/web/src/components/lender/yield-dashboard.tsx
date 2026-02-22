@@ -14,6 +14,7 @@ interface YieldDashboardProps {
   potAvailablePence?: number;
   potLockedPence?: number;
   sparklineData: number[];
+  usingMarketAvg?: boolean;
 }
 
 function bpsToPercent(bps: number): string {
@@ -44,6 +45,7 @@ export function YieldDashboard({
   potAvailablePence,
   potLockedPence,
   sparklineData,
+  usingMarketAvg,
 }: YieldDashboardProps) {
   const sparklinePath =
     sparklineData.length >= 2
@@ -133,7 +135,12 @@ export function YieldDashboard({
             <p className="text-2xl font-extrabold text-navy tracking-tight">
               {bpsToPercent(stats.avgAprBps)}
             </p>
-            <p className="text-xs text-text-secondary mt-1">Avg. APR</p>
+            <p className="text-xs text-text-secondary mt-1">
+              {usingMarketAvg ? "Avg. APR (Market)" : "Avg. APR"}
+            </p>
+            {usingMarketAvg && (
+              <p className="text-[10px] text-coral mt-0.5">Based on platform trades</p>
+            )}
           </CardContent>
         </Card>
       </div>
