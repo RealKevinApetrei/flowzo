@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   // Fetch primary account balance to validate
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, balance_available")
+    .select("id, balance_available, balance_current")
     .eq("user_id", user.id)
     .order("balance_updated_at", { ascending: false })
     .limit(1)
@@ -38,6 +38,7 @@ export async function POST(request: Request) {
 
   const amountGBP = amountPence / 100;
   const cardBalanceGBP = Number(account?.balance_available ?? 0);
+  const cardCurrentGBP = Number(account?.balance_current ?? 0);
 
   if (amountGBP > cardBalanceGBP) {
     return NextResponse.json(
@@ -71,11 +72,14 @@ export async function POST(request: Request) {
     );
   }
 
-  // Deduct from Monzo card balance
+  // Deduct from Monzo card balance (both current + available)
   if (account) {
     await supabase
       .from("accounts")
-      .update({ balance_available: cardBalanceGBP - amountGBP })
+      .update({
+        balance_available: cardBalanceGBP - amountGBP,
+        balance_current: cardCurrentGBP - amountGBP,
+      })
       .eq("id", account.id);
   }
 

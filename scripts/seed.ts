@@ -495,14 +495,19 @@ async function createLendingData(users: SeedUser[]) {
     (u) => u.role === "LENDER_ONLY" || u.role === "BOTH",
   );
 
-  const pots = lenders.map((u) => ({
-    user_id: u.id,
-    available: randomFloat(50, 2000),
-    locked: 0,
-    total_deployed: 0,
-    realized_yield: 0,
-    currency: "GBP",
-  }));
+  const potAmountByUser = new Map<string, number>();
+  const pots = lenders.map((u) => {
+    const potAmount = randomFloat(50, 2000);
+    potAmountByUser.set(u.id, potAmount);
+    return {
+      user_id: u.id,
+      available: potAmount,
+      locked: 0,
+      total_deployed: 0,
+      realized_yield: 0,
+      currency: "GBP",
+    };
+  });
 
   const preferences = lenders.map((u) => {
     const autoMatch = Math.random() < 0.8;
@@ -544,7 +549,7 @@ async function createLendingData(users: SeedUser[]) {
 
   console.log(`  ${pots.length} lending pots created.`);
   console.log(`  ${preferences.length} lender preferences created.`);
-  return lenders;
+  return { lenders, potAmountByUser };
 }
 
 // ---------------------------------------------------------------------------
@@ -558,7 +563,7 @@ interface SeedAccount {
   balance: number; // GBP
 }
 
-async function createAccountsForSeedUsers(users: SeedUser[]): Promise<SeedAccount[]> {
+async function createAccountsForSeedUsers(users: SeedUser[], potAmountByUser: Map<string, number>): Promise<SeedAccount[]> {
   console.log("Creating bank connections and accounts for borrowers...");
 
   const borrowers = users.filter(
@@ -573,13 +578,18 @@ async function createAccountsForSeedUsers(users: SeedUser[]): Promise<SeedAccoun
     const connId = uuid();
     const acctId = uuid();
 
-    // Balance based on risk grade
-    let balance: number;
+    // Balance based on risk grade — total initial balance
+    let totalBalance: number;
     switch (b.riskGrade) {
-      case "A": balance = randomFloat(1500, 3000); break;
-      case "B": balance = randomFloat(800, 1800); break;
-      case "C": balance = randomFloat(200, 900); break;
+      case "A": totalBalance = randomFloat(1500, 3000); break;
+      case "B": totalBalance = randomFloat(800, 1800); break;
+      case "C": totalBalance = randomFloat(200, 900); break;
     }
+
+    // For BOTH-role users, deduct pot amount from card balance so totals are consistent
+    // card_balance + pot_available = totalBalance
+    const potAmount = potAmountByUser.get(b.id) ?? 0;
+    const balance = Math.max(0, totalBalance - potAmount);
 
     connections.push({
       id: connId,
@@ -1626,8 +1636,8 @@ async function main() {
   }
 
   await updateProfiles(users);
-  const lenders = await createLendingData(users);
-  const seedAccounts = await createAccountsForSeedUsers(users);
+  const { lenders, potAmountByUser } = await createLendingData(users);
+  const seedAccounts = await createAccountsForSeedUsers(users, potAmountByUser);
   const obligationsMap = await createObligations(users);
   await createTrades(users, lenders, obligationsMap);
   await createProposals(users, obligationsMap);

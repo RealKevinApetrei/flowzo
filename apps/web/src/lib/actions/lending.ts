@@ -176,7 +176,7 @@ export async function topUpPot(amountPence: number) {
   // Fetch primary account balance to validate
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, balance_available")
+    .select("id, balance_available, balance_current")
     .eq("user_id", user.id)
     .order("balance_updated_at", { ascending: false })
     .limit(1)
@@ -184,6 +184,7 @@ export async function topUpPot(amountPence: number) {
 
   const amountGBP = amountPence / 100;
   const cardBalanceGBP = Number(account?.balance_available ?? 0);
+  const cardCurrentGBP = Number(account?.balance_current ?? 0);
 
   if (amountGBP > cardBalanceGBP) {
     throw new Error(`Insufficient card balance: £${cardBalanceGBP.toFixed(2)} available`);
@@ -208,11 +209,14 @@ export async function topUpPot(amountPence: number) {
 
   if (error) throw new Error(`Top-up failed: ${error.message}`);
 
-  // Deduct from Monzo card balance
+  // Deduct from Monzo card balance (both current + available)
   if (account) {
     await supabase
       .from("accounts")
-      .update({ balance_available: cardBalanceGBP - amountGBP })
+      .update({
+        balance_available: cardBalanceGBP - amountGBP,
+        balance_current: cardCurrentGBP - amountGBP,
+      })
       .eq("id", account.id);
   }
 }
@@ -240,10 +244,10 @@ export async function withdrawFromPot(amountPence: number) {
 
   if (error) throw new Error(`Withdrawal failed: ${error.message}`);
 
-  // Add back to Monzo card balance
+  // Add back to Monzo card balance (both current + available)
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, balance_available")
+    .select("id, balance_available, balance_current")
     .eq("user_id", user.id)
     .order("balance_updated_at", { ascending: false })
     .limit(1)
@@ -252,7 +256,10 @@ export async function withdrawFromPot(amountPence: number) {
   if (account) {
     await supabase
       .from("accounts")
-      .update({ balance_available: Number(account.balance_available) + amountGBP })
+      .update({
+        balance_available: Number(account.balance_available) + amountGBP,
+        balance_current: Number(account.balance_current) + amountGBP,
+      })
       .eq("id", account.id);
   }
 }
@@ -290,6 +297,25 @@ export async function queueWithdrawal() {
       p_description: `Immediate withdrawal (no locked funds): £${amountGBP.toFixed(2)}`,
       p_idempotency_key: `imm-withdraw-${user.id}-${Date.now()}`,
     });
+
+    // Return funds to Monzo card balance
+    const { data: acct } = await supabase
+      .from("accounts")
+      .select("id, balance_available, balance_current")
+      .eq("user_id", user.id)
+      .order("balance_updated_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (acct) {
+      await supabase
+        .from("accounts")
+        .update({
+          balance_available: Number(acct.balance_available) + amountGBP,
+          balance_current: Number(acct.balance_current) + amountGBP,
+        })
+        .eq("id", acct.id);
+    }
 
     await supabase
       .from("lending_pots")
@@ -345,10 +371,10 @@ export async function withdrawAllAvailable() {
 
   if (error) throw new Error(`Withdrawal failed: ${error.message}`);
 
-  // Add back to Monzo card balance
+  // Add back to Monzo card balance (both current + available)
   const { data: account } = await supabase
     .from("accounts")
-    .select("id, balance_available")
+    .select("id, balance_available, balance_current")
     .eq("user_id", user.id)
     .order("balance_updated_at", { ascending: false })
     .limit(1)
@@ -357,7 +383,10 @@ export async function withdrawAllAvailable() {
   if (account) {
     await supabase
       .from("accounts")
-      .update({ balance_available: Number(account.balance_available) + amountGBP })
+      .update({
+        balance_available: Number(account.balance_available) + amountGBP,
+        balance_current: Number(account.balance_current) + amountGBP,
+      })
       .eq("id", account.id);
   }
 
