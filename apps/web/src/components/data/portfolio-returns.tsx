@@ -25,10 +25,10 @@ export function PortfolioReturns({ data }: PortfolioReturnsProps) {
   const pad = { left: 80, right: 20, top: 10, bottom: 10 };
   const barH = 18;
   const chartW = W - pad.left - pad.right;
-  const maxVal = Math.max(data.weighted_yield, data.risk_free_rate, 0.01);
+  const maxVal = Math.max(data.weighted_yield_pct, data.risk_free_rate_pct, 0.01);
 
-  const portfolioW = (data.weighted_yield / maxVal) * chartW;
-  const riskFreeW = (data.risk_free_rate / maxVal) * chartW;
+  const portfolioW = (data.weighted_yield_pct / maxVal) * chartW;
+  const riskFreeW = (data.risk_free_rate_pct / maxVal) * chartW;
 
   return (
     <section id="returns" className="card-monzo p-5 space-y-4">
@@ -60,25 +60,25 @@ export function PortfolioReturns({ data }: PortfolioReturnsProps) {
         <div className="bg-warm-grey/30 rounded-xl p-3">
           <p className="text-xs text-text-muted">Weighted Yield</p>
           <p className="text-lg font-bold text-navy mt-0.5">
-            {(data.weighted_yield * 100).toFixed(2)}%
+            {(data.weighted_yield_pct * 100).toFixed(2)}%
           </p>
         </div>
         <div className="bg-warm-grey/30 rounded-xl p-3">
           <p className="text-xs text-text-muted">Risk-Free Rate</p>
           <p className="text-lg font-bold text-navy mt-0.5">
-            {(data.risk_free_rate * 100).toFixed(2)}%
+            {(data.risk_free_rate_pct * 100).toFixed(2)}%
           </p>
         </div>
         <div className="bg-warm-grey/30 rounded-xl p-3">
           <p className="text-xs text-text-muted">Excess Return</p>
-          <p className={`text-lg font-bold mt-0.5 ${data.excess_return >= 0 ? "text-success" : "text-danger"}`}>
-            {data.excess_return >= 0 ? "+" : ""}{(data.excess_return * 100).toFixed(2)}%
+          <p className={`text-lg font-bold mt-0.5 ${data.excess_return_pct >= 0 ? "text-success" : "text-danger"}`}>
+            {data.excess_return_pct >= 0 ? "+" : ""}{(data.excess_return_pct * 100).toFixed(2)}%
           </p>
         </div>
         <div className="bg-warm-grey/30 rounded-xl p-3">
           <p className="text-xs text-text-muted">Total Capital</p>
           <p className="text-lg font-bold text-navy mt-0.5">
-            {"\u00A3"}{data.total_capital.toFixed(2)}
+            {"\u00A3"}{data.total_capital_gbp.toFixed(2)}
           </p>
         </div>
       </div>
@@ -91,7 +91,7 @@ export function PortfolioReturns({ data }: PortfolioReturnsProps) {
         </text>
         <rect x={pad.left} y={pad.top} width={Math.max(portfolioW, 2)} height={barH} rx={4} fill="var(--coral)" opacity={0.85} />
         <text x={pad.left + portfolioW + 6} y={pad.top + barH / 2 + 4} fontSize={9} fontWeight="bold" fill="var(--coral)">
-          {(data.weighted_yield * 100).toFixed(1)}%
+          {(data.weighted_yield_pct * 100).toFixed(1)}%
         </text>
 
         {/* Risk-free bar */}
@@ -100,7 +100,7 @@ export function PortfolioReturns({ data }: PortfolioReturnsProps) {
         </text>
         <rect x={pad.left} y={pad.top + barH + 16} width={Math.max(riskFreeW, 2)} height={barH} rx={4} fill="var(--text-muted)" opacity={0.5} />
         <text x={pad.left + riskFreeW + 6} y={pad.top + barH + 16 + barH / 2 + 4} fontSize={9} fontWeight="bold" fill="var(--text-muted)">
-          {(data.risk_free_rate * 100).toFixed(1)}%
+          {(data.risk_free_rate_pct * 100).toFixed(1)}%
         </text>
       </svg>
 
@@ -109,7 +109,7 @@ export function PortfolioReturns({ data }: PortfolioReturnsProps) {
         <p className="text-xs text-text-secondary">
           The portfolio earns{" "}
           <span className="font-bold text-success">
-            {(data.excess_return * 100).toFixed(1)}%
+            {(data.excess_return_pct * 100).toFixed(1)}%
           </span>{" "}
           above the risk-free rate, with a risk-adjusted Sharpe ratio of{" "}
           <span className={`font-bold ${sharpeColor}`}>{data.sharpe_ratio.toFixed(2)}</span>.

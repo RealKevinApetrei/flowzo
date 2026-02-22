@@ -129,7 +129,7 @@ export function ForecastAccuracy({ data }: ForecastAccuracyProps) {
             fontSize={7}
             fill="var(--text-muted)"
           >
-            {data.days[idx]?.slice(5) ?? ""}
+            Day {data.days[idx] ?? ""}
           </text>
         ))}
 

@@ -106,7 +106,9 @@ export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
         {sorted.map((item) => (
           <div
             key={item.id}
-            className="flex items-center gap-3 py-2.5 border-b border-warm-grey last:border-0"
+            className={`flex items-center gap-3 py-2.5 border-b border-warm-grey last:border-0 ${
+              item.category === "estimated" ? "opacity-50" : ""
+            }`}
           >
             {/* Date */}
             <div className="w-12 text-center shrink-0">
@@ -120,21 +122,23 @@ export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
 
             {/* Name + subtitle */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-navy truncate">
-                {item.name}
+              <p className={`text-sm font-medium truncate ${item.category === "estimated" ? "text-text-secondary italic" : "text-navy"}`}>
+                {item.category === "estimated" ? `~${item.name}` : item.name}
               </p>
               <p className="text-[10px] text-text-muted">
-                {item.type === "income" && "Income"}
-                {item.type === "repayment" && "Auto-repayment"}
-                {item.type === "bill" && frequencyLabel(item.frequency ?? "MONTHLY")}
+                {item.category === "estimated" && "Estimated"}
+                {item.category !== "estimated" && item.type === "income" && "Income"}
+                {item.category !== "estimated" && item.type === "repayment" && "Auto-repayment"}
+                {item.category !== "estimated" && item.type === "bill" && frequencyLabel(item.frequency ?? "MONTHLY")}
               </p>
             </div>
 
             {/* Amount */}
-            <p className={`text-sm font-bold shrink-0 ${
-              item.type === "income" ? "text-success" : item.type === "repayment" ? "text-coral" : "text-navy"
+            <p className={`text-sm shrink-0 ${
+              item.category === "estimated" ? "text-text-muted font-medium" :
+              item.type === "income" ? "text-success font-bold" : item.type === "repayment" ? "text-coral font-bold" : "text-navy font-bold"
             }`}>
-              {item.type === "income" ? "+" : "-"}{formatCurrency(item.amount_pence)}
+              {item.type === "income" ? "+" : item.category === "estimated" ? "~" : "-"}{formatCurrency(item.amount_pence)}
             </p>
 
           </div>
