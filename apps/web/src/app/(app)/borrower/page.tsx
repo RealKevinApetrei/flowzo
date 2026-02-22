@@ -531,8 +531,8 @@ export default async function BorrowerHomePage() {
           <SuggestionFeed userId={user.id} marketContext={marketContext} />
         </section>
 
-        {/* Auto-scroll anchor — placed at very bottom so page scrolls all the way down */}
-        <AutoScrollAnchor delay={800} />
+        {/* Auto-scroll anchor — only for demo mode */}
+        {isDemo && <AutoScrollAnchor delay={800} />}
       </div>
     </div>
   );
