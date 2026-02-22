@@ -309,6 +309,7 @@ serve(async (req: Request) => {
                       .update({
                         balance_available: balanceAfter,
                         balance_current: Number(lenderAcct.balance_current) + withdrawAmount,
+                        balance_updated_at: new Date().toISOString(),
                       })
                       .eq("id", lenderAcct.id);
 
