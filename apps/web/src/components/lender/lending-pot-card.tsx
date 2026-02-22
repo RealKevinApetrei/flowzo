@@ -239,15 +239,22 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
                 </div>
 
                 {/* Slider */}
-                <input
-                  type="range"
-                  min={100}
-                  max={available}
-                  step={100}
-                  value={withdrawPence}
-                  onChange={(e) => setWithdrawPence(Number(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer accent-coral bg-warm-grey"
-                />
+                <div className="relative h-8 flex items-center">
+                  <div className="absolute inset-x-0 h-2 rounded-full bg-warm-grey" />
+                  <div
+                    className="absolute left-0 h-2 rounded-full bg-coral transition-all"
+                    style={{ width: `${((withdrawPence - 100) / Math.max(available - 100, 1)) * 100}%` }}
+                  />
+                  <input
+                    type="range"
+                    min={100}
+                    max={available}
+                    step={100}
+                    value={withdrawPence}
+                    onChange={(e) => setWithdrawPence(Number(e.target.value))}
+                    className="relative w-full h-2 appearance-none bg-transparent cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-coral [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-coral [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
+                  />
+                </div>
 
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
