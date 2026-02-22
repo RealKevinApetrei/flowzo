@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { callClaude } from "@/lib/claude/client";
 import {
   FINANCIAL_INSIGHTS_SYSTEM,
@@ -8,12 +7,6 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
     const body = await req.json();
     const {
       riskGrade,
@@ -40,13 +33,25 @@ export async function POST(req: NextRequest) {
       incomePattern: incomePattern ?? "monthly salary",
     });
 
-    const insight = await callClaude(
+    const raw = await callClaude(
       FINANCIAL_INSIGHTS_SYSTEM,
       [{ role: "user", content: prompt }],
-      400,
+      300,
     );
 
-    return NextResponse.json({ insight });
+    // Parse structured JSON from Claude
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return NextResponse.json(parsed);
+    }
+
+    // Fallback: return as plain insight
+    return NextResponse.json({
+      status: "caution",
+      headline: "Cash flow analysis",
+      insights: [{ icon: "💡", text: raw.slice(0, 80) }],
+    });
   } catch (error) {
     console.error("Financial insights error:", error);
     return NextResponse.json(
