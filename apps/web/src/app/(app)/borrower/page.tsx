@@ -8,6 +8,7 @@ import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/u
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
+import { ClaudeInsights } from "@/components/borrower/claude-insights";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -522,6 +523,25 @@ export default async function BorrowerHomePage() {
           <section>
             <UpcomingTransactions items={cashflows} />
           </section>
+        )}
+
+        {/* Claude AI Financial Insight */}
+        {riskGrade && (
+          <ClaudeInsights
+            riskGrade={riskGrade}
+            creditScore={profile?.credit_score as number | null}
+            dangerDays={dangerCount}
+            obligations={upcomingObligations.slice(0, 5).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+            }))}
+            avgBalancePence={Math.round(
+              (displayForecasts.reduce((s, f) => s + f.projected_balance_pence, 0) /
+                Math.max(displayForecasts.length, 1)),
+            )}
+            incomePattern="monthly salary"
+          />
         )}
 
         {/* AI Suggestions -- primary actionable content */}

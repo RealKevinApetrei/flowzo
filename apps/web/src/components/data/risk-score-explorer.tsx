@@ -46,6 +46,7 @@ export function RiskScoreExplorer() {
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [explain, setExplain] = useState<ExplainResult | null>(null);
+  const [claudeNarrative, setClaudeNarrative] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function updateField(key: keyof typeof DEFAULTS, val: number) {
@@ -57,6 +58,7 @@ export function RiskScoreExplorer() {
     setError(null);
     setScore(null);
     setExplain(null);
+    setClaudeNarrative(null);
 
     try {
       // Backend expects flat fields, not wrapped in "features"
@@ -80,6 +82,28 @@ export function RiskScoreExplorer() {
       }
       if (!scoreRes.ok && !explainRes.ok) {
         setError("Could not reach scoring API.");
+      }
+
+      // Fetch Claude narrative explanation (non-blocking)
+      if (scoreRes.ok && explainRes.ok) {
+        const scoreData = score ?? { credit_score: 0, risk_grade: "B", probability_of_default: 0 };
+        const explainData = explain;
+        const shapForClaude = [
+          ...(explainData?.positive ?? []).map((s: { feature: string; shap_value: number }) => ({ feature: s.feature, value: 0, impact: s.shap_value })),
+          ...(explainData?.negative ?? []).map((s: { feature: string; shap_value: number }) => ({ feature: s.feature, value: 0, impact: s.shap_value })),
+        ];
+        fetch("/api/claude/risk-explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            creditScore: scoreData.credit_score,
+            riskGrade: scoreData.risk_grade,
+            shapValues: shapForClaude,
+          }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => { if (data?.explanation) setClaudeNarrative(data.explanation); })
+          .catch(() => {});
       }
     } catch {
       setError("Network error — try again.");
@@ -256,6 +280,14 @@ export function RiskScoreExplorer() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Claude AI narrative explanation */}
+      {claudeNarrative && (
+        <div className="rounded-xl bg-coral/5 border border-coral/10 p-3 mt-2">
+          <p className="text-[10px] font-bold text-coral uppercase tracking-wider mb-1">AI Explanation</p>
+          <p className="text-xs text-text-secondary leading-relaxed">{claudeNarrative}</p>
         </div>
       )}
     </section>
