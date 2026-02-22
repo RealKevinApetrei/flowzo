@@ -72,7 +72,7 @@ def load_data() -> pd.DataFrame:
         return _load_from_csv()
     sample = _load_sample()
     if sample is not None:
-        print("CSV not found, using cached sample_data.joblib (may be incomplete)")
+        print("CSV not found, using pre-serialized sample_data.joblib")
         return sample
     raise FileNotFoundError(
         f"No data source found. Place application_train.csv at {DATA_PATH}"
