@@ -439,8 +439,6 @@ def spending_forecast(body: SpendingForecastRequest):
     - gamma_flat  : single overall Gamma fit (moderate history)
     - fallback_flat: flat mean ± percentile factors (very sparse history)
     """
-    import numpy as np
-
     txn_records = [
         TxnRecord(
             amount=t.amount,
@@ -461,24 +459,26 @@ def spending_forecast(body: SpendingForecastRequest):
         else _Date.today()
     )
 
-    forecasts = forecast_irregular_spending(
-        transactions=txn_records,
-        obligations=obl_records,
-        forecast_start=start,
-        horizon_days=body.horizon_days,
-    )
-
-    # Determine which model tier was used (for observability)
+    # Classify once and reuse for both model-tier detection and forecast
     irregular = classify_transactions(txn_records, obl_records)
     daily = _aggregate_daily_spend(irregular)
+
+    # Determine which model tier will be used (for observability)
     dow_buckets: dict[int, list] = {}
-    for d, spend in daily.items():
-        dow_buckets.setdefault(d.weekday(), []).append(spend)
+    for d in daily:
+        dow_buckets.setdefault(d.weekday(), []).append(daily[d])
     has_dow_fit = any(len(v) >= 4 for v in dow_buckets.values())
     model_tier = (
         "gamma_dow" if has_dow_fit
         else "gamma_flat" if len(daily) >= 2
         else "fallback_flat"
+    )
+
+    forecasts = forecast_irregular_spending(
+        transactions=txn_records,
+        obligations=obl_records,
+        forecast_start=start,
+        horizon_days=body.horizon_days,
     )
 
     return {

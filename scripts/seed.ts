@@ -742,12 +742,10 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const shiftDays = randomInt(1, 14);
     const amount = randomFloat(10, 500);
     const feeRate = 0.049 * (borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2);
+    // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
     const fee = Math.max(
       0.01,
-      Math.min(
-        Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
-        Math.min(amount * 0.05, 10),
-      ),
+      Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
     );
 
     let originalDueDate: Date;
@@ -1067,12 +1065,10 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
         : borrower.riskGrade === "B"
           ? 1.5
           : 2);
+    // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
     const fee = Math.max(
       0.01,
-      Math.min(
-        Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
-        Math.min(amount * 0.05, 10),
-      ),
+      Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
     );
 
     // Pick and fill a template
