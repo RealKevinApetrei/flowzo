@@ -498,9 +498,11 @@ function OrderBookTab({
               align: "right",
               render: (r: PendingTrade) => {
                 const apr =
-                  (Number(r.fee) / Number(r.amount)) *
-                  (365 / r.shift_days) *
-                  100;
+                  r.amount > 0 && r.shift_days > 0
+                    ? (Number(r.fee) / Number(r.amount)) *
+                      (365 / r.shift_days) *
+                      100
+                    : 0;
                 return (
                   <span className="font-bold text-success">
                     {apr.toFixed(1)}%

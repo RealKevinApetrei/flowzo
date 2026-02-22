@@ -84,3 +84,26 @@ group by risk_grade;
 
 grant select on public.trade_performance to authenticated;
 alter view public.trade_performance set (security_invoker = true);
+
+-- Extend platform_totals with matched/cancelled counts and total fees
+drop view if exists public.platform_totals cascade;
+create view public.platform_totals as
+select
+  count(*) filter (where status = 'LIVE') as live_trades,
+  count(*) filter (where status = 'PENDING_MATCH') as pending_trades,
+  count(*) filter (where status = 'REPAID') as repaid_trades,
+  count(*) filter (where status = 'DEFAULTED') as defaulted_trades,
+  count(*) filter (where status = 'MATCHED') as matched_trades,
+  count(*) filter (where status = 'CANCELLED') as cancelled_trades,
+  coalesce(sum(fee) filter (where status = 'REPAID'), 0) as total_fees_collected,
+  count(*) as total_trades
+from trades;
+
+grant select on public.platform_totals to authenticated;
+alter view public.platform_totals set (security_invoker = true);
+
+-- Fix lender names: rename dual-role users showing as "Borrower" in leaderboard
+update profiles
+set display_name = 'Lender ' || substring(display_name from '[0-9]+$')
+where display_name like 'Borrower %'
+  and id in (select distinct user_id from lending_pots);

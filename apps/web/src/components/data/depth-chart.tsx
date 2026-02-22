@@ -42,8 +42,9 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     const bucketMap = new Map<string, DepthBucket>();
 
     for (const trade of pendingTrades) {
-      if (!trade.amount || !trade.shift_days || trade.shift_days === 0) continue;
+      if (!trade.amount || !trade.shift_days || trade.shift_days === 0 || trade.fee == null) continue;
       const apr = (trade.fee / trade.amount) * (365 / trade.shift_days) * 100;
+      if (!isFinite(apr)) continue;
       const bucket = Math.floor(apr / BUCKET_WIDTH) * BUCKET_WIDTH;
       const key = `${bucket}-${trade.risk_grade}`;
 
@@ -98,8 +99,9 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     // Compute APR statistics from individual trades
     const allAprs: number[] = [];
     for (const trade of pendingTrades) {
-      if (!trade.amount || !trade.shift_days || trade.shift_days === 0) continue;
-      allAprs.push((trade.fee / trade.amount) * (365 / trade.shift_days) * 100);
+      if (!trade.amount || !trade.shift_days || trade.shift_days === 0 || trade.fee == null) continue;
+      const tradeApr = (trade.fee / trade.amount) * (365 / trade.shift_days) * 100;
+      if (isFinite(tradeApr)) allAprs.push(tradeApr);
     }
     allAprs.sort((a, b) => a - b);
 

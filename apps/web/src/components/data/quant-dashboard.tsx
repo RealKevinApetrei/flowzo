@@ -50,41 +50,45 @@ export function QuantDashboard() {
   } | null>(null);
   const [stressMultiplier, setStressMultiplier] = useState(0.7);
 
-  async function fetchSection(section: QuantSection) {
+  async function fetchSection(section: QuantSection, force = false) {
     setLoading(true);
     setError(null);
 
     try {
       switch (section) {
         case "backtest": {
-          if (backtest) break;
+          if (backtest && !force) break;
           const res = await fetch("/api/quant/backtest");
           if (!res.ok) throw new Error("Failed to fetch backtest");
           const data = await res.json();
-          setBacktest(data.backtest ?? []);
+          if (!data.backtest || typeof data.backtest !== "object") throw new Error("Invalid backtest response");
+          setBacktest(Array.isArray(data.backtest) ? data.backtest : Object.entries(data.backtest).map(([grade, stats]) => ({ grade, ...(stats as Record<string, unknown>) })));
           break;
         }
         case "returns": {
-          if (returns) break;
+          if (returns && !force) break;
           const res = await fetch("/api/quant/returns");
           if (!res.ok) throw new Error("Failed to fetch returns");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setReturns(data);
           break;
         }
         case "eda": {
-          if (eda) break;
+          if (eda && !force) break;
           const res = await fetch("/api/quant/eda");
           if (!res.ok) throw new Error("Failed to fetch EDA");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setEda(data);
           break;
         }
         case "forecast": {
-          if (forecast) break;
+          if (forecast && !force) break;
           const res = await fetch("/api/quant/forecast-accuracy");
           if (!res.ok) throw new Error("Failed to fetch forecast");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setForecast(data);
           break;
         }
@@ -106,6 +110,7 @@ export function QuantDashboard() {
           });
           if (!res.ok) throw new Error("Failed to run stress test");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setStressResult(data);
           break;
         }
@@ -156,8 +161,14 @@ export function QuantDashboard() {
       )}
 
       {error && (
-        <div className="bg-danger/10 border border-danger/20 rounded-xl p-3 text-sm text-danger">
-          {error}
+        <div className="bg-danger/10 border border-danger/20 rounded-xl p-3 text-sm text-danger flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            onClick={() => fetchSection(activeSection, true)}
+            className="px-3 py-1 rounded-full bg-danger/20 text-danger text-xs font-semibold hover:bg-danger/30 transition-colors whitespace-nowrap ml-3"
+          >
+            Retry
+          </button>
         </div>
       )}
 
