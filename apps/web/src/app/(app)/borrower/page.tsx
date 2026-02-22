@@ -207,12 +207,12 @@ export default async function BorrowerHomePage() {
     category: o.category,
   }));
 
-  // Fetch active trades (MATCHED or LIVE) for the borrower
+  // Fetch active trades (PENDING_MATCH, MATCHED, or LIVE) for the borrower
   const { data: activeTrades } = await supabase
     .from("trades")
     .select("id, amount, fee, original_due_date, new_due_date, shift_days, status, matched_at, live_at, obligations(name)")
     .eq("borrower_id", user.id)
-    .in("status", ["MATCHED", "LIVE"])
+    .in("status", ["PENDING_MATCH", "MATCHED", "LIVE"])
     .order("new_due_date", { ascending: true });
 
   const activeShifts = (activeTrades ?? []).map((t) => {
