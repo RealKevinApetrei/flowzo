@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect } from "react";
+import { useRef, useEffect } from "react";
 
 /**
- * Auto-scrolls to the bottom of the page on mount with a short delay.
+ * Renders an invisible anchor and scrolls to it on mount.
+ * Place this component at the very bottom of the page content.
  */
-export function AutoScroll({ delay = 500 }: { delay?: number }) {
+export function AutoScrollAnchor({ delay = 800 }: { delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     }, delay);
     return () => clearTimeout(timer);
   }, [delay]);
 
-  return null;
+  return <div ref={ref} aria-hidden />;
 }
