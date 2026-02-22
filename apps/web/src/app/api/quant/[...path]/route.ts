@@ -21,6 +21,7 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     const fetchOptions: RequestInit = {
       method: request.method,
       headers,
+      signal: AbortSignal.timeout(15_000),
     };
 
     if (request.method === "POST") {
@@ -28,12 +29,22 @@ async function proxyRequest(request: Request, params: { path: string[] }) {
     }
 
     const res = await fetch(url, fetchOptions);
-    const data = await res.json();
 
-    return NextResponse.json(data, { status: res.status });
-  } catch {
+    if (!res.ok) {
+      const errorText = await res.text().catch(() => res.statusText);
+      return NextResponse.json(
+        { error: `Quant API error: ${res.statusText}`, details: errorText },
+        { status: res.status },
+      );
+    }
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: 200 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    const isTimeout = message.includes("abort") || message.includes("timeout");
     return NextResponse.json(
-      { error: "Failed to reach Quant API" },
+      { error: isTimeout ? "Quant API timed out" : "Failed to reach Quant API" },
       { status: 502 },
     );
   }

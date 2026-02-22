@@ -69,25 +69,63 @@ function isObligationDueOn(
   }
 }
 
-/** Estimate average daily income from positive recurring transactions. */
-function estimateDailyIncome(
+/** Detect income pattern: paydays + irregular daily income. */
+interface IncomePattern {
+  paydays: number[]; // days of month (e.g., [25])
+  paydayAmount: number; // estimated salary per payday
+  otherDailyIncome: number; // small irregular daily average
+}
+
+function detectIncomePattern(
   transactions: Record<string, unknown>[],
-): number {
-  if (!transactions || transactions.length === 0) return 0;
+): IncomePattern {
+  const empty = { paydays: [], paydayAmount: 0, otherDailyIncome: 0 };
+  if (!transactions || transactions.length === 0) return empty;
 
   const positiveTxns = transactions.filter(
     (t) => Number(t.amount) > 0,
   );
-  if (positiveTxns.length === 0) return 0;
+  if (positiveTxns.length === 0) return empty;
 
-  const totalIncome = positiveTxns.reduce(
+  // Group by day-of-month, track totals and max single deposit
+  const dayBuckets = new Map<
+    number,
+    { total: number; count: number; maxSingle: number }
+  >();
+  for (const t of positiveTxns) {
+    const day = new Date(t.booked_at as string).getDate();
+    const amount = Number(t.amount);
+    const existing = dayBuckets.get(day) ?? {
+      total: 0,
+      count: 0,
+      maxSingle: 0,
+    };
+    existing.total += amount;
+    existing.count++;
+    existing.maxSingle = Math.max(existing.maxSingle, amount);
+    dayBuckets.set(day, existing);
+  }
+
+  // Find payday: day with highest single deposit > £200
+  const sorted = [...dayBuckets.entries()].sort(
+    (a, b) => b[1].maxSingle - a[1].maxSingle,
+  );
+
+  const paydays: number[] = [];
+  let paydayAmount = 0;
+
+  if (sorted.length > 0 && sorted[0][1].maxSingle > 200) {
+    paydays.push(sorted[0][0]);
+    paydayAmount = sorted[0][1].maxSingle;
+  }
+
+  // Non-payday daily income
+  const totalPositive = positiveTxns.reduce(
     (sum, t) => sum + Number(t.amount),
     0,
   );
-
-  // Find the date range of transactions
   const dates = positiveTxns.map((t) =>
-    new Date(t.booked_at as string).getTime()
+    new Date(t.booked_at as string).getTime(),
   );
   const minDate = Math.min(...dates);
   const maxDate = Math.max(...dates);
@@ -95,8 +133,13 @@ function estimateDailyIncome(
     1,
     Math.round((maxDate - minDate) / (1000 * 60 * 60 * 24)),
   );
+  // Estimate payday contribution over the span (roughly 1 payday per 30 days)
+  const estimatedPaydays = Math.max(1, Math.round(spanDays / 30));
+  const totalPayday = paydayAmount * estimatedPaydays;
+  const otherIncome = Math.max(0, totalPositive - totalPayday);
+  const otherDailyIncome = otherIncome / spanDays;
 
-  return totalIncome / spanDays;
+  return { paydays, paydayAmount, otherDailyIncome };
 }
 
 // Overdraft buffer: GBP 100
@@ -161,7 +204,17 @@ serve(async (req: Request) => {
       .gte("booked_at", ninetyDaysAgo.toISOString())
       .order("booked_at", { ascending: true });
 
-    const dailyIncome = estimateDailyIncome(recentTxns ?? []);
+    const incomePattern = detectIncomePattern(recentTxns ?? []);
+
+    // 3b. Fetch active trade repayments within forecast window ----------
+    const forecastEnd = addDays(new Date(), FORECAST_DAYS);
+    const { data: activeTrades } = await supabase
+      .from("trades")
+      .select("amount, fee, new_due_date")
+      .eq("borrower_id", user_id)
+      .in("status", ["MATCHED", "LIVE"])
+      .gte("new_due_date", isoDate(new Date()))
+      .lte("new_due_date", isoDate(forecastEnd));
 
     // 4. Generate a run_id (forecast snapshot) --------------------------
     const { data: snapshot, error: snapErr } = await supabase
@@ -203,9 +256,26 @@ serve(async (req: Request) => {
         }
       }
 
-      // Income estimate for the day
-      const incomeExpected =
-        Math.round(dailyIncome * 100) / 100;
+      // Outgoings: trade repayments due on this day (principal + fee)
+      const dateStr = isoDate(forecastDate);
+      for (const trade of activeTrades ?? []) {
+        if (trade.new_due_date === dateStr) {
+          dailyOutgoings += Number(trade.amount) + Number(trade.fee);
+        }
+      }
+
+      // Income: payday-concentrated pattern, fallback to flat if no data
+      const dayOfMonth = forecastDate.getDate();
+      let incomeExpected: number;
+      if (incomePattern.paydays.length > 0) {
+        incomeExpected = incomePattern.otherDailyIncome;
+        if (incomePattern.paydays.includes(dayOfMonth)) {
+          incomeExpected += incomePattern.paydayAmount;
+        }
+      } else {
+        incomeExpected = incomePattern.otherDailyIncome;
+      }
+      incomeExpected = Math.round(incomeExpected * 100) / 100;
 
       // Update running balance
       runningBalance =
@@ -296,7 +366,7 @@ serve(async (req: Request) => {
         starting_balance: Math.round(currentBalance * 100) / 100,
         forecast_days: FORECAST_DAYS,
         danger_days: dangerDaysCount,
-        daily_income_estimate: Math.round(dailyIncome * 100) / 100,
+        income_pattern: incomePattern,
         obligations_count: (obligations ?? []).length,
         recommended_loan_amount: recommendedLoanAmount,
         forecast: forecastRows,

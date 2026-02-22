@@ -390,6 +390,14 @@ function OrderBookTab({
   orderBook: OrderBookRow[];
   pendingTrades: PendingTrade[];
 }) {
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
+  const totalPages = Math.ceil(pendingTrades.length / PAGE_SIZE);
+  const paginatedTrades = pendingTrades.slice(
+    page * PAGE_SIZE,
+    (page + 1) * PAGE_SIZE,
+  );
+
   function hoursAgo(dateStr: string): string {
     const h = Math.round(
       (Date.now() - new Date(dateStr).getTime()) / 3600000,
@@ -458,10 +466,10 @@ function OrderBookTab({
         />
       </section>
 
-      {/* Full Order List */}
+      {/* Pending Trades (paginated) */}
       <section className="card-monzo p-5 space-y-3">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          All Pending Trades ({pendingTrades.length})
+          Pending Trades ({pendingTrades.length})
         </h2>
         <DataTable
           columns={[
@@ -490,9 +498,11 @@ function OrderBookTab({
               align: "right",
               render: (r: PendingTrade) => {
                 const apr =
-                  (Number(r.fee) / Number(r.amount)) *
-                  (365 / r.shift_days) *
-                  100;
+                  r.amount > 0 && r.shift_days > 0
+                    ? (Number(r.fee) / Number(r.amount)) *
+                      (365 / r.shift_days) *
+                      100
+                    : 0;
                 return (
                   <span className="font-bold text-success">
                     {apr.toFixed(1)}%
@@ -517,9 +527,30 @@ function OrderBookTab({
               ),
             },
           ]}
-          data={pendingTrades}
+          data={paginatedTrades}
           emptyMessage="No pending trades in the order book."
         />
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+              className="px-3 py-1 rounded-full text-xs font-semibold bg-warm-grey/50 text-text-secondary hover:bg-warm-grey disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            <span className="text-xs text-text-muted">
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+              className="px-3 py-1 rounded-full text-xs font-semibold bg-warm-grey/50 text-text-secondary hover:bg-warm-grey disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </section>
     </div>
   );

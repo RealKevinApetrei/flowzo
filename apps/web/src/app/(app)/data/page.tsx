@@ -59,12 +59,22 @@ export default async function DataPage() {
   };
 
   // ── Map order_book_depth → OrderBookRow ─────────────────────────────────
+  // Compute oldest pending trade per grade from raw pending trades
+  const oldestByGrade = new Map<string, string>();
+  for (const t of pendingTradesRaw ?? []) {
+    const grade = t.risk_grade as string;
+    const created = t.created_at as string;
+    const existing = oldestByGrade.get(grade);
+    if (!existing || created < existing) oldestByGrade.set(grade, created);
+  }
+
   const orderBook = (orderBookRaw ?? []).map((row) => {
     const avgAmount = Number(row.avg_amount ?? 0);
     const avgFee = Number(row.avg_fee ?? 0);
     const avgTermDays = Number(row.avg_term_days ?? 1);
+    const grade = row.risk_grade as string;
     return {
-      risk_grade: row.risk_grade as string,
+      risk_grade: grade,
       pending_count: Number(row.trade_count ?? 0),
       total_amount: Number(row.total_amount ?? 0),
       avg_amount: avgAmount,
@@ -74,7 +84,7 @@ export default async function DataPage() {
         avgAmount > 0 && avgTermDays > 0
           ? Number(((avgFee / avgAmount) * (365 / avgTermDays) * 100).toFixed(1))
           : 0,
-      oldest_pending: new Date().toISOString(),
+      oldest_pending: oldestByGrade.get(grade) ?? new Date().toISOString(),
     };
   });
 
@@ -83,28 +93,24 @@ export default async function DataPage() {
     risk_grade: row.risk_grade as string,
     matched_count: Number(row.matched_count ?? 0),
     avg_hours_to_match: Number(row.avg_hours_to_match ?? 0),
-    median_hours_to_match: Number(row.avg_hours_to_match ?? 0),
-    fastest_match_hours: 0,
-    slowest_match_hours: 0,
+    median_hours_to_match: Number(row.median_hours_to_match ?? row.avg_hours_to_match ?? 0),
+    fastest_match_hours: Number(row.fastest_match_hours ?? 0),
+    slowest_match_hours: Number(row.slowest_match_hours ?? 0),
   }));
 
   // ── Map trade_performance → SettlementRow ───────────────────────────────
-  const settlement = (performance ?? []).map((row) => {
-    const repaidCount = Number(row.repaid_count ?? 0);
-    const defaultedCount = Number(row.defaulted_count ?? 0);
-    const settledCount = repaidCount + defaultedCount;
-    return {
-      risk_grade: row.risk_grade as string,
-      repaid_count: repaidCount,
-      defaulted_count: defaultedCount,
-      live_count: 0,
-      default_rate_pct:
-        settledCount > 0 ? Number(((defaultedCount / settledCount) * 100).toFixed(1)) : 0,
-      avg_days_to_repay: 0,
-      total_fees_earned: Number(row.avg_fee_repaid ?? 0) * repaidCount,
-      total_defaulted_volume: null,
-    };
-  });
+  const settlement = (performance ?? []).map((row) => ({
+    risk_grade: row.risk_grade as string,
+    repaid_count: Number(row.repaid_count ?? 0),
+    defaulted_count: Number(row.defaulted_count ?? 0),
+    live_count: Number(row.live_count ?? 0),
+    default_rate_pct: Number(row.default_rate ?? 0) * 100,
+    avg_days_to_repay: Number(row.avg_days_to_repay ?? 0),
+    total_fees_earned: Number(row.total_fees_earned ?? 0),
+    total_defaulted_volume: row.total_defaulted_volume != null
+      ? Number(row.total_defaulted_volume)
+      : null,
+  }));
 
   // ── Compute yield trends from repaid trades ─────────────────────────────
   const monthlyMap = new Map<

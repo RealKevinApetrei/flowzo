@@ -25,8 +25,10 @@ interface EdaStats {
 }
 
 interface ForecastAccuracy {
-  mape: number;
-  time_series: { day: number; actual: number; predicted: number }[];
+  mape_pct: number;
+  days: string[];
+  actual: number[];
+  forecasted: number[];
 }
 
 type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress";
@@ -48,41 +50,45 @@ export function QuantDashboard() {
   } | null>(null);
   const [stressMultiplier, setStressMultiplier] = useState(0.7);
 
-  async function fetchSection(section: QuantSection) {
+  async function fetchSection(section: QuantSection, force = false) {
     setLoading(true);
     setError(null);
 
     try {
       switch (section) {
         case "backtest": {
-          if (backtest) break;
+          if (backtest && !force) break;
           const res = await fetch("/api/quant/backtest");
           if (!res.ok) throw new Error("Failed to fetch backtest");
           const data = await res.json();
-          setBacktest(data.backtest ?? []);
+          if (!data.backtest || typeof data.backtest !== "object") throw new Error("Invalid backtest response");
+          setBacktest(Array.isArray(data.backtest) ? data.backtest : Object.entries(data.backtest).map(([grade, stats]) => ({ grade, ...(stats as Record<string, unknown>) })));
           break;
         }
         case "returns": {
-          if (returns) break;
+          if (returns && !force) break;
           const res = await fetch("/api/quant/returns");
           if (!res.ok) throw new Error("Failed to fetch returns");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setReturns(data);
           break;
         }
         case "eda": {
-          if (eda) break;
+          if (eda && !force) break;
           const res = await fetch("/api/quant/eda");
           if (!res.ok) throw new Error("Failed to fetch EDA");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setEda(data);
           break;
         }
         case "forecast": {
-          if (forecast) break;
+          if (forecast && !force) break;
           const res = await fetch("/api/quant/forecast-accuracy");
           if (!res.ok) throw new Error("Failed to fetch forecast");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setForecast(data);
           break;
         }
@@ -104,6 +110,7 @@ export function QuantDashboard() {
           });
           if (!res.ok) throw new Error("Failed to run stress test");
           const data = await res.json();
+          if (data.error) throw new Error(data.error);
           setStressResult(data);
           break;
         }
@@ -154,8 +161,14 @@ export function QuantDashboard() {
       )}
 
       {error && (
-        <div className="bg-danger/10 border border-danger/20 rounded-xl p-3 text-sm text-danger">
-          {error}
+        <div className="bg-danger/10 border border-danger/20 rounded-xl p-3 text-sm text-danger flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            onClick={() => fetchSection(activeSection, true)}
+            className="px-3 py-1 rounded-full bg-danger/20 text-danger text-xs font-semibold hover:bg-danger/30 transition-colors whitespace-nowrap ml-3"
+          >
+            Retry
+          </button>
         </div>
       )}
 
@@ -371,10 +384,12 @@ function CorrelationHeatmap({
 }
 
 function ForecastSection({ data }: { data: ForecastAccuracy }) {
-  const maxVal = Math.max(
-    ...data.time_series.map((d) => Math.max(d.actual, d.predicted)),
-    1,
-  );
+  if (!data.days?.length || !data.actual?.length || !data.forecasted?.length) {
+    return <p className="text-sm text-text-secondary">No forecast data available.</p>;
+  }
+
+  const len = data.days.length;
+  const maxVal = Math.max(...data.actual, ...data.forecasted, 1);
 
   return (
     <div className="space-y-3">
@@ -382,16 +397,16 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           label="MAPE"
-          value={`${(data.mape * 100).toFixed(1)}%`}
+          value={`${data.mape_pct.toFixed(1)}%`}
           subtitle="Mean Abs % Error"
-          variant={data.mape > 0.15 ? "warning" : "success"}
+          variant={data.mape_pct > 15 ? "warning" : "success"}
         />
         <StatCard
           label="Forecast Days"
-          value={String(data.time_series?.length ?? 0)}
+          value={String(len)}
         />
       </div>
-      {data.time_series && data.time_series.length > 0 && (
+      {len > 1 && (
         <div className="mt-2">
           <svg viewBox="0 0 300 80" className="w-full h-20" preserveAspectRatio="none">
             {/* Actual line */}
@@ -399,10 +414,10 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
               fill="none"
               stroke="#1B1B3A"
               strokeWidth="1.5"
-              points={data.time_series
+              points={data.actual
                 .map(
-                  (d, i) =>
-                    `${(i / (data.time_series.length - 1)) * 300},${80 - (d.actual / maxVal) * 70 - 5}`,
+                  (v, i) =>
+                    `${(i / (len - 1)) * 300},${80 - (v / maxVal) * 70 - 5}`,
                 )
                 .join(" ")}
             />
@@ -412,10 +427,10 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
               stroke="#FF5A5F"
               strokeWidth="1.5"
               strokeDasharray="4 2"
-              points={data.time_series
+              points={data.forecasted
                 .map(
-                  (d, i) =>
-                    `${(i / (data.time_series.length - 1)) * 300},${80 - (d.predicted / maxVal) * 70 - 5}`,
+                  (v, i) =>
+                    `${(i / (len - 1)) * 300},${80 - (v / maxVal) * 70 - 5}`,
                 )
                 .join(" ")}
             />
