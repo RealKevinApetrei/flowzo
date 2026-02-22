@@ -7,6 +7,33 @@
 
 ---
 
+## 2-Minute Pitch (Slides Only)
+
+Use `/pitch` — arrow keys to advance. ~17s per slide. Practise with a timer.
+
+### Slide 1 — The Problem (20s)
+> "1 in 4 UK workers run out of money before payday. Not because they overspend — because their bills land at the wrong time. A timing mismatch that costs them £45 in overdraft fees every month."
+
+### Slide 2 — The Cost (15s)
+> "Banks charge 40% APR on overdrafts for what is fundamentally a cashflow timing problem, not a debt problem. There's no product that uses the data already sitting in people's bank accounts to fix this."
+
+### Slide 3 — The Gap (15s)
+> "Zero products use Open Banking data to predict and prevent overdrafts through P2P lending. That's the gap Flowzo fills."
+
+### Slide 4 — Data Pipeline (25s)
+> "We treat bank transactions like tick data. Connect via TrueLayer, engineer features — income regularity, balance volatility, payment clustering — then score and propose. Raw data in, actionable signal out, under 10 seconds. Same discipline as quant finance, different asset class."
+
+### Slide 5 — Forecast (20s)
+> "Flowzo runs a 30-day balance projection. When it detects a shortfall, Claude AI proposes the exact bill to move, the exact date, and the exact fee — in plain English. 85%+ forecast accuracy, auto-matched in under 30 seconds."
+
+### Slide 6 — Engine (15s)
+> "The full loop is automated. Forecast, propose, match, settle. Lenders fund borrowers directly from idle cash — no balance sheet. Every state transition is event-sourced and auditable."
+
+### Slide 7 — Validation (10s)
+> "Risk grades backtested on 2.2 million LendingClub loans. Average fee: £1.20 versus a £45 overdraft — 37 times cheaper. The pipeline is live at flowzo.vercel.app."
+
+---
+
 ## Before You Start
 
 - Open the app in a browser, logged out
