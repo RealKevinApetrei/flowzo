@@ -54,24 +54,24 @@ export function SuggestionCard({
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
 
-  // Match probability — uses real market data when available
+  // Match probability — fee position is the primary driver
+  // At max fee (position=1) → ~92%, at min fee (position=0) → ~15%
+  // Market liquidity nudges the curve up/down by ±10%
   const matchProbability = useMemo(() => {
     const range = feeRange.max - feeRange.min;
-    if (range <= 0) return 100;
+    if (range <= 0) return 95;
     const position = (adjustedFee - feeRange.min) / range; // 0..1
 
+    // Base curve: 15% at min → 92% at max (smooth ease-in)
+    const baseProbability = 15 + Math.pow(position, 0.7) * 77;
+
+    // Market liquidity nudge (±10%)
     if (marketContext && marketContext.supply_count > 0) {
-      // Market-aware: base on liquidity ratio + fee position
-      // Higher liquidity = higher base probability, fee slider adjusts within band
-      const liquidityBase = Math.min(marketContext.liquidity_ratio, 2) / 2; // 0..1 (capped at 2x)
-      const baseProbability = liquidityBase * 70 + 20; // 20–90% base from liquidity
-      // Fee position modulates ±15%
-      const feeAdjustment = (position - 0.5) * 30;
-      return Math.round(Math.min(99, Math.max(5, baseProbability + feeAdjustment)));
+      const liquidityNudge = (Math.min(marketContext.liquidity_ratio, 2) / 2 - 0.5) * 20;
+      return Math.round(Math.min(99, Math.max(5, baseProbability + liquidityNudge)));
     }
 
-    // Fallback: placeholder curve based on fee position
-    return Math.round(Math.pow(position, 0.6) * 100);
+    return Math.round(Math.min(99, Math.max(5, baseProbability)));
   }, [adjustedFee, feeRange, marketContext]);
 
   // Dynamic color based on match probability
