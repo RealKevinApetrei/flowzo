@@ -73,16 +73,16 @@ const slides = [
   {
     id: 4,
     label: "Data Pipeline",
-    bg: "bg-soft-white",
-    dark: false,
+    bg: "bg-navy-bg",
+    dark: true,
     content: (
       <div className="w-full max-w-5xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Data Pipeline</p>
-        <h1 className="text-4xl sm:text-6xl font-extrabold text-navy leading-tight mb-4">
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight mb-4">
           Bank data in.<br />
           <span className="text-coral">Actionable insight out.</span>
         </h1>
-        <p className="text-lg text-text-secondary mb-3 max-w-xl mx-auto">
+        <p className="text-lg text-white/70 mb-3 max-w-xl mx-auto">
           Three steps from raw transactions to a personalised bill-shift proposal — in under 10 seconds.
         </p>
         <p className="text-base text-coral font-semibold mb-10 max-w-xl mx-auto">
@@ -109,17 +109,17 @@ const slides = [
               desc: "An A/B/C risk grade is assigned and APR calculated accordingly. Claude AI generates a plain-English bill-shift proposal.",
             },
           ].map(({ step, title, subtitle, desc }) => (
-            <div key={title} className="card-monzo p-6 text-left">
+            <div key={title} className="bg-white/10 border border-white/20 rounded-2xl p-6 text-left">
               <div className="mb-3">
                 <span className="text-coral text-xs font-extrabold uppercase tracking-widest">{step}</span>
               </div>
-              <div className="font-extrabold text-navy text-lg">{title}</div>
+              <div className="font-extrabold text-white text-lg">{title}</div>
               <div className="text-coral text-sm font-semibold mb-2">{subtitle}</div>
-              <p className="text-text-secondary text-sm leading-relaxed">{desc}</p>
+              <p className="text-white/60 text-sm leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>
-        <p className="mt-8 text-xs text-text-muted">Powered by TrueLayer · Supabase Edge Functions · Claude API · 6-stage event-sourced pipeline</p>
+        <p className="mt-8 text-xs text-white/30">Powered by TrueLayer · Supabase Edge Functions · Claude API · 6-stage event-sourced pipeline</p>
       </div>
     ),
   },
@@ -157,20 +157,20 @@ const slides = [
   {
     id: 6,
     label: "Decision Engine",
-    bg: "bg-soft-white",
-    dark: false,
+    bg: "bg-navy-bg",
+    dark: true,
     content: (
       <div className="w-full max-w-5xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Engine</p>
-        <h1 className="text-4xl sm:text-6xl font-extrabold text-navy leading-tight mb-4">
+        <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight mb-4">
           Signal → Price → Match → Settle.<br />
           <span className="text-coral">Fully automated.</span>
         </h1>
-        <p className="text-lg text-text-secondary mb-4 max-w-xl mx-auto">
+        <p className="text-lg text-white/70 mb-4 max-w-xl mx-auto">
           The agentic loop runs continuously. Every decision is auditable. Every state transition is event-sourced.
         </p>
-        <p className="text-base text-text-secondary mb-8 max-w-xl mx-auto">
-          Lenders deploy idle cash into a <span className="text-navy font-semibold">democratised P2P pool</span> — funding borrowers directly, earning micro-returns, with full risk transparency.
+        <p className="text-base text-white/70 mb-8 max-w-xl mx-auto">
+          Lenders deploy idle cash into a <span className="text-white font-semibold">democratised P2P pool</span> — funding borrowers directly, earning micro-returns, with full risk transparency.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full max-w-3xl mx-auto mb-8">
           {[
@@ -185,7 +185,7 @@ const slides = [
             color ? (
               <div key={i} className={`${color} text-white font-bold text-sm px-5 py-2.5 rounded-full`}>{step}</div>
             ) : (
-              <span key={i} className="text-text-muted font-bold text-lg">{step}</span>
+              <span key={i} className="text-white/40 font-bold text-lg">{step}</span>
             )
           )}
         </div>
@@ -196,9 +196,9 @@ const slides = [
             { label: "Risk Engine", desc: "A/B/C grades drive fee pricing. Higher risk = higher return for lender." },
             { label: "Settlement", desc: "Repayment on shifted date. Full double-entry ledger. Idempotent." },
           ].map(({ label, desc }) => (
-            <div key={label} className="card-monzo p-5 text-left">
-              <div className="font-extrabold text-navy text-sm mb-1">{label}</div>
-              <p className="text-text-secondary text-xs leading-relaxed">{desc}</p>
+            <div key={label} className="bg-white/10 border border-white/20 rounded-2xl p-5 text-left">
+              <div className="font-extrabold text-white text-sm mb-1">{label}</div>
+              <p className="text-white/60 text-xs leading-relaxed">{desc}</p>
             </div>
           ))}
         </div>
