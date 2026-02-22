@@ -9,6 +9,8 @@ import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
 import { ClaudeInsights } from "@/components/borrower/claude-insights";
+import { BillPriority } from "@/components/borrower/bill-priority";
+import { WhatIfSimulator } from "@/components/borrower/what-if-simulator";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -543,6 +545,40 @@ export default async function BorrowerHomePage() {
             incomePattern="monthly salary"
           />
         )}
+
+        {/* AI Bill Priority Ranker + What-If Simulator */}
+        <div className="grid grid-cols-2 gap-3">
+          <BillPriority
+            obligations={upcomingObligations.slice(0, 8).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+              category: "Bill",
+            }))}
+            dangerDays={displayForecasts
+              .filter((f) => f.is_danger)
+              .map((f) => ({
+                day: new Date(f.forecast_date).getDate(),
+                deficit_pence: Math.abs(f.projected_balance_pence),
+              }))}
+            avgBalancePence={Math.round(
+              displayForecasts.reduce((s, f) => s + f.projected_balance_pence, 0) /
+                Math.max(displayForecasts.length, 1),
+            )}
+          />
+          <WhatIfSimulator
+            obligations={upcomingObligations.slice(0, 8).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+            }))}
+            forecasts={displayForecasts.map((f) => ({
+              day: new Date(f.forecast_date).getDate(),
+              balance_pence: f.projected_balance_pence,
+              is_danger: f.is_danger,
+            }))}
+          />
+        </div>
 
         {/* AI Suggestions -- primary actionable content */}
         <section id="suggestions">

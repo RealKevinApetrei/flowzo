@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LenderPageClient } from "@/components/lender/lender-page-client";
 import { LenderRealtimeWrapper } from "@/components/lender/lender-realtime-wrapper";
+import { LenderAdvisor } from "@/components/lender/lender-advisor";
 
 export default async function LenderHomePage() {
   const supabase = await createClient();
@@ -159,7 +160,7 @@ export default async function LenderHomePage() {
   // Fetch lender preferences for initial duration selection
   const { data: lenderPrefs } = await supabase
     .from("lender_preferences")
-    .select("max_shift_days")
+    .select("max_shift_days, min_apr, risk_bands, max_exposure")
     .eq("user_id", user.id)
     .single();
 
@@ -265,6 +266,25 @@ export default async function LenderHomePage() {
         usingMarketAvg={usingMarketAvg}
         upcomingRepayments={upcomingRepayments}
       />
+      <div className="px-4 pb-6 max-w-md mx-auto">
+        <LenderAdvisor
+          currentPrefs={{
+            min_apr: Number(lenderPrefs?.min_apr ?? 5),
+            risk_bands: (lenderPrefs?.risk_bands as string[]) ?? ["A", "B"],
+            max_exposure: Number(lenderPrefs?.max_exposure ?? 100),
+            max_shift_days: Number(lenderPrefs?.max_shift_days ?? 7),
+          }}
+          portfolio={{
+            grade_a_pct: 40,
+            grade_b_pct: 45,
+            grade_c_pct: 15,
+            total_deployed: Math.round(Number(pot?.locked ?? 0)),
+            realized_yield: Number(pot?.realized_yield ?? 0),
+            default_count: 0,
+          }}
+          marketRates={[]}
+        />
+      </div>
     </LenderRealtimeWrapper>
   );
 }
