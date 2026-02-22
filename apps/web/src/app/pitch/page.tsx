@@ -16,7 +16,7 @@ const slides = [
           <span className="text-coral">when you get paid.</span>
         </h1>
         <p className="text-xl sm:text-2xl text-white/70 max-w-2xl mx-auto leading-relaxed mb-10">
-          Millions of UK adults have regular income and pay their bills on time —
+          Millions of UK adults have regular income and pay their bills on time
           but a <span className="text-white font-semibold">timing mismatch</span> between when money arrives and when recurring payments land sends them into overdraft every month.
         </p>
         <div className="text-center">
@@ -100,7 +100,7 @@ const slides = [
               step: "02",
               title: "Analyse",
               subtitle: "Feature Engineering",
-              desc: "We detect recurring bills, classify income patterns, measure balance volatility, and flag danger days on a 30-day forecast.",
+              desc: "We detect recurring bills, classify income patterns, and flag danger days on a 30-day forecast.",
             },
             {
               step: "03",
@@ -132,7 +132,7 @@ const slides = [
       <div className="w-full max-w-4xl mx-auto px-8 text-center">
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">The Forecast</p>
         <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight mb-6">
-          ** days ahead.<br />
+          14 days ahead.<br />
           <span className="text-coral">Danger flagged.</span><br />
           Bills shifted.
         </h1>
@@ -142,7 +142,7 @@ const slides = [
         <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full mx-auto text-left border border-white/20 mb-8">
           <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">Live Proposal Example</p>
           <p className="text-white text-lg font-semibold leading-snug">
-            "Move your rent back 7 days to avoid a <span className="text-danger">−£45 overdraft</span>. Fee: <span className="text-coral">£1.20</span>."
+            "E.g. Move your rent back 7 days to avoid going into your overdraft."
           </p>
           <div className="mt-4 flex gap-3">
             <span className="bg-success/20 text-success text-xs font-bold px-3 py-1 rounded-full">Accept</span>
@@ -202,7 +202,7 @@ const slides = [
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 w-full">
           {[
             { label: "Borrower", desc: "Sees danger days on a calendar heatmap. Accepts a shift in one tap." },
-            { label: "P2P Microlender", desc: "Deploys idle cash via a D3 bubble board. Democratised access to lending returns." },
+            { label: "P2P Microlender", desc: " Displays orderbook to lenders. Deploys idle cash to a democratised P2P pool." },
             { label: "Risk Engine", desc: "A/B/C grades drive fee pricing. Higher risk = higher return for lender." },
             { label: "Settlement", desc: "Repayment on shifted date. Full double-entry ledger. Idempotent." },
           ].map(({ label, desc }) => (
@@ -225,15 +225,11 @@ const slides = [
         <p className="text-coral text-sm font-bold uppercase tracking-widest mb-6">Why We Win</p>
         <h1 className="text-4xl sm:text-6xl font-extrabold text-white leading-tight mb-6">
           Validated against<br />
-          <span className="text-coral">2.2M real loans.</span>
+          <span className="text-coral">303K real loans.</span>
         </h1>
         <p className="text-xl text-white/70 max-w-2xl mx-auto mb-8 leading-relaxed">
-          Flowzo risk grades backtested on LendingClub data. Grade A predicts defaults better than FICO alone.
+          Flowzo risk grades backtested on Home Credit Default Risk data. Grade A predicts defaults better than FICO alone.
         </p>
-        <div className="text-center mb-8">
-          <div className="text-5xl sm:text-7xl font-extrabold text-coral">£1.20</div>
-          <p className="text-lg text-white/60 mt-2">average Flowzo fee vs <span className="text-white font-bold">£45</span> overdraft charge — <span className="text-coral font-bold">37x cheaper</span></p>
-        </div>
         <div className="grid grid-cols-2 gap-8 w-full max-w-md mx-auto mb-8">
           {[
             { stat: "Grade A", label: "Default rate < B < C on backtest", color: "text-success" },
@@ -284,7 +280,7 @@ export default function PitchPage() {
   return (
     <div className={`h-screen ${slide.bg} transition-colors duration-500 flex flex-col overflow-hidden`}>
       {/* Slide content — fixed height, scrollable if needed */}
-      <div className="flex-1 min-h-0 overflow-y-auto flex items-center justify-center py-12">
+      <div className="flex-1 min-h-0 overflow-y-auto flex items-start justify-center pt-16 pb-8">
         {slide.content}
       </div>
 

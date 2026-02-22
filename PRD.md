@@ -393,10 +393,10 @@ Flowzo's open banking pipeline is directly analogous to building trading signals
 | Set up Vercel env vars for Preview + Development environments | P0 | 15m | DONE |
 | Set up GitHub Actions CI (lint + typecheck + build on every PR) | P0 | 1h | DONE |
 | Configure branch protection on `main` (require PR, require CI pass) | P0 | 15m | TODO |
-| Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h | TODO |
-| Write Playwright E2E tests (borrower, lender, data, auth guards, error states) | P2 | 2h | DONE (Member A) |
+| Write Vitest unit tests for: risk scoring, fee calculation, recurring detection, pool accounting | P1 | 2.5h | DONE |
+| Write Playwright E2E tests (borrower, lender, data, auth guards, error states) | P2 | 2h | DONE |
 | Create detailed demo script (step-by-step walkthrough for judges, with fallback paths) | P0 | 1.5h | DONE |
-| Build pitch deck (5 slides: Problem, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h | DONE |
+| Build pitch deck (7 slides: Problem ×3, Data Pipeline, Prediction, Decision Engine, Validation) | P0 | 3h | DONE |
 | Write the "Best Use of Data" submission narrative (SIG-focused, quantitative language) | P0 | 2h | TODO |
 | Prepare demo data: verify sandbox has realistic TrueLayer test accounts, pre-populate states | P1 | 1h | DONE (Member A — seed data boosted) |
 | Record backup demo video (in case live demo fails on the day) | P1 | 1h | TODO |
