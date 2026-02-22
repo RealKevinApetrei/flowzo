@@ -134,10 +134,12 @@ All 3 updated Edge Functions deployed: generate-proposals (market pricing + elig
 - **Credit Risk tab** on /data page: score distribution, eligibility breakdown, rules display
 - **Profile columns**: credit_score, max_trade_amount, max_active_trades, eligible_to_borrow, last_scored_at
 
-### Known Issues / Tech Debt
-- settle-trade processes allocations in a loop (not atomic) — if a step fails mid-loop, ledger/allocation mismatch possible
-- N+1 query pattern in match-trade lender scoring (fetches each lender's exposure individually)
-- CORS wildcard (`*`) on Edge Functions — should restrict to app domain in production
+### Known Issues / Tech Debt (Resolved)
+- ~~settle-trade processes allocations in a loop~~ — mitigated with CAS on trade status transitions + idempotency keys (safe for cron retries)
+- ~~N+1 query pattern in match-trade~~ — already fixed with batch queries (lines 238-266)
+- ~~CORS wildcard on Edge Functions~~ — now uses CORS_ORIGIN → SITE_URL → production default fallback chain
+- ~~fundTrade() race condition~~ — fixed with CAS: trade status claimed atomically before allocation
+- ~~Stale worktrees~~ — cleaned up
 
 ### Team Unblock Status
 - **Member B (Data Science):** UNBLOCKED — seed data in DB (obligations, forecasts, trades with obligation links), see issue #60
