@@ -20,31 +20,15 @@
 
 **Open the pitch deck at `/pitch`**
 
-> "Meet Alex. Alex makes £40,000 a year, pays rent on time, but has zero credit cards. To Experian, Alex doesn't exist. So when Alex’s £135 Council Tax bill hits tomorrow a day before payday, traditional banks will hit him with a £35 overdraft fee." 
+> "Hi, we are Flowzo and this is our pitch. The truth is, your bills don't care when you get paid. Let's take Alex for example. He makes £40,000 a year, pays rent on time, but has zero credit cards. To Experian, Alex doesn't exist. So when Alex’s £150 Council Tax bill hits tomorrow a day before payday, traditional banks will hit him with a £35 overdraft fee." 
 
 > "Alex is of course not the only one with this problem, 20 million UK adults are credit-invisible. We built Flowzo to fix this, using the data that is already there."
 
----
 
-## Act 2 — Borrower Flow (2 minutes)
 
-**Navigate to https://flowzo.vercel.app**
+> "The moment Alex logs in and connects his account using the truthlayer open banking API, Flowzo has already run a 30-day cash flow forecast based on his previous transactions. Red cells are danger days, where the balance is predicted to go negative."
 
-> "Let me show you the product."
-
-### Step 1 — Log in as the borrower
-
-- Click **Log in**
-- Email: `alex@flowzo.demo`
-- Password: `flowzo123`
-
----
-
-### Step 2 — Show the calendar heatmap
-
-> "The moment Alex logs in, Flowzo has already run a 30-day cash flow forecast based on his previous transactions. Red cells are danger days, where the balance is predicted to go negative."
-
-> "March 1st is a disaster. Rent of £750 is due on that day so the balance forecast is in overdraft by £735.50."
+> "March 3rd is a disaster. A bill of £150 is due on that day so the balance forecast is in overdraft by £20."
 
 ---
 
@@ -54,7 +38,7 @@
 
 **Scroll to the suggestion feed**
 
-> "With only a £0.55 fee, compared to the much higher overdraft fee."
+> "With only a £1.25 fee, compared to the much higher overdraft fee. Alex also has access to several AI suggestions and interpretations."
 
 ---
 
@@ -74,7 +58,7 @@
 - Email: `jordan@flowzo.demo`
 - Password: `flowzo123`
 
-> "Now this is Jordan, a retail lender with £239 of idle cash sitting in his Flowzo pot."
+> "Now this is Jordan, a retail lender with £100 of idle cash sitting in his Flowzo pot."
 
 ---
 
@@ -82,7 +66,9 @@
 
 **Navigate to the Lender tab**
 
-> "Jordan is systematically allocated to borrowers based on his APR compatibility and lending duration requirement. "
+> "Jordan is systematically allocated to borrowers based on his APR compatibility and lending duration requirement."
+
+> "Show how matching agent works. Jordan is also provided risk advice by an AI agent."
 
 ---
 
@@ -94,19 +80,13 @@
 
 **Navigate to `/data` → Credit Risk tab**
 
-> "Flowzo doesn't just classify risk, it enforces it. Borrowers below a 500 credit score are automatically blocked at the database level."
+
 
 - **Show**: Eligibility summary (eligible vs ineligible), grade distribution bars, score ranges
 - **Show**: Eligibility rules (score threshold, default history, credit limits)
 
 
 **Switch to Order Book tab**
-
-> "This is a real two-sided market. The blue curve is lender supply, with standing orders at different APR levels. The coloured curves are borrower demand."
-
-- **Show**: Market rate cards (bid/ask/spread per grade, liquidity ratios)
-- **Show**: Two-sided depth chart with market clearing point
-
 ---
 
 ## Act 5 — ML/Quant Analytics (1 minute)
@@ -114,6 +94,8 @@
 **Navigate to `/data` → ML / Quant tab**
 
 > "To make sure risk is accurately calculated, we validate everything against 300,000 historical loans."
+
+"
 
 - **Show**: Backtest (Grade A < B < C default rates)
 - **Show**: Portfolio Returns (Sharpe ratio, yield, excess return)
