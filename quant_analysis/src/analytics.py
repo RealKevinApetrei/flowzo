@@ -82,11 +82,11 @@ def calculate_portfolio_returns(
         "total_capital_gbp":  float,
     }
     """
-    # Grade → expected gross yield proxy
+    # Grade → expected gross yield proxy (UK-benchmarked APR targets)
     grade_yield = {
-        "A": 0.05,
-        "B": 0.08,
-        "C": 0.12,
+        "A": 0.085,   # 8.5% — low risk, above savings rate
+        "B": 0.145,   # 14.5% — medium risk, above default rate (~4.2%)
+        "C": 0.22,    # 22.0% — high risk, compensates for ~13% defaults
     }
 
     yields: list[float] = []

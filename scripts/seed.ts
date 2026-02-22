@@ -789,16 +789,22 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const borrower = pick(borrowers);
     const tradeId = uuid();
     const shiftDays = randomInt(1, 14);
-    // Credit-limit-aware amount: cap by grade
-    const maxAmounts: Record<string, number> = { A: 500, B: 200, C: 75 };
-    const maxAmount = maxAmounts[borrower.riskGrade] ?? 75;
-    const amount = randomFloat(10, maxAmount);
+    // Credit-limit-aware amount: realistic bill amounts (£30-£500)
+    const amountRanges: Record<string, [number, number]> = {
+      A: [50, 500],
+      B: [30, 250],
+      C: [20, 100],
+    };
+    const [minAmt, maxAmt] = amountRanges[borrower.riskGrade] ?? [20, 100];
+    const amount = randomFloat(minAmt, maxAmt);
     // UK-benchmarked pricing: BoE 4.5% + 2% margin = 6.5% base APR
     const riskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
     const effectiveAprPct = 6.5 * riskMult + 0.15 * shiftDays;
+    // Fee = APR-based + minimum £0.50 per trade to cover platform costs
+    const aprFee = amount * (effectiveAprPct / 100) * (shiftDays / 365);
     const fee = Math.max(
-      0.01,
-      Math.round(amount * (effectiveAprPct / 100) * (shiftDays / 365) * 100) / 100,
+      0.50,
+      Math.round(aprFee * 100) / 100,
     );
 
     let originalDueDate: Date;
@@ -1106,7 +1112,7 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
       obligationId = obl.id;
     } else {
       merchant = pick(MERCHANTS);
-      amount = randomFloat(10, 300);
+      amount = randomFloat(30, 300);
       originalDate = addDays(now, randomInt(-30, 30));
     }
 
@@ -1114,9 +1120,10 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
     // UK-benchmarked pricing (same formula as trade creation)
     const propRiskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
     const propAprPct = 6.5 * propRiskMult + 0.15 * shiftDays;
+    const aprFee = amount * (propAprPct / 100) * (shiftDays / 365);
     const fee = Math.max(
-      0.01,
-      Math.round(amount * (propAprPct / 100) * (shiftDays / 365) * 100) / 100,
+      0.50,
+      Math.round(aprFee * 100) / 100,
     );
 
     // Pick and fill a template
