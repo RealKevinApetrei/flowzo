@@ -63,6 +63,7 @@ interface UpcomingRepayment {
 
 interface LenderPageClientProps {
   initialPot: LendingPot | null;
+  cardBalancePence: number;
   initialYieldStats: YieldStats;
   currentApyBps: number;
   sparklineData: number[];
@@ -76,6 +77,7 @@ interface LenderPageClientProps {
 
 export function LenderPageClient({
   initialPot,
+  cardBalancePence,
   initialYieldStats,
   currentApyBps,
   sparklineData,
@@ -98,7 +100,7 @@ export function LenderPageClient({
         />
 
         {/* Lending Pot Card */}
-        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} withdrawalQueued={withdrawalQueued} onPotUpdated={() => router.refresh()} />
+        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} cardBalancePence={cardBalancePence} withdrawalQueued={withdrawalQueued} onPotUpdated={() => router.refresh()} />
 
         {/* Duration Preference */}
         <DurationSelector options={durationOptions} initialMaxShiftDays={initialMaxShiftDays} />

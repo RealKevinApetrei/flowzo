@@ -15,6 +15,7 @@ interface LendingPotCardProps {
     realized_yield_pence: number;
   } | null;
   currentApyBps: number;
+  cardBalancePence: number;
   withdrawalQueued?: boolean;
   onPotUpdated?: () => void;
 }
@@ -25,7 +26,7 @@ function bpsToPercent(bps: number): string {
   return (bps / 100).toFixed(2) + "%";
 }
 
-export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, onPotUpdated }: LendingPotCardProps) {
+export function LendingPotCard({ pot, currentApyBps, cardBalancePence, withdrawalQueued = false, onPotUpdated }: LendingPotCardProps) {
   const [loading, setLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
   const [showWithdraw, setShowWithdraw] = useState(false);
@@ -168,6 +169,17 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
           />
         </div>
 
+        {/* Card Balance */}
+        <div className="rounded-xl bg-coral/5 border border-coral/10 p-3 flex items-center justify-between">
+          <div>
+            <p className="text-xs text-text-secondary">Monzo card balance</p>
+            <p className="text-lg font-bold text-navy">{formatCurrency(cardBalancePence)}</p>
+          </div>
+          <p className="text-[10px] text-text-muted max-w-[140px] text-right">
+            Top-ups deducted from card. Withdrawals returned.
+          </p>
+        </div>
+
         {/* Top Up -- always visible */}
         <div className="space-y-3">
           <p className="text-sm font-medium text-navy">Top up your pot</p>
@@ -177,7 +189,7 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
                 key={amount}
                 variant="outline"
                 size="sm"
-                disabled={loading}
+                disabled={loading || amount > cardBalancePence}
                 onClick={() => handleTopUp(amount)}
               >
                 {formatCurrency(amount)}
@@ -192,7 +204,7 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
               <input
                 type="number"
                 min="1"
-                max="10000"
+                max={Math.floor(cardBalancePence / 100)}
                 step="1"
                 placeholder="Custom amount"
                 value={customAmount}
@@ -201,11 +213,11 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
               />
             </div>
             <Button
-              disabled={loading || !customAmount || Number(customAmount) <= 0}
+              disabled={loading || !customAmount || Number(customAmount) <= 0 || Math.round(Number(customAmount) * 100) > cardBalancePence}
               size="lg"
               onClick={() => {
                 const pence = Math.round(Number(customAmount) * 100);
-                if (pence > 0) {
+                if (pence > 0 && pence <= cardBalancePence) {
                   handleTopUp(pence);
                   setCustomAmount("");
                 }
@@ -214,6 +226,9 @@ export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, o
               Top Up
             </Button>
           </div>
+          {customAmount && Math.round(Number(customAmount) * 100) > cardBalancePence && (
+            <p className="text-xs text-danger">Exceeds card balance of {formatCurrency(cardBalancePence)}</p>
+          )}
         </div>
 
         {/* Withdraw + Stop Lending */}

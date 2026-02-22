@@ -173,6 +173,22 @@ export async function topUpPot(amountPence: number) {
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
+  // Fetch primary account balance to validate
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, balance_available")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const amountGBP = amountPence / 100;
+  const cardBalanceGBP = Number(account?.balance_available ?? 0);
+
+  if (amountGBP > cardBalanceGBP) {
+    throw new Error(`Insufficient card balance: £${cardBalanceGBP.toFixed(2)} available`);
+  }
+
   // Ensure lending pot exists
   await supabase.from("lending_pots").upsert(
     { user_id: user.id, available: 0, locked: 0, total_deployed: 0, realized_yield: 0 },
@@ -180,7 +196,6 @@ export async function topUpPot(amountPence: number) {
   );
 
   // Deposit directly via RPC (no relative URL — works in server context)
-  const amountGBP = amountPence / 100;
   const { error } = await supabase.rpc("update_lending_pot", {
     p_user_id: user.id,
     p_entry_type: "DEPOSIT",
@@ -192,6 +207,14 @@ export async function topUpPot(amountPence: number) {
   });
 
   if (error) throw new Error(`Top-up failed: ${error.message}`);
+
+  // Deduct from Monzo card balance
+  if (account) {
+    await supabase
+      .from("accounts")
+      .update({ balance_available: cardBalanceGBP - amountGBP })
+      .eq("id", account.id);
+  }
 }
 
 export async function withdrawFromPot(amountPence: number) {
@@ -216,6 +239,22 @@ export async function withdrawFromPot(amountPence: number) {
   });
 
   if (error) throw new Error(`Withdrawal failed: ${error.message}`);
+
+  // Add back to Monzo card balance
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, balance_available")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (account) {
+    await supabase
+      .from("accounts")
+      .update({ balance_available: Number(account.balance_available) + amountGBP })
+      .eq("id", account.id);
+  }
 }
 
 export async function queueWithdrawal() {
@@ -305,6 +344,22 @@ export async function withdrawAllAvailable() {
   });
 
   if (error) throw new Error(`Withdrawal failed: ${error.message}`);
+
+  // Add back to Monzo card balance
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, balance_available")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (account) {
+    await supabase
+      .from("accounts")
+      .update({ balance_available: Number(account.balance_available) + amountGBP })
+      .eq("id", account.id);
+  }
 
   // Clear the withdrawal queue flag if locked is also zero
   if (Number(pot.locked) <= 0) {

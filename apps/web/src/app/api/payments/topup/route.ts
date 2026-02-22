@@ -27,6 +27,25 @@ export async function POST(request: Request) {
     );
   }
 
+  // Fetch primary account balance to validate
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("id, balance_available")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const amountGBP = amountPence / 100;
+  const cardBalanceGBP = Number(account?.balance_available ?? 0);
+
+  if (amountGBP > cardBalanceGBP) {
+    return NextResponse.json(
+      { error: `Insufficient card balance: £${cardBalanceGBP.toFixed(2)} available` },
+      { status: 400 },
+    );
+  }
+
   // Ensure lending pot exists
   await supabase.from("lending_pots").upsert(
     { user_id: user.id, available: 0, locked: 0, total_deployed: 0, realized_yield: 0 },
@@ -34,7 +53,6 @@ export async function POST(request: Request) {
   );
 
   // Deposit via atomic RPC (row-level lock + ledger entry)
-  const amountGBP = amountPence / 100;
   const idempotencyKey = `deposit-${user.id}-${Date.now()}`;
   const { error } = await supabase.rpc("update_lending_pot", {
     p_user_id: user.id,
@@ -51,6 +69,14 @@ export async function POST(request: Request) {
       { error: `Deposit failed: ${error.message}` },
       { status: 500 },
     );
+  }
+
+  // Deduct from Monzo card balance
+  if (account) {
+    await supabase
+      .from("accounts")
+      .update({ balance_available: cardBalanceGBP - amountGBP })
+      .eq("id", account.id);
   }
 
   // Fetch updated pot to return

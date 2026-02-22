@@ -23,6 +23,17 @@ export default async function LenderHomePage() {
     .eq("user_id", user.id)
     .single();
 
+  // Fetch primary Monzo card balance
+  const { data: primaryAccount } = await supabase
+    .from("accounts")
+    .select("balance_available")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const cardBalancePence = Math.round(Number(primaryAccount?.balance_available ?? 0) * 100);
+
   // Fetch trades where this user has allocations (lenders don't have lender_id on trades)
   const { data: allocations } = await supabase
     .from("allocations")
@@ -243,6 +254,7 @@ export default async function LenderHomePage() {
               }
             : null
         }
+        cardBalancePence={cardBalancePence}
         initialYieldStats={yieldStats}
         currentApyBps={currentApyBps}
         sparklineData={sparklineData}
