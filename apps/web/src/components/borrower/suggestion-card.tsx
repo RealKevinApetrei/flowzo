@@ -83,7 +83,7 @@ export function SuggestionCard({
   // Build a specific explanation fallback
   const explanation =
     proposal.explanation_text ??
-    `Your balance drops near ${formatDate(payload.original_date)}. Shifting to ${formatDate(payload.shifted_date)} keeps you in the green.`;
+    `Your ${payload.obligation_name} payment of ${formatCurrency(payload.amount_pence)} is due on ${formatDate(payload.original_date)}. Shifting it to ${formatDate(payload.shifted_date)} gives your balance more breathing room.`;
 
   async function handleAccept() {
     setIsAccepting(true);
