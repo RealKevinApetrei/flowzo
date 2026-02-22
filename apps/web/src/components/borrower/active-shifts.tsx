@@ -11,6 +11,7 @@ interface ActiveShift {
   status: string;
   matched_at: string | null;
   live_at: string | null;
+  created_at?: string;
 }
 
 interface ActiveShiftsProps {
@@ -70,11 +71,21 @@ export function ActiveShifts({ shifts }: ActiveShiftsProps) {
                     <p className="text-xs text-text-secondary">{formatCurrency(shift.amount_pence)}</p>
                   </div>
                 </div>
-                {isPending ? (
-                  <span className="flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
-                    Finding lender
-                  </span>
+                {isPending ? (() => {
+                  const createdMs = shift.created_at ? new Date(shift.created_at).getTime() : 0;
+                  const waitingLong = createdMs > 0 && Date.now() - createdMs > 5 * 60 * 1000;
+                  return waitingLong ? (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-danger bg-danger/10 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-danger animate-pulse" />
+                      Taking longer than usual
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                      Finding lender
+                    </span>
+                  );
+                })(
                 ) : isLive ? (
                   <span className="flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
