@@ -798,8 +798,9 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const [minAmt, maxAmt] = amountRanges[borrower.riskGrade] ?? [20, 100];
     const amount = randomFloat(minAmt, maxAmt);
     // UK-benchmarked pricing: BoE 4.5% + 2% margin = 6.5% base APR
+    // Term premium: +0.5% APR per day ensures upward-sloping yield curve
     const riskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
-    const effectiveAprPct = 6.5 * riskMult + 0.15 * shiftDays;
+    const effectiveAprPct = 6.5 * riskMult + 0.5 * shiftDays;
     // Fee = APR-based, minimum scales with term to prevent yield curve inversion
     const aprFee = amount * (effectiveAprPct / 100) * (shiftDays / 365);
     const minFee = 0.50 * (shiftDays / 7); // £0.50 at 7d, proportional otherwise
@@ -1120,7 +1121,7 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
     const shiftedDate = addDays(originalDate, shiftDays);
     // UK-benchmarked pricing (same formula as trade creation)
     const propRiskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
-    const propAprPct = 6.5 * propRiskMult + 0.15 * shiftDays;
+    const propAprPct = 6.5 * propRiskMult + 0.5 * shiftDays;
     const aprFee = amount * (propAprPct / 100) * (shiftDays / 365);
     const propMinFee = 0.50 * (shiftDays / 7);
     const fee = Math.max(
