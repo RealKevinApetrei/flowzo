@@ -121,15 +121,20 @@ export default async function BorrowerHomePage() {
     redirect("/login");
   }
 
-  // Fetch user profile
+  // Fetch user profile (including credit risk data)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, risk_grade")
+    .select("display_name, risk_grade, credit_score, max_trade_amount, max_active_trades, eligible_to_borrow, last_scored_at")
     .eq("id", user.id)
     .single();
 
   const displayName = profile?.display_name ?? "there";
   const riskGrade = (profile?.risk_grade as string | null) ?? null;
+  const creditScore = profile?.credit_score as number | null;
+  const maxTradeAmount = Number(profile?.max_trade_amount ?? 75);
+  const maxActiveTrades = Number(profile?.max_active_trades ?? 1);
+  const eligibleToBorrow = profile?.eligible_to_borrow as boolean | null;
+  const lastScoredAt = profile?.last_scored_at as string | null;
 
   // Check for syncing bank connections
   const { data: syncingConnections } = await supabase
@@ -418,6 +423,61 @@ export default async function BorrowerHomePage() {
           storageKey="flowzo-bills-intro-seen"
           message="This is where you manage your bills and see your cash forecast."
         />
+
+        {/* Credit Score + Limits */}
+        {creditScore != null && (
+          <section className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Credit Profile</h2>
+              {lastScoredAt && (
+                <span className="text-[10px] text-text-muted">
+                  Scored {new Date(lastScoredAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Score circle */}
+              <div className="relative w-16 h-16 shrink-0">
+                <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="3" className="text-warm-grey" />
+                  <circle
+                    cx="18" cy="18" r="15.5" fill="none" strokeWidth="3"
+                    strokeDasharray={`${Math.round((creditScore / 850) * 97.4)} 97.4`}
+                    strokeLinecap="round"
+                    className={creditScore >= 700 ? "text-success" : creditScore >= 600 ? "text-warning" : "text-danger"}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-sm font-extrabold text-navy">{creditScore}</span>
+                </div>
+              </div>
+              {/* Stats */}
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-text-secondary">Status</span>
+                  {eligibleToBorrow ? (
+                    <span className="text-success font-semibold bg-success/10 px-2 py-0.5 rounded-full">Eligible</span>
+                  ) : (
+                    <span className="text-danger font-semibold bg-danger/10 px-2 py-0.5 rounded-full">Ineligible</span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-text-secondary">Max shift</span>
+                  <span className="font-semibold text-navy">£{maxTradeAmount.toFixed(0)}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-text-secondary">Active limit</span>
+                  <span className="font-semibold text-navy">{maxActiveTrades} trade{maxActiveTrades !== 1 ? "s" : ""}</span>
+                </div>
+              </div>
+            </div>
+            {!eligibleToBorrow && (
+              <p className="text-xs text-danger mt-3">
+                Score must be 500+ to borrow. Connect your bank and build history to improve.
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Connect bank banner -- shown when no data */}
         {!hasData && (

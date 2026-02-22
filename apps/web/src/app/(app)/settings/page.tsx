@@ -16,10 +16,10 @@ export default async function SettingsPage() {
     .select("id, provider, status, last_synced_at")
     .eq("user_id", userId);
 
-  // Fetch profile
+  // Fetch profile (including credit risk data)
   const { data: profile } = await supabase
     .from("profiles")
-    .select("display_name, role_preference, onboarding_completed")
+    .select("display_name, role_preference, onboarding_completed, risk_grade, credit_score, max_trade_amount, max_active_trades, eligible_to_borrow, last_scored_at")
     .eq("id", userId)
     .single();
 
@@ -77,6 +77,17 @@ export default async function SettingsPage() {
         lenderPeopleHelped: 14,
       };
 
+  const creditProfile = profile?.credit_score != null
+    ? {
+        creditScore: profile.credit_score as number,
+        riskGrade: (profile.risk_grade as string) ?? "C",
+        maxTradeAmount: Number(profile.max_trade_amount ?? 75),
+        maxActiveTrades: Number(profile.max_active_trades ?? 1),
+        eligibleToBorrow: (profile.eligible_to_borrow as boolean) ?? false,
+        lastScoredAt: profile.last_scored_at as string | null,
+      }
+    : undefined;
+
   return (
     <SettingsClient
       email={user?.email ?? ""}
@@ -86,6 +97,7 @@ export default async function SettingsPage() {
       onboardingCompleted={profile?.onboarding_completed ?? false}
       lenderPrefs={lenderPrefs ?? undefined}
       achievements={achievements}
+      creditProfile={creditProfile}
     />
   );
 }

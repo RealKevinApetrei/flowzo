@@ -34,6 +34,14 @@ interface SettingsClientProps {
     lenderAmountPence: number;
     lenderPeopleHelped: number;
   };
+  creditProfile?: {
+    creditScore: number;
+    riskGrade: string;
+    maxTradeAmount: number;
+    maxActiveTrades: number;
+    eligibleToBorrow: boolean;
+    lastScoredAt: string | null;
+  };
 }
 
 export function SettingsClient({
@@ -41,6 +49,7 @@ export function SettingsClient({
   displayName,
   connections,
   achievements,
+  creditProfile,
 }: SettingsClientProps) {
   const supabase = useSupabase();
   const router = useRouter();
@@ -152,6 +161,86 @@ export function SettingsClient({
             )}
           </div>
         </section>
+
+        {/* Credit Profile */}
+        {creditProfile && (
+          <section className="card-monzo p-5 space-y-4">
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Credit Profile
+            </h2>
+
+            {/* Score + Grade */}
+            <div className="flex items-center gap-4">
+              <div className="relative w-20 h-20 shrink-0">
+                <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
+                  <circle cx="18" cy="18" r="15.5" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-warm-grey" />
+                  <circle
+                    cx="18" cy="18" r="15.5" fill="none" strokeWidth="2.5"
+                    strokeDasharray={`${Math.round((creditProfile.creditScore / 850) * 97.4)} 97.4`}
+                    strokeLinecap="round"
+                    className={creditProfile.creditScore >= 700 ? "text-success" : creditProfile.creditScore >= 600 ? "text-warning" : "text-danger"}
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <span className="text-lg font-extrabold text-navy leading-none">{creditProfile.creditScore}</span>
+                  <span className="text-[9px] text-text-muted">/ 850</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
+                    creditProfile.riskGrade === "A" ? "bg-success/10 text-success" :
+                    creditProfile.riskGrade === "B" ? "bg-warning/10 text-warning" :
+                    "bg-danger/10 text-danger"
+                  }`}>
+                    Grade {creditProfile.riskGrade}
+                  </span>
+                  {creditProfile.eligibleToBorrow ? (
+                    <span className="text-[10px] font-semibold text-success bg-success/10 px-2 py-0.5 rounded-full">Eligible</span>
+                  ) : (
+                    <span className="text-[10px] font-semibold text-danger bg-danger/10 px-2 py-0.5 rounded-full">Ineligible</span>
+                  )}
+                </div>
+                <p className="text-xs text-text-secondary">
+                  {creditProfile.creditScore >= 700 ? "Excellent credit standing" :
+                   creditProfile.creditScore >= 600 ? "Good credit standing" :
+                   creditProfile.creditScore >= 500 ? "Fair credit standing" :
+                   "Below borrowing threshold"}
+                </p>
+                {creditProfile.lastScoredAt && (
+                  <p className="text-[10px] text-text-muted mt-0.5">
+                    Last assessed {new Date(creditProfile.lastScoredAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Credit Limits */}
+            <div className="rounded-xl bg-soft-white p-3 space-y-2">
+              <p className="text-[10px] text-text-muted uppercase tracking-wider font-semibold">Your Limits</p>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-secondary">Max shift amount</span>
+                <span className="font-bold text-navy">£{creditProfile.maxTradeAmount.toFixed(0)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-secondary">Active trades allowed</span>
+                <span className="font-bold text-navy">{creditProfile.maxActiveTrades}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-text-secondary">Max shift duration</span>
+                <span className="font-bold text-navy">
+                  {creditProfile.riskGrade === "A" ? "14" : creditProfile.riskGrade === "B" ? "10" : "7"} days
+                </span>
+              </div>
+            </div>
+
+            {!creditProfile.eligibleToBorrow && (
+              <p className="text-xs text-danger">
+                A credit score of 500 or above is required to borrow. Keep your bank connected and build a positive payment history.
+              </p>
+            )}
+          </section>
+        )}
 
         {/* Achievements */}
         {achievements && (achievements.borrowerSavedPence > 0 || achievements.lenderAmountPence > 0) && (
