@@ -52,20 +52,6 @@ function getDayColor(balancePence: number): {
   };
 }
 
-function calcOverdraftProbability(forecast: ForecastDay): number {
-  const projected = forecast.projected_balance_pence;
-  const low = forecast.confidence_low_pence;
-  const high = forecast.confidence_high_pence;
-
-  if (projected < 0) return 95;
-  if (low >= 0) return 0;
-
-  const range = high - low;
-  if (range <= 0) return projected < 0 ? 95 : 0;
-
-  return Math.min(Math.round((Math.abs(low) / range) * 100), 99);
-}
-
 function getMonthName(dateStr: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     month: "long",
@@ -266,17 +252,6 @@ export function CalendarHeatmap({
                   Risk
                 </span>
               )}
-              {(() => {
-                const overdraftProb = calcOverdraftProbability(
-                  selectedForecast.forecast!,
-                );
-                if (overdraftProb <= 0) return null;
-                return (
-                  <span className="text-[10px] font-semibold text-danger">
-                    {overdraftProb}% overdraft risk
-                  </span>
-                );
-              })()}
             </div>
           </div>
 

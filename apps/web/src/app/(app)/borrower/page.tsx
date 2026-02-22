@@ -5,6 +5,7 @@ import { TopBar } from "@/components/layout/top-bar";
 import { SuggestionFeed } from "@/components/borrower/suggestion-feed";
 import { DangerSummary } from "@/components/borrower/danger-summary";
 import { UpcomingTransactions } from "@/components/borrower/upcoming-transactions";
+import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
 function getGreeting(): string {
@@ -91,6 +92,30 @@ export default async function BorrowerHomePage() {
     category: o.category,
   }));
 
+  // Fetch active trades (MATCHED or LIVE) for the borrower
+  const { data: activeTrades } = await supabase
+    .from("trades")
+    .select("id, amount, fee, original_due_date, new_due_date, shift_days, status, matched_at, live_at, obligations(name)")
+    .eq("borrower_id", user.id)
+    .in("status", ["MATCHED", "LIVE"])
+    .order("new_due_date", { ascending: true });
+
+  const activeShifts = (activeTrades ?? []).map((t) => {
+    const obligation = Array.isArray(t.obligations) ? t.obligations[0] : t.obligations;
+    return {
+      id: t.id,
+      obligation_name: obligation?.name ?? "Bill",
+      amount_pence: Math.round(Number(t.amount) * 100),
+      fee_pence: Math.round(Number(t.fee) * 100),
+      original_due_date: t.original_due_date,
+      new_due_date: t.new_due_date,
+      shift_days: Number(t.shift_days),
+      status: t.status as string,
+      matched_at: t.matched_at,
+      live_at: t.live_at,
+    };
+  });
+
   const dangerCount = forecasts.filter((f) => f.is_danger).length;
   const hasData = forecasts.length > 0;
 
@@ -140,6 +165,11 @@ export default async function BorrowerHomePage() {
           <section>
             <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
           </section>
+        )}
+
+        {/* Active Shifts — current borrowing */}
+        {activeShifts.length > 0 && (
+          <ActiveShifts shifts={activeShifts} />
         )}
 
         {/* Upcoming Transactions */}

@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { TopBar } from "@/components/layout/top-bar";
 import { LendingPotCard } from "./lending-pot-card";
+import { DurationSelector } from "./duration-selector";
 import { YieldDashboard } from "./yield-dashboard";
+import { ImpactCard } from "./impact-card";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 
 interface LendingPot {
@@ -21,11 +23,27 @@ interface YieldStats {
   activeTrades: number;
 }
 
+interface DurationOption {
+  days: number;
+  aprPct: number;
+  gainPence: number;
+}
+
+interface ImpactStats {
+  peopleHelped: number;
+  tradesFunded: number;
+  totalLentPence: number;
+  essentialBills: number;
+}
+
 interface LenderPageClientProps {
   initialPot: LendingPot | null;
   initialYieldStats: YieldStats;
   currentApyBps: number;
   sparklineData: number[];
+  durationOptions: DurationOption[];
+  initialMaxShiftDays: number;
+  impactStats: ImpactStats;
 }
 
 export function LenderPageClient({
@@ -33,6 +51,9 @@ export function LenderPageClient({
   initialYieldStats,
   currentApyBps,
   sparklineData,
+  durationOptions,
+  initialMaxShiftDays,
+  impactStats,
 }: LenderPageClientProps) {
   const router = useRouter();
 
@@ -48,6 +69,9 @@ export function LenderPageClient({
         {/* Lending Pot Card */}
         <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} onPotUpdated={() => router.refresh()} />
 
+        {/* Duration Preference */}
+        <DurationSelector options={durationOptions} initialMaxShiftDays={initialMaxShiftDays} />
+
         {/* Yield Dashboard */}
         <YieldDashboard
           stats={initialYieldStats}
@@ -55,6 +79,9 @@ export function LenderPageClient({
           potLockedPence={initialPot?.locked_pence}
           sparklineData={sparklineData}
         />
+
+        {/* Impact Card */}
+        {impactStats.peopleHelped > 0 && <ImpactCard stats={impactStats} />}
       </div>
     </div>
   );

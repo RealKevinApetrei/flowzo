@@ -28,6 +28,24 @@ export async function updateLenderPreferences(formData: FormData) {
   if (error) throw new Error(`Failed to update preferences: ${error.message}`);
 }
 
+export async function updateDurationPreference(maxShiftDays: number) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  const { error } = await supabase
+    .from("lender_preferences")
+    .upsert(
+      { user_id: user.id, max_shift_days: maxShiftDays },
+      { onConflict: "user_id" },
+    );
+
+  if (error) throw new Error(`Failed to update duration preference: ${error.message}`);
+}
+
 export async function toggleAutoMatch(enabled: boolean) {
   const supabase = await createClient();
 

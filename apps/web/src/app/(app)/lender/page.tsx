@@ -97,6 +97,85 @@ export default async function LenderHomePage() {
     activeTrades: activeTrades.length,
   };
 
+  // Fetch yield curve for duration selector (dynamic APR per term bucket)
+  const { data: yieldCurve } = await supabase
+    .from("yield_curve")
+    .select("term_bucket, avg_apr_pct, trade_count");
+
+  const potPence = Math.round(Number(pot?.available ?? 0) * 100);
+  const fallbackApr = currentApyBps / 100; // bps → percent
+
+  // Map yield_curve buckets to duration options
+  const shortBucket = yieldCurve?.find((r) => r.term_bucket === "0-7d");
+  const midBucket = yieldCurve?.find((r) => r.term_bucket === "8-14d");
+
+  const shortApr = Number(shortBucket?.avg_apr_pct ?? fallbackApr);
+  const midApr = Number(midBucket?.avg_apr_pct ?? fallbackApr);
+
+  const durationOptions = [3, 7, 14].map((days) => {
+    const apr = days <= 7 ? shortApr : midApr;
+    const gainPence = Math.round((potPence * (apr / 100) * days) / 365);
+    return { days, aprPct: apr, gainPence };
+  });
+
+  // Fetch lender preferences for initial duration selection
+  const { data: lenderPrefs } = await supabase
+    .from("lender_preferences")
+    .select("max_shift_days")
+    .eq("user_id", user.id)
+    .single();
+
+  const initialMaxShiftDays = lenderPrefs?.max_shift_days ?? 7;
+
+  // Fetch impact data: unique borrowers helped + essential bills
+  const { data: impactAllocations } = await supabase
+    .from("allocations")
+    .select("trade_id, amount_slice, trades(borrower_id, status, obligation_id)")
+    .eq("lender_id", user.id)
+    .in("status", ["RESERVED", "ACTIVE", "REPAID"]);
+
+  const validImpact = (impactAllocations ?? []).filter((a) => {
+    const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+    return trade && ["MATCHED", "LIVE", "REPAID"].includes(trade.status as string);
+  });
+
+  const uniqueBorrowers = new Set(
+    validImpact.map((a) => {
+      const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+      return trade?.borrower_id;
+    }).filter(Boolean),
+  );
+
+  const totalLentPence = Math.round(
+    validImpact.reduce((sum, a) => sum + Number(a.amount_slice ?? 0), 0) * 100,
+  );
+
+  // Count essential bills funded (via obligation_id on trades)
+  const obligationIds = validImpact
+    .map((a) => {
+      const trade = Array.isArray(a.trades) ? a.trades[0] : a.trades;
+      return trade?.obligation_id;
+    })
+    .filter((id): id is string => !!id);
+
+  let essentialCount = 0;
+  if (obligationIds.length > 0) {
+    const uniqueObIds = [...new Set(obligationIds)];
+    const { count } = await supabase
+      .from("obligations")
+      .select("id", { count: "exact", head: true })
+      .in("id", uniqueObIds)
+      .eq("is_essential", true);
+    essentialCount = count ?? 0;
+  }
+
+  const impactStats = {
+    peopleHelped: uniqueBorrowers.size,
+    tradesFunded: validImpact.length,
+    totalLentPence,
+    essentialBills: essentialCount,
+  };
+
   return (
     <>
       <LenderPageClient
@@ -117,6 +196,9 @@ export default async function LenderHomePage() {
         initialYieldStats={yieldStats}
         currentApyBps={currentApyBps}
         sparklineData={sparklineData}
+        durationOptions={durationOptions}
+        initialMaxShiftDays={initialMaxShiftDays}
+        impactStats={impactStats}
       />
     </>
   );
