@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LenderPageClient } from "@/components/lender/lender-page-client";
+import { LenderRealtimeWrapper } from "@/components/lender/lender-realtime-wrapper";
 
 export default async function LenderHomePage() {
   const supabase = await createClient();
@@ -226,7 +227,7 @@ export default async function LenderHomePage() {
     .sort((a, b) => a.new_due_date.localeCompare(b.new_due_date));
 
   return (
-    <>
+    <LenderRealtimeWrapper userId={user.id}>
       <LenderPageClient
         initialPot={
           pot
@@ -252,6 +253,6 @@ export default async function LenderHomePage() {
         usingMarketAvg={usingMarketAvg}
         upcomingRepayments={upcomingRepayments}
       />
-    </>
+    </LenderRealtimeWrapper>
   );
 }
