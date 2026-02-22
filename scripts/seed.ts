@@ -69,6 +69,18 @@ function addDays(d: Date, n: number): Date {
   return out;
 }
 
+/** Realistic match delay: 70% within 0-30s, 20% within 1-60min, 10% within 1-24h */
+function realisticMatchDelay(): number {
+  const roll = Math.random();
+  if (roll < 0.7) return randomInt(1, 30);           // seconds
+  if (roll < 0.9) return randomInt(60, 3600);         // 1-60 minutes in seconds
+  return randomInt(3600, 86400);                       // 1-24 hours in seconds
+}
+
+function addSeconds(d: Date, s: number): Date {
+  return new Date(d.getTime() + s * 1000);
+}
+
 function uuid(): string {
   return crypto.randomUUID();
 }
@@ -482,9 +494,12 @@ async function createLendingData(users: SeedUser[]) {
       ["A"],
       ["B", "C"],
     ]) as string[];
+    const minApr = randomFloat(0, 5);
+    const targetApr = randomFloat(minApr + 0.5, minApr + 3);
     return {
       user_id: u.id,
-      min_apr: randomFloat(0, 5),
+      min_apr: minApr,
+      target_apr: targetApr,
       max_shift_days: pick([7, 10, 14]),
       max_exposure: randomFloat(50, 500),
       max_total_exposure: randomFloat(500, 2000),
@@ -761,7 +776,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
         const daysAgo = randomInt(30, 120);
         originalDueDate = addDays(now, -daysAgo);
         createdAt = addDays(originalDueDate, -randomInt(3, 14));
-        matchedAt = addDays(createdAt, randomInt(0, 3)).toISOString();
+        matchedAt = addSeconds(createdAt, realisticMatchDelay()).toISOString();
         liveAt = originalDueDate.toISOString();
         repaidAt = addDays(originalDueDate, shiftDays).toISOString();
         break;
@@ -771,7 +786,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
         const daysAgo = randomInt(30, 90);
         originalDueDate = addDays(now, -daysAgo);
         createdAt = addDays(originalDueDate, -randomInt(3, 14));
-        matchedAt = addDays(createdAt, randomInt(0, 3)).toISOString();
+        matchedAt = addSeconds(createdAt, realisticMatchDelay()).toISOString();
         liveAt = originalDueDate.toISOString();
         defaultedAt = addDays(originalDueDate, shiftDays + 3).toISOString(); // 3-day grace
         break;
@@ -781,7 +796,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
         const daysAgo = randomInt(1, Math.min(shiftDays - 1, 13));
         originalDueDate = addDays(now, -daysAgo);
         createdAt = addDays(originalDueDate, -randomInt(3, 10));
-        matchedAt = addDays(createdAt, randomInt(0, 2)).toISOString();
+        matchedAt = addSeconds(createdAt, realisticMatchDelay()).toISOString();
         liveAt = originalDueDate.toISOString();
         break;
       }
@@ -789,7 +804,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
         // Original due date in the future
         originalDueDate = addDays(now, randomInt(1, 30));
         createdAt = addDays(now, -randomInt(1, 10));
-        matchedAt = addDays(createdAt, randomInt(0, 2)).toISOString();
+        matchedAt = addSeconds(createdAt, realisticMatchDelay()).toISOString();
         break;
       }
       case "CANCELLED": {

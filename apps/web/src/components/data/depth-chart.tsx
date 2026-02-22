@@ -9,6 +9,16 @@ interface DepthBucket {
   totalVolume: number;
 }
 
+interface SupplyOrder {
+  risk_grade: string;
+  apr_bucket: number;
+  lender_count: number;
+  available_volume: number;
+  avg_apr: number;
+  best_apr: number;
+  max_term_days: number;
+}
+
 interface DepthChartProps {
   pendingTrades: {
     amount: number;
@@ -16,6 +26,7 @@ interface DepthChartProps {
     risk_grade: string;
     shift_days: number;
   }[];
+  supplyOrders?: SupplyOrder[];
 }
 
 const GRADE_COLORS: Record<string, { fill: string; stroke: string; label: string }> = {
@@ -24,12 +35,15 @@ const GRADE_COLORS: Record<string, { fill: string; stroke: string; label: string
   C: { fill: "rgba(239, 68, 68, 0.3)", stroke: "#EF4444", label: "Grade C" },
 };
 
+const BID_COLOR = { fill: "rgba(59, 130, 246, 0.2)", stroke: "#3B82F6" };
+
 const BUCKET_WIDTH = 50; // 50% APR buckets
 
-export function DepthChart({ pendingTrades }: DepthChartProps) {
+export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps) {
   const [hoveredBucket, setHoveredBucket] = useState<{
     apr: number;
     grade: string;
+    side: "bid" | "ask";
     x: number;
     y: number;
     count: number;
@@ -37,8 +51,8 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     cumVolume: number;
   } | null>(null);
 
-  const { cumulativeByGrade, maxCumVolume, aprRange, aprStats } = useMemo(() => {
-    // Group trades into APR buckets by grade
+  const { cumulativeByGrade, bidCumulative, maxCumVolume, aprRange, aprStats, crossingApr } = useMemo(() => {
+    // === ASK SIDE (demand — pending trades) ===
     const bucketMap = new Map<string, DepthBucket>();
 
     for (const trade of pendingTrades) {
@@ -63,12 +77,42 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
       (a, b) => a.aprBucket - b.aprBucket,
     );
 
-    // Get APR range
-    const aprValues = allBuckets.map((b) => b.aprBucket);
-    const minApr = Math.min(...aprValues, 0);
-    const maxApr = Math.max(...aprValues, 500) + BUCKET_WIDTH;
+    // === BID SIDE (supply — lender standing orders) ===
+    // Aggregate supply across all grades per APR bucket
+    const bidBucketMap = new Map<number, { apr: number; volume: number; count: number }>();
+    for (const order of supplyOrders) {
+      const bucket = Math.floor(order.apr_bucket / BUCKET_WIDTH) * BUCKET_WIDTH;
+      const existing = bidBucketMap.get(bucket);
+      if (existing) {
+        existing.volume += order.available_volume;
+        existing.count += order.lender_count;
+      } else {
+        bidBucketMap.set(bucket, {
+          apr: bucket,
+          volume: order.available_volume,
+          count: order.lender_count,
+        });
+      }
+    }
 
-    // Build cumulative volume per grade (ask side — sorted ascending by APR)
+    // Build cumulative bid (descending — at high APR, all lenders participate)
+    const bidBuckets = Array.from(bidBucketMap.values()).sort((a, b) => b.apr - a.apr);
+    let bidCum = 0;
+    const bidCumulativeDesc = bidBuckets.map((b) => {
+      bidCum += b.volume;
+      return { apr: b.apr, cumVolume: bidCum, volume: b.volume, count: b.count };
+    });
+    // Reverse so it's ascending by APR for rendering
+    const bidCumAsc = [...bidCumulativeDesc].reverse();
+
+    // Get combined APR range
+    const askAprs = allBuckets.map((b) => b.aprBucket);
+    const bidAprs = bidCumAsc.map((b) => b.apr);
+    const allAprs = [...askAprs, ...bidAprs];
+    const minApr = Math.min(...allAprs, 0);
+    const maxApr = Math.max(...allAprs, 500) + BUCKET_WIDTH;
+
+    // Build cumulative ask volume per grade (ascending by APR)
     const grades = ["A", "B", "C"];
     const cumByGrade: Record<string, { apr: number; cumVolume: number; volume: number; count: number }[]> = {};
 
@@ -89,51 +133,82 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
       });
     }
 
-    // Max cumulative volume across all grades (for Y-axis scaling)
+    // Max cumulative volume across all grades + bid side
     let maxCum = 0;
     for (const grade of grades) {
       const last = cumByGrade[grade]?.[cumByGrade[grade].length - 1];
       if (last && last.cumVolume > maxCum) maxCum = last.cumVolume;
     }
+    if (bidCumAsc.length > 0) {
+      const bidMax = bidCumAsc[0]?.cumVolume ?? 0; // First element has highest cumulative
+      if (bidMax > maxCum) maxCum = bidMax;
+    }
 
     // Compute APR statistics from individual trades
-    const allAprs: number[] = [];
+    const allTradeAprs: number[] = [];
     for (const trade of pendingTrades) {
       if (!trade.amount || !trade.shift_days || trade.shift_days === 0 || trade.fee == null) continue;
       const tradeApr = (trade.fee / trade.amount) * (365 / trade.shift_days) * 100;
-      if (isFinite(tradeApr)) allAprs.push(tradeApr);
+      if (isFinite(tradeApr)) allTradeAprs.push(tradeApr);
     }
-    allAprs.sort((a, b) => a - b);
+    allTradeAprs.sort((a, b) => a - b);
 
-    const aprStats = allAprs.length > 0
+    const aprStats = allTradeAprs.length > 0
       ? {
-          median: allAprs[Math.floor(allAprs.length / 2)],
-          q1: allAprs[Math.floor(allAprs.length * 0.25)],
-          q3: allAprs[Math.floor(allAprs.length * 0.75)],
-          mean: allAprs.reduce((s, v) => s + v, 0) / allAprs.length,
+          median: allTradeAprs[Math.floor(allTradeAprs.length / 2)],
+          q1: allTradeAprs[Math.floor(allTradeAprs.length * 0.25)],
+          q3: allTradeAprs[Math.floor(allTradeAprs.length * 0.75)],
+          mean: allTradeAprs.reduce((s, v) => s + v, 0) / allTradeAprs.length,
         }
       : null;
 
+    // Find crossing point (where bid cumVolume ≈ total ask cumVolume at same APR)
+    let crossingApr: number | null = null;
+    if (bidCumAsc.length > 0 && allBuckets.length > 0) {
+      // Total ask volume (all grades combined) ascending
+      const totalAskByBucket = new Map<number, number>();
+      for (const b of allBuckets) {
+        totalAskByBucket.set(b.aprBucket, (totalAskByBucket.get(b.aprBucket) ?? 0) + b.totalVolume);
+      }
+      let askCum = 0;
+      const askCumArr = Array.from(totalAskByBucket.entries())
+        .sort(([a], [b]) => a - b)
+        .map(([apr, vol]) => {
+          askCum += vol;
+          return { apr, cumVolume: askCum };
+        });
+
+      // Find where bid (descending from right) crosses ask (ascending from left)
+      for (const askPoint of askCumArr) {
+        const bidPoint = bidCumAsc.find((b) => b.apr <= askPoint.apr + BUCKET_WIDTH);
+        if (bidPoint && bidPoint.cumVolume >= askPoint.cumVolume) {
+          crossingApr = askPoint.apr;
+          break;
+        }
+      }
+    }
+
     return {
-      buckets: allBuckets,
       cumulativeByGrade: cumByGrade,
+      bidCumulative: bidCumAsc,
       maxCumVolume: maxCum || 1,
       aprRange: { min: minApr, max: maxApr },
       aprStats,
+      crossingApr,
     };
-  }, [pendingTrades]);
+  }, [pendingTrades, supplyOrders]);
 
-  if (pendingTrades.length === 0) {
+  if (pendingTrades.length === 0 && supplyOrders.length === 0) {
     return (
       <div className="text-center py-8 text-sm text-text-secondary">
-        No pending trades to display.
+        No order book data to display.
       </div>
     );
   }
 
   // SVG dimensions
   const W = 400;
-  const H = 180;
+  const H = 200;
   const PAD = { top: 10, right: 20, bottom: 38, left: 50 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
@@ -144,7 +219,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
   const yScale = (vol: number) =>
     PAD.top + plotH - (vol / maxCumVolume) * plotH;
 
-  // Build stepped area paths per grade
+  // Build stepped area paths
   const grades = ["A", "B", "C"];
 
   function buildSteppedPath(
@@ -152,8 +227,6 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
   ): string {
     if (points.length === 0) return "";
     const parts: string[] = [];
-
-    // Start at baseline
     const firstX = xScale(points[0].apr);
     parts.push(`M ${firstX} ${yScale(0)}`);
 
@@ -161,18 +234,13 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
       const x1 = xScale(points[i].apr);
       const x2 = xScale(points[i].apr + BUCKET_WIDTH);
       const y = yScale(points[i].cumVolume);
-
-      // Step up
       parts.push(`L ${x1} ${y}`);
-      // Horizontal across bucket
       parts.push(`L ${x2} ${y}`);
     }
 
-    // Close back to baseline
     const lastX = xScale(points[points.length - 1].apr + BUCKET_WIDTH);
     parts.push(`L ${lastX} ${yScale(0)}`);
     parts.push("Z");
-
     return parts.join(" ");
   }
 
@@ -180,7 +248,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
   const yTicks = [0, maxCumVolume * 0.25, maxCumVolume * 0.5, maxCumVolume * 0.75, maxCumVolume];
   const fmtK = (v: number) => (v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v.toFixed(0)}`);
 
-  // X-axis tick values (dynamically spaced, max ~6 labels)
+  // X-axis tick values
   const xTicks: number[] = [];
   const maxTickCount = 6;
   const aprSpan = aprRange.max - aprRange.min;
@@ -190,13 +258,21 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     xTicks.push(apr);
   }
 
+  const hasBidData = bidCumulative.length > 0;
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Market Depth
+          Market Depth {hasBidData ? "(Bid / Ask)" : ""}
         </h3>
         <div className="flex gap-3">
+          {hasBidData && (
+            <div className="flex items-center gap-1">
+              <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: BID_COLOR.stroke }} />
+              <span className="text-[10px] text-text-muted">Supply</span>
+            </div>
+          )}
           {grades.map((g) => (
             <div key={g} className="flex items-center gap-1">
               <div
@@ -278,8 +354,57 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
             />
           )}
 
-          {/* Median APR line */}
-          {aprStats && (
+          {/* Bid side fill (supply — blue, rendered first so asks draw on top) */}
+          {hasBidData && (
+            <path
+              d={buildSteppedPath(bidCumulative)}
+              fill={BID_COLOR.fill}
+              stroke={BID_COLOR.stroke}
+              strokeWidth="1.5"
+            />
+          )}
+
+          {/* Ask side fills (demand — grade colors, C first so A on top) */}
+          {[...grades].reverse().map((grade) => {
+            const points = cumulativeByGrade[grade] ?? [];
+            if (points.length === 0) return null;
+            return (
+              <path
+                key={`fill-${grade}`}
+                d={buildSteppedPath(points)}
+                fill={GRADE_COLORS[grade].fill}
+                stroke={GRADE_COLORS[grade].stroke}
+                strokeWidth="1.5"
+              />
+            );
+          })}
+
+          {/* Crossing point (market clearing rate) */}
+          {crossingApr != null && (
+            <>
+              <line
+                x1={xScale(crossingApr + BUCKET_WIDTH / 2)}
+                y1={PAD.top}
+                x2={xScale(crossingApr + BUCKET_WIDTH / 2)}
+                y2={PAD.top + plotH}
+                stroke="#8B5CF6"
+                strokeWidth="1.5"
+                strokeDasharray="4,3"
+              />
+              <text
+                x={xScale(crossingApr + BUCKET_WIDTH / 2) + 3}
+                y={PAD.top + 10}
+                fontSize="7"
+                fill="#8B5CF6"
+                fontWeight="bold"
+              >
+                Clear {crossingApr}%
+              </text>
+            </>
+          )}
+
+          {/* Median APR line (only if no crossing point) */}
+          {crossingApr == null && aprStats && (
             <>
               <line
                 x1={xScale(aprStats.median)}
@@ -301,29 +426,14 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
             </>
           )}
 
-          {/* Area fills (render C first so A is on top) */}
-          {[...grades].reverse().map((grade) => {
-            const points = cumulativeByGrade[grade] ?? [];
-            if (points.length === 0) return null;
-            return (
-              <path
-                key={`fill-${grade}`}
-                d={buildSteppedPath(points)}
-                fill={GRADE_COLORS[grade].fill}
-                stroke={GRADE_COLORS[grade].stroke}
-                strokeWidth="1.5"
-              />
-            );
-          })}
-
-          {/* Interactive hover zones */}
+          {/* Interactive hover zones — ask side */}
           {grades.map((grade) =>
             (cumulativeByGrade[grade] ?? []).map((point, i) => {
               const x1 = xScale(point.apr);
               const x2 = xScale(point.apr + BUCKET_WIDTH);
               return (
                 <rect
-                  key={`hover-${grade}-${i}`}
+                  key={`hover-ask-${grade}-${i}`}
                   x={x1}
                   y={PAD.top}
                   width={x2 - x1}
@@ -334,6 +444,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
                     setHoveredBucket({
                       apr: point.apr,
                       grade,
+                      side: "ask",
                       x: svgRect ? ((x1 + x2) / 2 / W) * svgRect.width : 0,
                       y: svgRect ? (yScale(point.cumVolume) / H) * svgRect.height : 0,
                       count: point.count,
@@ -345,6 +456,35 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
               );
             }),
           )}
+
+          {/* Interactive hover zones — bid side */}
+          {bidCumulative.map((point, i) => {
+            const x1 = xScale(point.apr);
+            const x2 = xScale(point.apr + BUCKET_WIDTH);
+            return (
+              <rect
+                key={`hover-bid-${i}`}
+                x={x1}
+                y={PAD.top}
+                width={x2 - x1}
+                height={plotH}
+                fill="transparent"
+                onMouseEnter={(e) => {
+                  const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                  setHoveredBucket({
+                    apr: point.apr,
+                    grade: "ALL",
+                    side: "bid",
+                    x: svgRect ? ((x1 + x2) / 2 / W) * svgRect.width : 0,
+                    y: svgRect ? (yScale(point.cumVolume) / H) * svgRect.height : 0,
+                    count: point.count,
+                    volume: point.volume,
+                    cumVolume: point.cumVolume,
+                  });
+                }}
+              />
+            );
+          })}
         </svg>
 
         {/* Tooltip */}
@@ -361,7 +501,8 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
               {hoveredBucket.apr}–{hoveredBucket.apr + BUCKET_WIDTH}% APR
             </div>
             <div>
-              Grade {hoveredBucket.grade}: {hoveredBucket.count} trades
+              {hoveredBucket.side === "bid" ? "Supply" : `Demand (Grade ${hoveredBucket.grade})`}:{" "}
+              {hoveredBucket.count} {hoveredBucket.side === "bid" ? "lenders" : "trades"}
             </div>
             <div>Volume: £{hoveredBucket.volume.toFixed(0)}</div>
             <div>Cumulative: £{hoveredBucket.cumVolume.toFixed(0)}</div>
@@ -371,6 +512,19 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
 
       {/* Summary stats */}
       <div className="flex gap-3 text-center">
+        {hasBidData && (
+          <div
+            className="flex-1 rounded-lg py-2"
+            style={{ backgroundColor: BID_COLOR.fill }}
+          >
+            <p className="text-sm font-bold" style={{ color: BID_COLOR.stroke }}>
+              £{(bidCumulative[0]?.cumVolume ?? 0).toFixed(0)}
+            </p>
+            <p className="text-[10px] text-text-muted">
+              {bidCumulative.reduce((s, b) => s + b.count, 0)} Supply
+            </p>
+          </div>
+        )}
         {grades.map((grade) => {
           const data = cumulativeByGrade[grade] ?? [];
           const totalVol = data[data.length - 1]?.cumVolume ?? 0;
@@ -401,7 +555,9 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
           <span>Q1: {aprStats.q1.toFixed(0)}%</span>
           <span>Median: {aprStats.median.toFixed(0)}%</span>
           <span>Q3: {aprStats.q3.toFixed(0)}%</span>
-          <span>Mean: {aprStats.mean.toFixed(0)}%</span>
+          {crossingApr != null && (
+            <span className="font-bold text-purple-500">Clear: {crossingApr}%</span>
+          )}
         </div>
       )}
     </div>

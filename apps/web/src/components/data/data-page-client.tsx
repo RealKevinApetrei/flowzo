@@ -97,6 +97,29 @@ interface PendingTrade {
   created_at: string;
 }
 
+interface SupplyOrder {
+  risk_grade: string;
+  apr_bucket: number;
+  lender_count: number;
+  available_volume: number;
+  avg_apr: number;
+  best_apr: number;
+  max_term_days: number;
+}
+
+interface MarketRate {
+  risk_grade: string;
+  ask_apr: number;
+  best_bid_apr: number;
+  weighted_avg_bid_apr: number;
+  spread: number;
+  demand_count: number;
+  demand_volume: number;
+  supply_count: number;
+  supply_volume: number;
+  liquidity_ratio: number | null;
+}
+
 interface RevenueSummary {
   total_fee_income: number;
   total_default_losses: number;
@@ -111,23 +134,6 @@ interface RevenueMonthlyRow {
   default_losses: number;
   net_revenue: number;
   trade_count: number;
-}
-
-interface SupplyOrder {
-  risk_grade: string;
-  apr_bucket: number;
-  lender_count: number;
-  available_volume: number;
-}
-
-interface MarketRate {
-  risk_grade: string;
-  bid_apr: number;
-  ask_apr: number;
-  spread: number;
-  liquidity_ratio: number;
-  supply_count: number;
-  demand_count: number;
 }
 
 interface DataPageClientProps {
@@ -213,7 +219,12 @@ export function DataPageClient({
         />
       )}
       {activeTab === "orderbook" && (
-        <OrderBookTab orderBook={orderBook} pendingTrades={pendingTrades} supplyOrders={supplyOrders} marketRates={marketRates} />
+        <OrderBookTab
+          orderBook={orderBook}
+          pendingTrades={pendingTrades}
+          supplyOrders={supplyOrders}
+          marketRates={marketRates}
+        />
       )}
       {activeTab === "performance" && (
         <PerformanceTab matchSpeed={matchSpeed} settlement={settlement} />
@@ -454,47 +465,64 @@ function OrderBookTab({
     return h < 1 ? "<1h" : `${h}h`;
   }
 
+  // Aggregate supply by grade for summary
+  const supplyByGrade = new Map<string, { lenders: number; volume: number; bestApr: number; avgApr: number }>();
+  for (const s of supplyOrders) {
+    const existing = supplyByGrade.get(s.risk_grade);
+    if (existing) {
+      existing.lenders += s.lender_count;
+      existing.volume += s.available_volume;
+      existing.bestApr = Math.min(existing.bestApr, s.best_apr);
+    } else {
+      supplyByGrade.set(s.risk_grade, {
+        lenders: s.lender_count,
+        volume: s.available_volume,
+        bestApr: s.best_apr,
+        avgApr: s.avg_apr,
+      });
+    }
+  }
+
   return (
     <div className="space-y-4">
       {/* Market Rate Cards */}
       {marketRates.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {marketRates.map((mr) => {
-            const liquidityColor = mr.liquidity_ratio > 1
-              ? "text-success"
-              : mr.liquidity_ratio >= 0.5
-                ? "text-warning"
-                : "text-danger";
-            const liquidityBg = mr.liquidity_ratio > 1
-              ? "bg-success/10"
-              : mr.liquidity_ratio >= 0.5
-                ? "bg-warning/10"
-                : "bg-danger/10";
+        <div className="grid grid-cols-3 gap-3">
+          {["A", "B", "C"].map((grade) => {
+            const mr = marketRates.find((r) => r.risk_grade === grade);
+            if (!mr) return null;
+            const liquidityColor =
+              mr.liquidity_ratio != null && mr.liquidity_ratio >= 1
+                ? "success"
+                : mr.liquidity_ratio != null && mr.liquidity_ratio >= 0.5
+                  ? "warning"
+                  : "danger";
             return (
-              <div key={mr.risk_grade} className="card-monzo p-4 space-y-2">
+              <div key={grade} className="card-monzo p-3 space-y-1">
                 <div className="flex items-center justify-between">
-                  <GradeBadge grade={mr.risk_grade} />
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${liquidityBg} ${liquidityColor}`}>
-                    {mr.liquidity_ratio > 1 ? "Liquid" : mr.liquidity_ratio >= 0.5 ? "Moderate" : "Thin"}
+                  <GradeBadge grade={grade} />
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                    liquidityColor === "success"
+                      ? "bg-success/10 text-success"
+                      : liquidityColor === "warning"
+                        ? "bg-warning/10 text-warning"
+                        : "bg-danger/10 text-danger"
+                  }`}>
+                    {mr.liquidity_ratio != null ? `${mr.liquidity_ratio.toFixed(1)}x` : "—"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-2 gap-1 text-[10px]">
                   <div>
-                    <p className="text-text-muted">Bid APR</p>
-                    <p className="font-bold text-success">{mr.bid_apr.toFixed(1)}%</p>
+                    <span className="text-text-muted">Bid</span>
+                    <p className="font-bold text-success">{mr.best_bid_apr.toFixed(1)}%</p>
                   </div>
                   <div>
-                    <p className="text-text-muted">Ask APR</p>
+                    <span className="text-text-muted">Ask</span>
                     <p className="font-bold text-coral">{mr.ask_apr.toFixed(1)}%</p>
                   </div>
-                  <div>
-                    <p className="text-text-muted">Spread</p>
-                    <p className="font-medium text-navy">{mr.spread.toFixed(1)}%</p>
-                  </div>
-                  <div>
-                    <p className="text-text-muted">Supply / Demand</p>
-                    <p className="font-medium text-navy">{mr.supply_count} / {mr.demand_count}</p>
-                  </div>
+                </div>
+                <div className="text-[9px] text-text-muted">
+                  Spread: {mr.spread.toFixed(1)}% | {mr.supply_count} lenders
                 </div>
               </div>
             );
@@ -502,61 +530,67 @@ function OrderBookTab({
         </div>
       )}
 
-      {/* Supply Summary */}
+      {/* Two-Sided Depth Chart */}
+      <section className="card-monzo p-5 space-y-3">
+        <DepthChart pendingTrades={pendingTrades} supplyOrders={supplyOrders} />
+      </section>
+
+      {/* Supply Summary (Lender Standing Orders) */}
       {supplyOrders.length > 0 && (
         <section className="card-monzo p-5 space-y-3">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-            Supply (Lender Standing Orders)
+            Supply (Lender Orders)
           </h2>
           <DataTable
             columns={[
               {
                 key: "grade",
                 header: "Grade",
-                render: (r: SupplyOrder) => (
-                  <GradeBadge grade={r.risk_grade} />
+                render: (r: { grade: string; lenders: number; volume: number; bestApr: number }) => (
+                  <GradeBadge grade={r.grade} />
                 ),
               },
               {
-                key: "count",
+                key: "lenders",
                 header: "Lenders",
                 align: "right",
-                render: (r: SupplyOrder) => (
-                  <span className="font-medium">{r.lender_count}</span>
+                render: (r: { grade: string; lenders: number; volume: number; bestApr: number }) => (
+                  <span className="font-medium">{r.lenders}</span>
                 ),
               },
               {
                 key: "volume",
                 header: "Available",
                 align: "right",
-                render: (r: SupplyOrder) => fmtK(r.available_volume),
+                render: (r: { grade: string; lenders: number; volume: number; bestApr: number }) =>
+                  fmtK(r.volume),
               },
               {
                 key: "apr",
-                header: "Target APR",
+                header: "Best APR",
                 align: "right",
-                render: (r: SupplyOrder) => (
+                render: (r: { grade: string; lenders: number; volume: number; bestApr: number }) => (
                   <span className="font-bold text-success">
-                    {r.apr_bucket.toFixed(1)}%
+                    {r.bestApr.toFixed(1)}%
                   </span>
                 ),
               },
             ]}
-            data={supplyOrders}
-            emptyMessage="No supply data."
+            data={["A", "B", "C"]
+              .map((g) => {
+                const s = supplyByGrade.get(g);
+                return s ? { grade: g, ...s } : null;
+              })
+              .filter(Boolean) as { grade: string; lenders: number; volume: number; bestApr: number }[]}
+            emptyMessage="No lender supply data."
           />
         </section>
       )}
 
-      {/* Depth Chart */}
-      <section className="card-monzo p-5 space-y-3">
-        <DepthChart pendingTrades={pendingTrades} />
-      </section>
-
-      {/* Demand by Grade */}
+      {/* Demand Summary (Pending Trades by Grade) */}
       <section className="card-monzo p-5 space-y-3">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Demand (Pending by Grade)
+          Demand (Pending Trades)
         </h2>
         <DataTable
           columns={[
@@ -645,7 +679,7 @@ function OrderBookTab({
                       100
                     : 0;
                 return (
-                  <span className="font-bold text-success">
+                  <span className="font-bold text-coral">
                     {apr.toFixed(1)}%
                   </span>
                 );
@@ -1024,7 +1058,7 @@ function LendersTab({
     <div className="space-y-4">
       {/* Summary */}
       <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Lenders" value={String(lenders.length)} />
+        <StatCard label="Lenders" value={String(totalPool > 0 ? lenders.length : 0)} />
         <StatCard
           label="HHI"
           value={hhi.toFixed(0)}
