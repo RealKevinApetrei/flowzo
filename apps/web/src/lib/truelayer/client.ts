@@ -67,4 +67,21 @@ export async function getTransactions(
   );
 }
 
+export interface TrueLayerCard {
+  account_id: string;
+  card_network: string; // VISA, MASTERCARD, AMEX, etc.
+  card_type: string; // CREDIT, DEBIT, CHARGE, PREPAID
+  currency: string;
+  display_name: string;
+  partial_card_number: string; // last 4 digits
+  name_on_card: string;
+  valid_from?: string; // MM/YY
+  valid_to?: string; // MM/YY
+  update_timestamp: string;
+}
+
+export async function getCards(accessToken: string): Promise<TrueLayerCard[]> {
+  return truelayerFetch<TrueLayerCard[]>("/data/v1/cards", accessToken);
+}
+
 export type { TrueLayerAccount, TrueLayerBalance, TrueLayerTransaction };
