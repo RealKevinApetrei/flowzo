@@ -96,9 +96,10 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
     setLoading(false);
   }, [supabase, userId]);
 
-  // Touch swipe refs (must be before early returns to satisfy rules of hooks)
-  const touchStartX = useRef<number | null>(null);
-  const touchDeltaX = useRef(0);
+  // Swipe/drag refs (must be before early returns to satisfy rules of hooks)
+  const dragStartX = useRef<number | null>(null);
+  const dragDeltaX = useRef(0);
+  const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -235,30 +236,45 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
     setActiveIndex(Math.max(0, Math.min(index, proposals.length - 1)));
   }
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-    touchDeltaX.current = 0;
+  // Shared swipe logic
+  function startDrag(x: number) {
+    dragStartX.current = x;
+    dragDeltaX.current = 0;
+    isDragging.current = true;
   }
 
-  function handleTouchMove(e: React.TouchEvent) {
-    if (touchStartX.current === null) return;
-    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  function moveDrag(x: number) {
+    if (dragStartX.current === null) return;
+    dragDeltaX.current = x - dragStartX.current;
   }
 
-  function handleTouchEnd() {
-    const threshold = 50; // minimum px to count as a swipe
-    if (Math.abs(touchDeltaX.current) > threshold) {
-      if (touchDeltaX.current < 0) {
-        // Swiped left → next
-        goTo(activeIndex + 1);
-      } else {
-        // Swiped right → previous
-        goTo(activeIndex - 1);
-      }
+  function endDrag() {
+    const threshold = 50;
+    if (Math.abs(dragDeltaX.current) > threshold) {
+      if (dragDeltaX.current < 0) goTo(activeIndex + 1);
+      else goTo(activeIndex - 1);
     }
-    touchStartX.current = null;
-    touchDeltaX.current = 0;
+    dragStartX.current = null;
+    dragDeltaX.current = 0;
+    isDragging.current = false;
   }
+
+  // Touch handlers
+  function handleTouchStart(e: React.TouchEvent) { startDrag(e.touches[0].clientX); }
+  function handleTouchMove(e: React.TouchEvent) { moveDrag(e.touches[0].clientX); }
+  function handleTouchEnd() { endDrag(); }
+
+  // Mouse handlers (desktop drag)
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    startDrag(e.clientX);
+  }
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!isDragging.current) return;
+    moveDrag(e.clientX);
+  }
+  function handleMouseUp() { if (isDragging.current) endDrag(); }
+  function handleMouseLeave() { if (isDragging.current) endDrag(); }
 
   const activeProposal = proposals[activeIndex];
 
@@ -295,13 +311,17 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
         )}
       </div>
 
-      {/* Active card with touch swipe */}
+      {/* Active card with swipe/drag */}
       <div
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="touch-pan-y"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        className="touch-pan-y select-none cursor-grab active:cursor-grabbing"
       >
         {activeProposal && (
           <SuggestionCard
