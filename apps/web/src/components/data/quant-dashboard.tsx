@@ -48,7 +48,7 @@ interface LendersData {
   lenders: SimLender[];
 }
 
-type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress" | "lenders" | "scoring";
+type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "scoring" | "stress" | "lenders";
 
 export function QuantDashboard() {
   const [activeSection, setActiveSection] = useState<QuantSection>("backtest");

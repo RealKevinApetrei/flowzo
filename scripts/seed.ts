@@ -1145,7 +1145,7 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
 // Step 6b: Pre-generate Forecasts for Demo Borrowers
 // ---------------------------------------------------------------------------
 
-const FORECAST_DAYS = 30;
+const FORECAST_DAYS = 180;
 const OVERDRAFT_BUFFER = 100.0;
 const DEMO_FORECAST_COUNT = 20; // first N borrowers get pre-generated forecasts
 
@@ -1154,7 +1154,7 @@ async function createForecasts(
   seedAccounts: SeedAccount[],
   obligationsMap: Map<string, SeedObligation[]>,
 ) {
-  console.log("Pre-generating 30-day forecasts for demo borrowers...");
+  console.log("Pre-generating 180-day forecasts for demo borrowers...");
 
   const borrowers = users.filter(
     (u) => u.role === "BORROWER_ONLY" || u.role === "BOTH",
@@ -1212,9 +1212,8 @@ async function createForecasts(
 
       runningBalance = runningBalance - dailyOutgoings + incomeExpected;
 
-      // Confidence bands
-      const uncertainty =
-        dayOffset < 14 ? dayOffset * 3 : 13 * 3 + (dayOffset - 13) * 6;
+      // Confidence bands — grow sub-linearly over 180 days using sqrt
+      const uncertainty = 10 * Math.sqrt(dayOffset + 1);
       const confidenceLow = Math.round((runningBalance - uncertainty) * 100) / 100;
       const confidenceHigh = Math.round((runningBalance + uncertainty) * 100) / 100;
 
@@ -1254,10 +1253,10 @@ async function createForecasts(
   }
 
   // Insert forecast rows
-  for (let i = 0; i < allForecastRows.length; i += 50) {
+  for (let i = 0; i < allForecastRows.length; i += 200) {
     const { error } = await supabase
       .from("forecasts")
-      .insert(allForecastRows.slice(i, i + 50));
+      .insert(allForecastRows.slice(i, i + 200));
     if (error) console.error(`  Forecast insert error (batch ${i}):`, error.message);
   }
 
