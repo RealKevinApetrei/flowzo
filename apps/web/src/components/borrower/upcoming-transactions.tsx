@@ -21,8 +21,6 @@ interface UpcomingTransactionsProps {
   items: CashflowItem[];
 }
 
-const MAX_VISIBLE = 8;
-
 function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr);
   return new Intl.DateTimeFormat("en-GB", {
@@ -78,25 +76,40 @@ function typeIcon(type: CashflowItem["type"]) {
 }
 
 export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
-  const [showAll, setShowAll] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   if (items.length === 0) return null;
 
   const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
-  const visible = showAll ? sorted : sorted.slice(0, MAX_VISIBLE);
-  const hasMore = sorted.length > MAX_VISIBLE;
 
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base font-bold text-navy">Upcoming</h2>
-        <span className="text-xs text-text-muted">
-          Next 30 days
-        </span>
-      </div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center justify-between w-full"
+      >
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-bold text-navy">Cashflow Breakdown</h2>
+          <span className="text-xs text-text-muted">
+            {sorted.length} items
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted">Next 30 days</span>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={`w-4 h-4 text-text-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`}
+          >
+            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+          </svg>
+        </div>
+      </button>
 
-      <div className="space-y-0.5">
-        {visible.map((item) => (
+      {expanded && (
+      <div className="space-y-0.5 mt-4">
+        {sorted.map((item) => (
           <div
             key={item.id}
             className="flex items-center gap-3 py-2.5 border-b border-warm-grey last:border-0"
@@ -149,14 +162,6 @@ export function UpcomingTransactions({ items }: UpcomingTransactionsProps) {
           </div>
         ))}
       </div>
-
-      {hasMore && (
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className="w-full text-center text-xs font-medium text-coral mt-3 py-1 hover:text-coral-dark transition-colors"
-        >
-          {showAll ? "Show less" : `See all ${sorted.length} cashflows`}
-        </button>
       )}
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { createTrade, submitTrade } from "@/lib/actions/trades";
@@ -189,6 +189,36 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     setActiveIndex(Math.max(0, Math.min(index, proposals.length - 1)));
   }
 
+  // Touch swipe handling
+  const touchStartX = useRef<number | null>(null);
+  const touchDeltaX = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStartX.current = e.touches[0].clientX;
+    touchDeltaX.current = 0;
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  }
+
+  function handleTouchEnd() {
+    const threshold = 50; // minimum px to count as a swipe
+    if (Math.abs(touchDeltaX.current) > threshold) {
+      if (touchDeltaX.current < 0) {
+        // Swiped left → next
+        goTo(activeIndex + 1);
+      } else {
+        // Swiped right → previous
+        goTo(activeIndex - 1);
+      }
+    }
+    touchStartX.current = null;
+    touchDeltaX.current = 0;
+  }
+
   const activeProposal = proposals[activeIndex];
 
   return (
@@ -224,14 +254,22 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         )}
       </div>
 
-      {/* Active card */}
-      {activeProposal && (
-        <SuggestionCard
-          proposal={activeProposal}
-          onAccept={handleAccept}
-          onDismiss={handleDismiss}
-        />
-      )}
+      {/* Active card with touch swipe */}
+      <div
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        className="touch-pan-y"
+      >
+        {activeProposal && (
+          <SuggestionCard
+            proposal={activeProposal}
+            onAccept={handleAccept}
+            onDismiss={handleDismiss}
+          />
+        )}
+      </div>
 
       {/* Dot indicators */}
       {proposals.length > 1 && (
