@@ -106,7 +106,7 @@ const slides = [
               step: "03",
               title: "Score & Propose",
               subtitle: "AI Decision Engine",
-              desc: "An A/B/C risk grade is assigned and APR calculated accordingly. Claude AI generates a plain-English bill-shift proposal.",
+              desc: "ML credit scoring (300-850) assigns risk grades. Continuous pricing adjusts APR by exact score. Borrowers below 500 are blocked. Claude AI explains each proposal.",
             },
           ].map(({ step, title, subtitle, desc }) => (
             <div key={title} className="bg-white/10 border border-white/20 rounded-2xl p-6 text-left">
@@ -193,7 +193,7 @@ const slides = [
           {[
             { label: "Borrower", desc: "Sees danger days on a calendar heatmap. Accepts a shift in one tap." },
             { label: "P2P Microlender", desc: " Displays orderbook to lenders. Deploys idle cash to a democratised P2P pool." },
-            { label: "Risk Engine", desc: "A/B/C grades drive fee pricing. Higher risk = higher return for lender." },
+            { label: "Risk Engine", desc: "ML credit scoring with eligibility gates, credit limits, and continuous score-adjusted pricing. Default history enforcement." },
             { label: "Settlement", desc: "Repayment on shifted date. Full double-entry ledger. Idempotent." },
           ].map(({ label, desc }) => (
             <div key={label} className="bg-white/10 border border-white/20 rounded-2xl p-5 text-left">
@@ -218,7 +218,7 @@ const slides = [
           <span className="text-coral">303K real loans.</span>
         </h1>
         <p className="text-xl text-white/70 max-w-2xl mx-auto mb-8 leading-relaxed">
-          Flowzo risk grades backtested on Home Credit Default Risk data. Grade A predicts defaults better than FICO alone.
+          Flowzo risk grades backtested on 303K Home Credit loans. ML credit scoring (300-850) with eligibility gates, continuous pricing, and default history enforcement.
         </p>
         <div className="grid grid-cols-2 gap-8 w-full max-w-md mx-auto mb-8">
           {[
@@ -235,7 +235,7 @@ const slides = [
           <div className="bg-coral/20 border border-coral/40 rounded-2xl px-6 py-4 text-center">
             <p className="text-coral font-extrabold text-sm uppercase tracking-wider">SIG Prize</p>
             <p className="text-white font-bold mt-1">Best Use of Data</p>
-            <p className="text-white/50 text-xs mt-1">Feature engineering · Backtesting · Explainability</p>
+            <p className="text-white/50 text-xs mt-1">Feature engineering · Credit scoring · Eligibility gates · Backtesting</p>
           </div>
           <div className="bg-white/10 border border-white/20 rounded-2xl px-6 py-4 text-center">
             <p className="text-white/60 font-extrabold text-sm uppercase tracking-wider">Monzo Track</p>

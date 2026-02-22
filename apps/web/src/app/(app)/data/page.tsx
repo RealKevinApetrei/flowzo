@@ -21,6 +21,8 @@ export default async function DataPage() {
     { data: revenueMonthly },
     { data: orderBookSupply },
     { data: marketRates },
+    { data: creditScoreDist },
+    { data: eligibilitySummaryRaw },
   ] = await Promise.all([
     supabase.from("trade_analytics").select("*"),
     supabase.from("risk_distribution").select("*"),
@@ -53,6 +55,9 @@ export default async function DataPage() {
     supabase.from("order_book_supply").select("*"),
     // Market rates (bid/ask per grade)
     supabase.from("market_rates").select("*"),
+    // Credit risk analytics
+    supabase.from("credit_score_distribution").select("*"),
+    supabase.from("eligibility_summary").select("*").single(),
   ]);
 
   // ── Compose poolHealth from pool_overview + platform_totals ─────────────
@@ -221,6 +226,33 @@ export default async function DataPage() {
     liquidity_ratio: row.liquidity_ratio != null ? Number(row.liquidity_ratio) : null,
   }));
 
+  // ── Map credit risk data ──────────────────────────────────────────────
+  const creditRisk = {
+    scoreDist: (creditScoreDist ?? []).map((r) => ({
+      risk_grade: r.risk_grade as string,
+      borrower_count: Number(r.borrower_count ?? 0),
+      avg_score: Number(r.avg_score ?? 0),
+      min_score: Number(r.min_score ?? 0),
+      max_score: Number(r.max_score ?? 0),
+      eligible_count: Number(r.eligible_count ?? 0),
+      ineligible_count: Number(r.ineligible_count ?? 0),
+      avg_credit_limit: Number(r.avg_credit_limit ?? 0),
+    })),
+    summary: eligibilitySummaryRaw
+      ? {
+          total_borrowers: Number(eligibilitySummaryRaw.total_borrowers ?? 0),
+          eligible: Number(eligibilitySummaryRaw.eligible ?? 0),
+          ineligible: Number(eligibilitySummaryRaw.ineligible ?? 0),
+          eligible_pct: Number(eligibilitySummaryRaw.eligible_pct ?? 0),
+          avg_score: Number(eligibilitySummaryRaw.avg_score ?? 0),
+          grade_a_count: Number(eligibilitySummaryRaw.grade_a_count ?? 0),
+          grade_b_count: Number(eligibilitySummaryRaw.grade_b_count ?? 0),
+          grade_c_count: Number(eligibilitySummaryRaw.grade_c_count ?? 0),
+          ineligible_score_count: Number(eligibilitySummaryRaw.ineligible_score_count ?? 0),
+        }
+      : null,
+  };
+
   return (
     <div>
       <TopBar title="Data & Analytics" />
@@ -249,6 +281,7 @@ export default async function DataPage() {
           pendingTrades={pendingTrades}
           supplyOrders={supplyOrders}
           marketRates={marketRatesMapped}
+          creditRisk={creditRisk}
           revenueSummary={
             revenueSummary
               ? {

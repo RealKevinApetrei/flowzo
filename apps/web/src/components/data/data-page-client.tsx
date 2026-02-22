@@ -120,6 +120,34 @@ interface MarketRate {
   liquidity_ratio: number | null;
 }
 
+interface CreditScoreDistRow {
+  risk_grade: string;
+  borrower_count: number;
+  avg_score: number;
+  min_score: number;
+  max_score: number;
+  eligible_count: number;
+  ineligible_count: number;
+  avg_credit_limit: number;
+}
+
+interface EligibilitySummary {
+  total_borrowers: number;
+  eligible: number;
+  ineligible: number;
+  eligible_pct: number;
+  avg_score: number;
+  grade_a_count: number;
+  grade_b_count: number;
+  grade_c_count: number;
+  ineligible_score_count: number;
+}
+
+interface CreditRiskData {
+  scoreDist: CreditScoreDistRow[];
+  summary: EligibilitySummary | null;
+}
+
 interface RevenueSummary {
   total_fee_income: number;
   total_default_losses: number;
@@ -148,6 +176,7 @@ interface DataPageClientProps {
   pendingTrades: PendingTrade[];
   supplyOrders: SupplyOrder[];
   marketRates: MarketRate[];
+  creditRisk: CreditRiskData;
   revenueSummary: RevenueSummary | null;
   revenueMonthly: RevenueMonthlyRow[];
 }
@@ -165,6 +194,7 @@ const TABS = [
   { id: "orderbook", label: "Order Book" },
   { id: "performance", label: "Performance" },
   { id: "yield", label: "Yield" },
+  { id: "credit", label: "Credit Risk" },
   { id: "revenue", label: "Revenue" },
   { id: "lenders", label: "Lenders" },
   { id: "quant", label: "ML / Quant" },
@@ -186,6 +216,7 @@ export function DataPageClient({
   pendingTrades,
   supplyOrders,
   marketRates,
+  creditRisk,
   revenueSummary,
   revenueMonthly,
 }: DataPageClientProps) {
@@ -230,6 +261,7 @@ export function DataPageClient({
         <PerformanceTab matchSpeed={matchSpeed} settlement={settlement} />
       )}
       {activeTab === "yield" && <YieldTab yieldTrends={yieldTrends} />}
+      {activeTab === "credit" && <CreditRiskTab data={creditRisk} />}
       {activeTab === "revenue" && (
         <RevenueTab summary={revenueSummary} monthly={revenueMonthly} />
       )}
@@ -1145,6 +1177,157 @@ function LendersTab({
             Show top 25 only
           </button>
         )}
+      </section>
+    </div>
+  );
+}
+
+// ── Tab: Credit Risk ────────────────────────────────────────────────────────
+
+function CreditRiskTab({ data }: { data: CreditRiskData }) {
+  const { scoreDist, summary } = data;
+
+  const gradeColors: Record<string, string> = {
+    A: "text-success",
+    B: "text-warning",
+    C: "text-danger",
+  };
+
+  return (
+    <div className="space-y-4">
+      {/* Eligibility Summary */}
+      {summary && (
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            label="Eligible"
+            value={String(summary.eligible)}
+            subtitle={`${summary.eligible_pct}% of borrowers`}
+            variant="success"
+          />
+          <StatCard
+            label="Ineligible"
+            value={String(summary.ineligible)}
+            subtitle="Score < 500"
+            variant={summary.ineligible > 0 ? "danger" : "default"}
+          />
+          <StatCard
+            label="Avg Score"
+            value={String(summary.avg_score)}
+            subtitle="300-850 scale"
+          />
+        </div>
+      )}
+
+      {/* Grade Distribution */}
+      {summary && (
+        <section className="card-monzo p-5 space-y-3">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Grade Distribution
+          </h2>
+          <div className="flex gap-2">
+            {[
+              { grade: "A", count: summary.grade_a_count, color: "bg-success" },
+              { grade: "B", count: summary.grade_b_count, color: "bg-warning" },
+              { grade: "C", count: summary.grade_c_count, color: "bg-danger" },
+            ].map(({ grade, count, color }) => {
+              const pct = summary.total_borrowers > 0 ? (count / summary.total_borrowers) * 100 : 0;
+              return (
+                <div key={grade} className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-bold">Grade {grade}</span>
+                    <span className="text-[10px] text-text-muted">{count} ({pct.toFixed(0)}%)</span>
+                  </div>
+                  <div className="h-2 bg-warm-grey/30 rounded-full overflow-hidden">
+                    <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Score Distribution by Grade */}
+      <section className="card-monzo p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Credit Score Distribution
+        </h2>
+        <DataTable
+          columns={[
+            {
+              key: "grade",
+              header: "Grade",
+              render: (r: CreditScoreDistRow) => <GradeBadge grade={r.risk_grade} />,
+            },
+            {
+              key: "count",
+              header: "Borrowers",
+              align: "right",
+              render: (r: CreditScoreDistRow) => <span className="font-medium">{r.borrower_count}</span>,
+            },
+            {
+              key: "score",
+              header: "Score Range",
+              align: "right",
+              render: (r: CreditScoreDistRow) => (
+                <span className={gradeColors[r.risk_grade] ?? ""}>
+                  {r.min_score}–{r.max_score}
+                </span>
+              ),
+            },
+            {
+              key: "avg",
+              header: "Avg Score",
+              align: "right",
+              render: (r: CreditScoreDistRow) => <span className="font-bold">{r.avg_score}</span>,
+            },
+            {
+              key: "limit",
+              header: "Avg Limit",
+              align: "right",
+              render: (r: CreditScoreDistRow) => `£${Number(r.avg_credit_limit).toFixed(0)}`,
+            },
+            {
+              key: "eligible",
+              header: "Eligible",
+              align: "right",
+              render: (r: CreditScoreDistRow) => (
+                <span className="text-success font-medium">{r.eligible_count}</span>
+              ),
+            },
+          ]}
+          data={scoreDist}
+          emptyMessage="No credit score data."
+        />
+      </section>
+
+      {/* Eligibility Rules */}
+      <section className="card-monzo p-5 space-y-3">
+        <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+          Eligibility Rules
+        </h2>
+        <div className="space-y-2 text-xs text-text-secondary">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-danger" />
+            <span>Score &lt; 500: <strong className="text-danger">Blocked</strong> — cannot create trades</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-danger" />
+            <span>Default rate &gt; 20%: <strong className="text-danger">Blocked</strong> — too many defaults</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-danger" />
+            <span>2+ defaults in 30 days: <strong className="text-danger">Blocked</strong> — recent default pattern</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-warning" />
+            <span>Amount exceeds credit limit: <strong className="text-warning">Rejected</strong> — A: £500, B: £200, C: £75</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-warning" />
+            <span>Active trade limit exceeded: <strong className="text-warning">Rejected</strong> — A: 5, B: 3, C: 1</span>
+          </div>
+        </div>
       </section>
     </div>
   );

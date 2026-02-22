@@ -121,6 +121,16 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
 - Vercel redirect URI must be registered in TrueLayer Console: `https://<domain>/api/truelayer/callback`
 - Production: set `TRUELAYER_ENV=production` to switch to real banks (uk-ob-all uk-oauth-all)
 
+### Credit Risk System (Production-Level)
+- **Eligibility gate**: score >= 500 required (DB trigger `check_borrower_eligibility`)
+- **Credit limits enforced at DB level**: A=£500/5 trades, B=£200/3 trades, C=£75/1 trade
+- **Default history enforcement**: >20% default rate OR 2+ defaults in 30 days → blocked
+- **Continuous pricing**: `scoreAdjustedMultiplier()` interpolates within grade bands (A: 0.8-1.2x, B: 1.2-1.8x, C: 1.8-2.5x)
+- **Term premium**: +15% per 14-day period (3d/7d/14d differentiated)
+- **Income regularity scaling**: credit limits scaled by primary_bank_health_score (0.5-1.0x)
+- **Credit Risk tab** on /data page: score distribution, eligibility breakdown, rules display
+- **Profile columns**: credit_score, max_trade_amount, max_active_trades, eligible_to_borrow, last_scored_at
+
 ### Known Issues / Tech Debt
 - settle-trade processes allocations in a loop (not atomic) — if a step fails mid-loop, ledger/allocation mismatch possible
 - N+1 query pattern in match-trade lender scoring (fetches each lender's exposure individually)
