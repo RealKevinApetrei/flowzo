@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { StatCard } from "./stat-card";
 import { DataTable, GradeBadge } from "./data-table";
+import { RiskScoreExplorer } from "./risk-score-explorer";
 
 interface BacktestRow {
   grade: string;
@@ -47,7 +48,7 @@ interface LendersData {
   lenders: SimLender[];
 }
 
-type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress" | "lenders";
+type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress" | "lenders" | "scoring";
 
 export function QuantDashboard() {
   const [activeSection, setActiveSection] = useState<QuantSection>("backtest");
@@ -109,6 +110,10 @@ export function QuantDashboard() {
           setForecast(data);
           break;
         }
+        case "scoring": {
+          // RiskScoreExplorer manages its own state
+          break;
+        }
         case "lenders": {
           if (lenders && !force) break;
           const res = await fetch("/api/quant/lenders");
@@ -158,6 +163,7 @@ export function QuantDashboard() {
     { id: "returns", label: "Portfolio" },
     { id: "eda", label: "EDA" },
     { id: "forecast", label: "Forecast" },
+    { id: "scoring", label: "Credit Score" },
     { id: "stress", label: "Stress Test" },
     { id: "lenders", label: "Liquidity Pool" },
   ];
@@ -210,6 +216,9 @@ export function QuantDashboard() {
           {activeSection === "eda" && eda && <EdaSection data={eda} />}
           {activeSection === "forecast" && forecast && (
             <ForecastSection data={forecast} />
+          )}
+          {activeSection === "scoring" && (
+            <RiskScoreExplorer />
           )}
           {activeSection === "lenders" && lenders && (
             <LendersSection data={lenders} />
