@@ -113,6 +113,23 @@ interface RevenueMonthlyRow {
   trade_count: number;
 }
 
+interface SupplyOrder {
+  risk_grade: string;
+  apr_bucket: number;
+  lender_count: number;
+  available_volume: number;
+}
+
+interface MarketRate {
+  risk_grade: string;
+  bid_apr: number;
+  ask_apr: number;
+  spread: number;
+  liquidity_ratio: number;
+  supply_count: number;
+  demand_count: number;
+}
+
 interface DataPageClientProps {
   poolHealth: PoolHealth | null;
   riskDist: RiskRow[];
@@ -123,6 +140,8 @@ interface DataPageClientProps {
   yieldTrends: YieldTrendRow[];
   lenderConcentration: LenderConcRow[];
   pendingTrades: PendingTrade[];
+  supplyOrders: SupplyOrder[];
+  marketRates: MarketRate[];
   revenueSummary: RevenueSummary | null;
   revenueMonthly: RevenueMonthlyRow[];
 }
@@ -159,6 +178,8 @@ export function DataPageClient({
   yieldTrends,
   lenderConcentration,
   pendingTrades,
+  supplyOrders,
+  marketRates,
   revenueSummary,
   revenueMonthly,
 }: DataPageClientProps) {
@@ -192,7 +213,7 @@ export function DataPageClient({
         />
       )}
       {activeTab === "orderbook" && (
-        <OrderBookTab orderBook={orderBook} pendingTrades={pendingTrades} />
+        <OrderBookTab orderBook={orderBook} pendingTrades={pendingTrades} supplyOrders={supplyOrders} marketRates={marketRates} />
       )}
       {activeTab === "performance" && (
         <PerformanceTab matchSpeed={matchSpeed} settlement={settlement} />
@@ -410,9 +431,13 @@ function OverviewTab({
 function OrderBookTab({
   orderBook,
   pendingTrades,
+  supplyOrders,
+  marketRates,
 }: {
   orderBook: OrderBookRow[];
   pendingTrades: PendingTrade[];
+  supplyOrders: SupplyOrder[];
+  marketRates: MarketRate[];
 }) {
   const [page, setPage] = useState(0);
   const PAGE_SIZE = 10;
@@ -431,15 +456,107 @@ function OrderBookTab({
 
   return (
     <div className="space-y-4">
+      {/* Market Rate Cards */}
+      {marketRates.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {marketRates.map((mr) => {
+            const liquidityColor = mr.liquidity_ratio > 1
+              ? "text-success"
+              : mr.liquidity_ratio >= 0.5
+                ? "text-warning"
+                : "text-danger";
+            const liquidityBg = mr.liquidity_ratio > 1
+              ? "bg-success/10"
+              : mr.liquidity_ratio >= 0.5
+                ? "bg-warning/10"
+                : "bg-danger/10";
+            return (
+              <div key={mr.risk_grade} className="card-monzo p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <GradeBadge grade={mr.risk_grade} />
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${liquidityBg} ${liquidityColor}`}>
+                    {mr.liquidity_ratio > 1 ? "Liquid" : mr.liquidity_ratio >= 0.5 ? "Moderate" : "Thin"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-text-muted">Bid APR</p>
+                    <p className="font-bold text-success">{mr.bid_apr.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">Ask APR</p>
+                    <p className="font-bold text-coral">{mr.ask_apr.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">Spread</p>
+                    <p className="font-medium text-navy">{mr.spread.toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted">Supply / Demand</p>
+                    <p className="font-medium text-navy">{mr.supply_count} / {mr.demand_count}</p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Supply Summary */}
+      {supplyOrders.length > 0 && (
+        <section className="card-monzo p-5 space-y-3">
+          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+            Supply (Lender Standing Orders)
+          </h2>
+          <DataTable
+            columns={[
+              {
+                key: "grade",
+                header: "Grade",
+                render: (r: SupplyOrder) => (
+                  <GradeBadge grade={r.risk_grade} />
+                ),
+              },
+              {
+                key: "count",
+                header: "Lenders",
+                align: "right",
+                render: (r: SupplyOrder) => (
+                  <span className="font-medium">{r.lender_count}</span>
+                ),
+              },
+              {
+                key: "volume",
+                header: "Available",
+                align: "right",
+                render: (r: SupplyOrder) => fmtK(r.available_volume),
+              },
+              {
+                key: "apr",
+                header: "Target APR",
+                align: "right",
+                render: (r: SupplyOrder) => (
+                  <span className="font-bold text-success">
+                    {r.apr_bucket.toFixed(1)}%
+                  </span>
+                ),
+              },
+            ]}
+            data={supplyOrders}
+            emptyMessage="No supply data."
+          />
+        </section>
+      )}
+
       {/* Depth Chart */}
       <section className="card-monzo p-5 space-y-3">
         <DepthChart pendingTrades={pendingTrades} />
       </section>
 
-      {/* Summary by Grade */}
+      {/* Demand by Grade */}
       <section className="card-monzo p-5 space-y-3">
         <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-          Pending by Grade
+          Demand (Pending by Grade)
         </h2>
         <DataTable
           columns={[
@@ -469,7 +586,7 @@ function OrderBookTab({
               header: "Avg APR",
               align: "right",
               render: (r: OrderBookRow) => (
-                <span className="font-bold text-success">
+                <span className="font-bold text-coral">
                   {Number(r.avg_implied_apr_pct).toFixed(1)}%
                 </span>
               ),
@@ -880,6 +997,8 @@ function LendersTab({
   lenders: LenderConcRow[];
   totalPool: number;
 }) {
+  const [showAll, setShowAll] = useState(false);
+
   // Sort by total capital descending
   const sorted = [...lenders].sort(
     (a, b) => Number(b.total_capital) - Number(a.total_capital),
@@ -973,13 +1092,24 @@ function LendersTab({
                 `${Number(r.utilization_pct).toFixed(0)}%`,
             },
           ]}
-          data={sorted.slice(0, 25)}
+          data={showAll ? sorted : sorted.slice(0, 25)}
           emptyMessage="No lender data."
         />
-        {sorted.length > 25 && (
-          <p className="text-xs text-text-muted text-center">
-            Showing top 25 of {sorted.length} lenders
-          </p>
+        {sorted.length > 25 && !showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="w-full text-center text-xs font-semibold text-coral py-2 hover:underline"
+          >
+            Show all {sorted.length} lenders
+          </button>
+        )}
+        {showAll && sorted.length > 25 && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="w-full text-center text-xs font-semibold text-text-muted py-2 hover:underline"
+          >
+            Show top 25 only
+          </button>
         )}
       </section>
     </div>

@@ -198,6 +198,23 @@ export default async function BorrowerHomePage() {
     };
   });
 
+  // Fetch market rates for match probability (graceful if view doesn't exist)
+  const { data: marketRatesRaw } = await supabase
+    .from("market_rates")
+    .select("*")
+    .limit(3);
+
+  // Aggregate market context: average across grades for a general signal
+  const marketContext = (marketRatesRaw && marketRatesRaw.length > 0)
+    ? {
+        liquidity_ratio: marketRatesRaw.reduce((s, r) => s + Number(r.liquidity_ratio ?? 0), 0) / marketRatesRaw.length,
+        supply_count: marketRatesRaw.reduce((s, r) => s + Number(r.supply_count ?? 0), 0),
+        demand_count: marketRatesRaw.reduce((s, r) => s + Number(r.demand_count ?? 0), 0),
+        bid_apr: marketRatesRaw.reduce((s, r) => s + Number(r.bid_apr ?? 0), 0) / marketRatesRaw.length,
+        ask_apr: marketRatesRaw.reduce((s, r) => s + Number(r.ask_apr ?? 0), 0) / marketRatesRaw.length,
+      }
+    : undefined;
+
   // Use demo data if no real data exists (for vivid calendar display)
   const isDemo = forecasts.length === 0 && upcomingObligations.length === 0 && activeShifts.length === 0;
   const displayForecasts = forecasts.length > 0 ? forecasts : buildDemoForecasts();
@@ -385,7 +402,7 @@ export default async function BorrowerHomePage() {
         {/* AI Suggestions -- primary actionable content */}
         <section id="suggestions">
           <h2 className="text-lg font-bold text-navy mb-3">Suggestions</h2>
-          <SuggestionFeed userId={user.id} />
+          <SuggestionFeed userId={user.id} marketContext={marketContext} />
         </section>
       </div>
     </div>

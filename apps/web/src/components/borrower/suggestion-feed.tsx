@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { createTrade, submitTrade } from "@/lib/actions/trades";
 import { toast } from "sonner";
 import { SuggestionCard } from "@/components/borrower/suggestion-card";
+import { useRealtime } from "@/lib/hooks/use-realtime";
 
 interface Proposal {
   id: string;
@@ -23,8 +24,17 @@ interface Proposal {
   explanation_text: string | null;
 }
 
+interface MarketContext {
+  liquidity_ratio: number;
+  supply_count: number;
+  demand_count: number;
+  bid_apr: number;
+  ask_apr: number;
+}
+
 interface SuggestionFeedProps {
   userId: string;
+  marketContext?: MarketContext;
 }
 
 function SkeletonCard() {
@@ -46,7 +56,7 @@ function SkeletonCard() {
   );
 }
 
-export function SuggestionFeed({ userId }: SuggestionFeedProps) {
+export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,6 +106,36 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     fetchProposals();
   }, [fetchProposals]);
 
+  // Realtime: listen for new proposals
+  useRealtime<{ id: string; user_id: string; status: string }>("agent_proposals", {
+    filter: `user_id=eq.${userId}`,
+    onInsert: () => {
+      fetchProposals();
+    },
+    onUpdate: (record) => {
+      if (record.status !== "PENDING") {
+        // Proposal was accepted/dismissed elsewhere — remove it
+        setProposals((prev) => prev.filter((p) => p.id !== record.id));
+      }
+    },
+  });
+
+  // Realtime: listen for trade status changes (borrower sees match/repay updates)
+  useRealtime<{ id: string; status: string; borrower_id: string }>("trades", {
+    filter: `borrower_id=eq.${userId}`,
+    onUpdate: (record) => {
+      if (record.status === "MATCHED") {
+        toast.success("Your bill shift has been matched with a lender!");
+        router.refresh();
+      } else if (record.status === "LIVE") {
+        toast("Your shifted bill is now live.");
+        router.refresh();
+      } else if (record.status === "REPAID") {
+        toast.success("Bill shift repaid successfully!");
+        router.refresh();
+      }
+    },
+  });
 
   async function handleAccept(proposalId: string, adjustedFeePence?: number) {
     const proposal = proposals.find((p) => p.id === proposalId);
@@ -266,6 +306,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
         {activeProposal && (
           <SuggestionCard
             proposal={activeProposal}
+            marketContext={marketContext}
             onAccept={handleAccept}
             onDismiss={handleDismiss}
           />

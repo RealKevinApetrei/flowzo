@@ -19,13 +19,15 @@ export default async function DataPage() {
     { data: repaidTrades },
     { data: revenueSummary },
     { data: revenueMonthly },
+    { data: supplyRaw },
+    { data: marketRatesRaw },
   ] = await Promise.all([
     supabase.from("trade_analytics").select("*"),
     supabase.from("risk_distribution").select("*"),
     supabase.from("pool_overview").select("*").single(),
     supabase.from("order_book_depth").select("*"),
     supabase.from("trade_performance").select("*"),
-    supabase.from("lender_leaderboard").select("*").limit(25),
+    supabase.from("lender_leaderboard").select("*"),
     supabase.from("platform_totals").select("*").single(),
     supabase.from("matching_efficiency").select("*"),
     supabase
@@ -47,6 +49,9 @@ export default async function DataPage() {
       .from("platform_revenue_monthly")
       .select("*")
       .order("month", { ascending: true }),
+    // Order book supply + market rates (may not exist yet — data will be null on error)
+    supabase.from("order_book_supply").select("*"),
+    supabase.from("market_rates").select("*"),
   ]);
 
   // ── Compose poolHealth from pool_overview + platform_totals ─────────────
@@ -190,6 +195,25 @@ export default async function DataPage() {
     created_at: row.created_at as string,
   }));
 
+  // ── Map supply orders ─────────────────────────────────────────────────
+  const supplyOrders = (supplyRaw ?? []).map((row) => ({
+    risk_grade: (row.risk_grade ?? "A") as string,
+    apr_bucket: Number(row.apr_bucket ?? row.target_apr ?? 0),
+    lender_count: Number(row.lender_count ?? row.count ?? 0),
+    available_volume: Number(row.available_volume ?? row.total_available ?? 0),
+  }));
+
+  // ── Map market rates ──────────────────────────────────────────────────
+  const marketRates = (marketRatesRaw ?? []).map((row) => ({
+    risk_grade: (row.risk_grade ?? "A") as string,
+    bid_apr: Number(row.bid_apr ?? 0),
+    ask_apr: Number(row.ask_apr ?? 0),
+    spread: Number(row.spread ?? 0),
+    liquidity_ratio: Number(row.liquidity_ratio ?? 0),
+    supply_count: Number(row.supply_count ?? 0),
+    demand_count: Number(row.demand_count ?? 0),
+  }));
+
   return (
     <div>
       <TopBar title="Data & Analytics" />
@@ -216,6 +240,8 @@ export default async function DataPage() {
           yieldTrends={yieldTrends}
           lenderConcentration={lenderConcentration}
           pendingTrades={pendingTrades}
+          supplyOrders={supplyOrders}
+          marketRates={marketRates}
           revenueSummary={
             revenueSummary
               ? {
