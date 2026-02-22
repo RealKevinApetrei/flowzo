@@ -7,10 +7,8 @@ import { RiskScoreExplorer } from "./risk-score-explorer";
 
 interface BacktestRow {
   grade: string;
-  total: number;
-  defaulted: number;
   default_rate: number;
-  avg_score: number;
+  n_borrowers: number;
 }
 
 interface PortfolioReturns {
@@ -22,8 +20,8 @@ interface PortfolioReturns {
 }
 
 interface EdaStats {
-  summary: Record<string, { mean: number; std: number; min: number; max: number }>;
-  correlations: Record<string, Record<string, number>>;
+  summary: Record<string, { mean: number; std: number; median?: number; min?: number; max?: number }>;
+  correlation: Record<string, Record<string, number>>;
 }
 
 interface ForecastAccuracy {
@@ -61,9 +59,11 @@ export function QuantDashboard() {
   const [eda, setEda] = useState<EdaStats | null>(null);
   const [forecast, setForecast] = useState<ForecastAccuracy | null>(null);
   const [stressResult, setStressResult] = useState<{
-    base_score: number;
+    original_score: number;
     stressed_score: number;
-    delta: number;
+    score_delta: number;
+    original_grade: string;
+    stressed_grade: string;
   } | null>(null);
   const [stressMultiplier, setStressMultiplier] = useState(0.7);
   const [lenders, setLenders] = useState<LendersData | null>(null);
@@ -80,7 +80,15 @@ export function QuantDashboard() {
           if (!res.ok) throw new Error("Failed to fetch backtest");
           const data = await res.json();
           if (!data.backtest || typeof data.backtest !== "object") throw new Error("Invalid backtest response");
-          setBacktest(Array.isArray(data.backtest) ? data.backtest : Object.entries(data.backtest).map(([grade, stats]) => ({ grade, ...(stats as Record<string, unknown>) })));
+          const bt = data.backtest;
+          const rows: BacktestRow[] = Array.isArray(bt)
+            ? bt
+            : Object.entries(bt).map(([grade, stats]) => ({
+                grade,
+                default_rate: (stats as { default_rate: number }).default_rate ?? 0,
+                n_borrowers: (stats as { n_borrowers: number }).n_borrowers ?? 0,
+              }));
+          setBacktest(rows);
           break;
         }
         case "returns": {
@@ -98,7 +106,11 @@ export function QuantDashboard() {
           if (!res.ok) throw new Error("Failed to fetch EDA");
           const data = await res.json();
           if (data.error) throw new Error(data.error);
-          setEda(data);
+          // Backend uses "correlation" not "correlations"
+          setEda({
+            summary: data.summary ?? {},
+            correlation: data.correlation ?? data.correlations ?? {},
+          });
           break;
         }
         case "forecast": {
@@ -254,18 +266,12 @@ function BacktestSection({ data }: { data: BacktestRow[] }) {
             render: (r: BacktestRow) => <GradeBadge grade={r.grade} />,
           },
           {
-            key: "total",
+            key: "n_borrowers",
             header: "Sample",
             align: "right",
             render: (r: BacktestRow) => (
-              <span className="font-medium">{r.total}</span>
+              <span className="font-medium">{r.n_borrowers.toLocaleString()}</span>
             ),
-          },
-          {
-            key: "defaulted",
-            header: "Defaults",
-            align: "right",
-            render: (r: BacktestRow) => r.defaulted,
           },
           {
             key: "rate",
@@ -274,18 +280,12 @@ function BacktestSection({ data }: { data: BacktestRow[] }) {
             render: (r: BacktestRow) => (
               <span
                 className={
-                  r.default_rate > 10 ? "text-danger font-bold" : "text-navy"
+                  r.default_rate > 0.10 ? "text-danger font-bold" : "text-navy"
                 }
               >
-                {(r.default_rate * 100).toFixed(1)}%
+                {(r.default_rate * 100).toFixed(2)}%
               </span>
             ),
-          },
-          {
-            key: "score",
-            header: "Avg Score",
-            align: "right",
-            render: (r: BacktestRow) => r.avg_score?.toFixed(0) ?? "—",
           },
         ]}
         data={data}
@@ -295,13 +295,17 @@ function BacktestSection({ data }: { data: BacktestRow[] }) {
 }
 
 function ReturnsSection({ data }: { data: PortfolioReturns }) {
+  const fmtGBP = (v: number) => v >= 1000000
+    ? `£${(v / 1000000).toFixed(1)}M`
+    : v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v.toFixed(2)}`;
+
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-bold text-navy">Portfolio Returns</h3>
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           label="Weighted Yield"
-          value={`${((data.weighted_yield_pct ?? 0) * 100).toFixed(2)}%`}
+          value={`${(data.weighted_yield_pct ?? 0).toFixed(2)}%`}
           variant="success"
         />
         <StatCard
@@ -310,17 +314,17 @@ function ReturnsSection({ data }: { data: PortfolioReturns }) {
         />
         <StatCard
           label="Risk-Free Rate"
-          value={`${((data.risk_free_rate_pct ?? 0) * 100).toFixed(2)}%`}
+          value={`${(data.risk_free_rate_pct ?? 0).toFixed(2)}%`}
         />
         <StatCard
           label="Excess Return"
-          value={`${data.excess_return_pct >= 0 ? "+" : ""}${((data.excess_return_pct ?? 0) * 100).toFixed(2)}%`}
-          variant={data.excess_return_pct >= 0 ? "success" : "danger"}
+          value={`${(data.excess_return_pct ?? 0) >= 0 ? "+" : ""}${(data.excess_return_pct ?? 0).toFixed(2)}%`}
+          variant={(data.excess_return_pct ?? 0) >= 0 ? "success" : "danger"}
         />
       </div>
       <StatCard
         label="Total Capital"
-        value={`£${(data.total_capital_gbp ?? 0).toFixed(2)}`}
+        value={fmtGBP(data.total_capital_gbp ?? 0)}
       />
     </div>
   );
@@ -336,7 +340,7 @@ function EdaSection({ data }: { data: EdaStats }) {
           {
             key: "feature",
             header: "Feature",
-            render: (r: [string, { mean: number; std: number; min: number; max: number }]) => (
+            render: (r: [string, { mean: number; std: number; median?: number }]) => (
               <span className="text-xs">{r[0].replace(/_/g, " ")}</span>
             ),
           },
@@ -347,28 +351,27 @@ function EdaSection({ data }: { data: EdaStats }) {
             render: (r: [string, { mean: number }]) => r[1].mean?.toFixed(2),
           },
           {
+            key: "median",
+            header: "Median",
+            align: "right",
+            render: (r: [string, { median?: number }]) => r[1].median?.toFixed(2) ?? "—",
+          },
+          {
             key: "std",
             header: "Std",
             align: "right",
             render: (r: [string, { std: number }]) => r[1].std?.toFixed(2),
           },
-          {
-            key: "range",
-            header: "Range",
-            align: "right",
-            render: (r: [string, { min: number; max: number }]) =>
-              `${r[1].min?.toFixed(1)} – ${r[1].max?.toFixed(1)}`,
-          },
         ]}
         data={features}
       />
 
-      {data.correlations && (
+      {data.correlation && Object.keys(data.correlation).length > 0 && (
         <>
           <h3 className="text-sm font-bold text-navy mt-4">
             Correlation Matrix
           </h3>
-          <CorrelationHeatmap correlations={data.correlations} />
+          <CorrelationHeatmap correlations={data.correlation} />
         </>
       )}
     </div>
@@ -581,7 +584,7 @@ function StressSection({
   onMultiplierChange,
   onRun,
 }: {
-  result: { base_score: number; stressed_score: number; delta: number } | null;
+  result: { original_score: number; stressed_score: number; score_delta: number; original_grade: string; stressed_grade: string } | null;
   multiplier: number;
   onMultiplierChange: (m: number) => void;
   onRun: () => void;
@@ -620,24 +623,31 @@ function StressSection({
       </button>
 
       {result && (
-        <div className="grid grid-cols-3 gap-3 mt-2">
-          <StatCard label="Base Score" value={result.base_score?.toFixed(0) ?? "—"} />
-          <StatCard
-            label="Stressed Score"
-            value={result.stressed_score?.toFixed(0) ?? "—"}
-            variant={
-              result.stressed_score < 500
-                ? "danger"
-                : result.stressed_score < 650
-                  ? "warning"
-                  : "default"
-            }
-          />
-          <StatCard
-            label="Delta"
-            value={`${result.delta > 0 ? "+" : ""}${result.delta?.toFixed(0) ?? "—"}`}
-            variant={result.delta < -50 ? "danger" : "default"}
-          />
+        <div className="space-y-3 mt-2">
+          <div className="grid grid-cols-3 gap-3">
+            <StatCard
+              label="Base Score"
+              value={result.original_score?.toFixed(0) ?? "—"}
+              subtitle={`Grade ${result.original_grade}`}
+            />
+            <StatCard
+              label="Stressed Score"
+              value={result.stressed_score?.toFixed(0) ?? "—"}
+              subtitle={`Grade ${result.stressed_grade}`}
+              variant={
+                result.stressed_score < 500
+                  ? "danger"
+                  : result.stressed_score < 650
+                    ? "warning"
+                    : "default"
+              }
+            />
+            <StatCard
+              label="Delta"
+              value={`${result.score_delta > 0 ? "+" : ""}${result.score_delta?.toFixed(0) ?? "—"}`}
+              variant={result.score_delta < -50 ? "danger" : "default"}
+            />
+          </div>
         </div>
       )}
     </div>

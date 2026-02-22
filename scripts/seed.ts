@@ -33,7 +33,7 @@ const LENDER_COUNT = 175;
 const DUAL_ROLE_COUNT = 75; // borrowers who are also lenders
 const TOTAL_USERS = BORROWER_COUNT + LENDER_COUNT; // 425
 
-const TRADE_COUNT = 1050;
+const TRADE_COUNT = 10000;
 const PROPOSAL_COUNT = 500;
 
 const PASSWORD = "FlowzoDemo2026!";
@@ -69,12 +69,12 @@ function addDays(d: Date, n: number): Date {
   return out;
 }
 
-/** Realistic match delay: 70% within 0-30s, 20% within 1-60min, 10% within 1-24h */
+/** Realistic match delay: 80% within 1-10s, 15% within 10-60s, 5% within 1-5min */
 function realisticMatchDelay(): number {
   const roll = Math.random();
-  if (roll < 0.7) return randomInt(1, 30);           // seconds
-  if (roll < 0.9) return randomInt(60, 3600);         // 1-60 minutes in seconds
-  return randomInt(3600, 86400);                       // 1-24 hours in seconds
+  if (roll < 0.8) return randomInt(1, 10);             // 1-10 seconds
+  if (roll < 0.95) return randomInt(10, 60);           // 10-60 seconds
+  return randomInt(60, 300);                            // 1-5 minutes in seconds
 }
 
 function addSeconds(d: Date, s: number): Date {
@@ -494,8 +494,8 @@ async function createLendingData(users: SeedUser[]) {
       ["A"],
       ["B", "C"],
     ]) as string[];
-    const minApr = randomFloat(0, 5);
-    const targetApr = randomFloat(minApr + 0.5, minApr + 3);
+    const minApr = randomFloat(2, 8);
+    const targetApr = randomFloat(minApr + 0.5, minApr + 2);
     return {
       user_id: u.id,
       min_apr: minApr,
@@ -740,13 +740,13 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
   const transitions: Record<string, unknown>[] = [];
   const events: Record<string, unknown>[] = [];
 
-  // Distribution: 55% REPAID, 15% LIVE, 10% MATCHED, 10% PENDING_MATCH, 7% DEFAULTED, 3% CANCELLED
+  // Distribution: 45% REPAID, 12% LIVE, 8% MATCHED, 20% PENDING_MATCH, 12% DEFAULTED, 3% CANCELLED
   const statusDistribution = [
-    ...Array(Math.round(TRADE_COUNT * 0.55)).fill("REPAID"),
-    ...Array(Math.round(TRADE_COUNT * 0.15)).fill("LIVE"),
-    ...Array(Math.round(TRADE_COUNT * 0.1)).fill("MATCHED"),
-    ...Array(Math.round(TRADE_COUNT * 0.1)).fill("PENDING_MATCH"),
-    ...Array(Math.round(TRADE_COUNT * 0.07)).fill("DEFAULTED"),
+    ...Array(Math.round(TRADE_COUNT * 0.45)).fill("REPAID"),
+    ...Array(Math.round(TRADE_COUNT * 0.12)).fill("LIVE"),
+    ...Array(Math.round(TRADE_COUNT * 0.08)).fill("MATCHED"),
+    ...Array(Math.round(TRADE_COUNT * 0.20)).fill("PENDING_MATCH"),
+    ...Array(Math.round(TRADE_COUNT * 0.12)).fill("DEFAULTED"),
     ...Array(Math.round(TRADE_COUNT * 0.03)).fill("CANCELLED"),
   ];
 
@@ -756,8 +756,9 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const tradeId = uuid();
     const shiftDays = randomInt(1, 14);
     const amount = randomFloat(10, 500);
-    const feeRate = 0.049 * (borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2);
-    // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
+    const riskMult = borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2;
+    const termPremium = 1 + (shiftDays / 14) * 0.15; // +15% premium per 14-day period
+    const feeRate = 0.049 * riskMult * termPremium;
     const fee = Math.max(
       0.01,
       Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,

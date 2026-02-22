@@ -37,7 +37,7 @@ const GRADE_COLORS: Record<string, { fill: string; stroke: string; label: string
 
 const BID_COLOR = { fill: "rgba(59, 130, 246, 0.2)", stroke: "#3B82F6" };
 
-const BUCKET_WIDTH = 50; // 50% APR buckets
+const BUCKET_WIDTH = 2; // 2% APR buckets for granularity
 
 export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps) {
   const [hoveredBucket, setHoveredBucket] = useState<{
@@ -109,8 +109,8 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
     const askAprs = allBuckets.map((b) => b.aprBucket);
     const bidAprs = bidCumAsc.map((b) => b.apr);
     const allAprs = [...askAprs, ...bidAprs];
-    const minApr = Math.min(...allAprs, 0);
-    const maxApr = Math.max(...allAprs, 500) + BUCKET_WIDTH;
+    const minApr = Math.max(Math.min(...allAprs, 0), 0);
+    const maxApr = Math.min(Math.max(...allAprs, 20) + BUCKET_WIDTH, 50);
 
     // Build cumulative ask volume per grade (ascending by APR)
     const grades = ["A", "B", "C"];
