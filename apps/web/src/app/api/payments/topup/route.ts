@@ -74,13 +74,25 @@ export async function POST(request: Request) {
 
   // Deduct from Monzo card balance (both current + available)
   if (account) {
+    const newBalance = cardBalanceGBP - amountGBP;
     await supabase
       .from("accounts")
       .update({
-        balance_available: cardBalanceGBP - amountGBP,
+        balance_available: newBalance,
         balance_current: cardCurrentGBP - amountGBP,
       })
       .eq("id", account.id);
+
+    // Log balance change
+    await supabase.from("account_balance_log").insert({
+      user_id: user.id,
+      account_id: account.id,
+      entry_type: "TOPUP_DEBIT",
+      amount: amountGBP,
+      balance_before: cardBalanceGBP,
+      balance_after: newBalance,
+      description: `Top up lending pot £${amountGBP.toFixed(2)}`,
+    });
   }
 
   // Fetch updated pot to return

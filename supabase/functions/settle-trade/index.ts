@@ -302,13 +302,26 @@ serve(async (req: Request) => {
                     .single();
 
                   if (lenderAcct) {
+                    const balanceBefore = Number(lenderAcct.balance_available);
+                    const balanceAfter = balanceBefore + withdrawAmount;
                     await supabase
                       .from("accounts")
                       .update({
-                        balance_available: Number(lenderAcct.balance_available) + withdrawAmount,
+                        balance_available: balanceAfter,
                         balance_current: Number(lenderAcct.balance_current) + withdrawAmount,
                       })
                       .eq("id", lenderAcct.id);
+
+                    // Log balance change
+                    await supabase.from("account_balance_log").insert({
+                      user_id: alloc.lender_id,
+                      account_id: lenderAcct.id,
+                      entry_type: "AUTO_WITHDRAW_CREDIT",
+                      amount: withdrawAmount,
+                      balance_before: balanceBefore,
+                      balance_after: balanceAfter,
+                      description: `Auto-withdraw after trade ${trade.id} repaid`,
+                    });
                   }
 
                   if (Number(lenderPot.locked) <= principal) {
