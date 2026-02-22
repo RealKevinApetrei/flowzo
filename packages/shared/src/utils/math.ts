@@ -9,7 +9,10 @@ export function calculateFee(
 ): { fee: number; annualizedRate: number } {
   const riskMultiplier = FEE_CONFIG.riskMultipliers[riskGrade];
   const utilizationMultiplier = 1.0 + Math.max(poolUtilization - 0.5, 0) * 2.0;
-  const rawFee = FEE_CONFIG.baseRatePerDay * amountPence * shiftDays * riskMultiplier * utilizationMultiplier;
+  // Base APR + term premium (longer shifts = higher rate)
+  const effectiveAprPct = FEE_CONFIG.baseAprPct * riskMultiplier
+    + FEE_CONFIG.termPremiumPerDay * shiftDays;
+  const rawFee = amountPence * (effectiveAprPct / 100) * (shiftDays / 365) * utilizationMultiplier;
   const cappedFee = Math.max(
     FEE_CONFIG.minFee,
     Math.round(Math.min(rawFee, amountPence * FEE_CONFIG.maxFeePercent, FEE_CONFIG.maxFeeAbsolute)),
