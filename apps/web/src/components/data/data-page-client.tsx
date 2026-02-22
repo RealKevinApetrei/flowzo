@@ -1031,6 +1031,8 @@ function LendersTab({
   lenders: LenderConcRow[];
   totalPool: number;
 }) {
+  const [showAll, setShowAll] = useState(false);
+
   // Sort by total capital descending
   const sorted = [...lenders].sort(
     (a, b) => Number(b.total_capital) - Number(a.total_capital),
@@ -1124,13 +1126,24 @@ function LendersTab({
                 `${Number(r.utilization_pct).toFixed(0)}%`,
             },
           ]}
-          data={sorted.slice(0, 25)}
+          data={showAll ? sorted : sorted.slice(0, 25)}
           emptyMessage="No lender data."
         />
-        {sorted.length > 25 && (
-          <p className="text-xs text-text-muted text-center">
-            Showing top 25 of {sorted.length} lenders
-          </p>
+        {sorted.length > 25 && !showAll && (
+          <button
+            onClick={() => setShowAll(true)}
+            className="w-full text-center text-xs font-semibold text-coral py-2 hover:underline"
+          >
+            Show all {sorted.length} lenders
+          </button>
+        )}
+        {showAll && sorted.length > 25 && (
+          <button
+            onClick={() => setShowAll(false)}
+            className="w-full text-center text-xs font-semibold text-text-muted py-2 hover:underline"
+          >
+            Show top 25 only
+          </button>
         )}
       </section>
     </div>

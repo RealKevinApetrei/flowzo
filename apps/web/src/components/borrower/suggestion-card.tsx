@@ -5,6 +5,14 @@ import { formatCurrency, formatDate } from "@flowzo/shared";
 import { Button } from "@/components/ui/button";
 import { RangeSlider } from "@/components/ui/range-slider";
 
+interface MarketContext {
+  liquidity_ratio: number;
+  supply_count: number;
+  demand_count: number;
+  bid_apr: number;
+  ask_apr: number;
+}
+
 interface SuggestionCardProps {
   proposal: {
     id: string;
@@ -20,12 +28,14 @@ interface SuggestionCardProps {
     };
     explanation_text: string | null;
   };
+  marketContext?: MarketContext;
   onAccept: (id: string, adjustedFeePence: number) => void | Promise<void>;
   onDismiss: (id: string) => void | Promise<void>;
 }
 
 export function SuggestionCard({
   proposal,
+  marketContext,
   onAccept,
   onDismiss,
 }: SuggestionCardProps) {
@@ -44,16 +54,25 @@ export function SuggestionCard({
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
 
-  // Match probability based on fee position in range
-  // TODO: Replace with real order book data from backend (see Issue #51)
-  // Backend should expose: GET /api/trades/match-probability?fee_pence=X&shift_days=Y
+  // Match probability — uses real market data when available
   const matchProbability = useMemo(() => {
     const range = feeRange.max - feeRange.min;
-    if (range <= 0) return 1;
+    if (range <= 0) return 100;
     const position = (adjustedFee - feeRange.min) / range; // 0..1
-    // Placeholder curve: generous near top, drops at bottom
+
+    if (marketContext && marketContext.supply_count > 0) {
+      // Market-aware: base on liquidity ratio + fee position
+      // Higher liquidity = higher base probability, fee slider adjusts within band
+      const liquidityBase = Math.min(marketContext.liquidity_ratio, 2) / 2; // 0..1 (capped at 2x)
+      const baseProbability = liquidityBase * 70 + 20; // 20–90% base from liquidity
+      // Fee position modulates ±15%
+      const feeAdjustment = (position - 0.5) * 30;
+      return Math.round(Math.min(99, Math.max(5, baseProbability + feeAdjustment)));
+    }
+
+    // Fallback: placeholder curve based on fee position
     return Math.round(Math.pow(position, 0.6) * 100);
-  }, [adjustedFee, feeRange]);
+  }, [adjustedFee, feeRange, marketContext]);
 
   // Dynamic color based on match probability
   const feeColor = useMemo(() => {
