@@ -1,5 +1,5 @@
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY ?? "";
-const MODEL = process.env.CLAUDE_MODEL ?? "claude-3-5-haiku-20241022";
+const MODEL = process.env.CLAUDE_MODEL ?? "claude-haiku-4-5-20251001";
 
 interface ClaudeMessage {
   role: "user" | "assistant";
