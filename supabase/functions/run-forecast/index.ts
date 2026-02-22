@@ -144,7 +144,7 @@ function detectIncomePattern(
 
 // Overdraft buffer: GBP 100
 const OVERDRAFT_BUFFER = 100.0;
-const FORECAST_DAYS = 30;
+const FORECAST_DAYS = 180;
 
 // ---------------------------------------------------------------------------
 // Main handler

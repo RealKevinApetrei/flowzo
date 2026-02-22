@@ -24,27 +24,59 @@ function demoDate(daysFromNow: number): string {
 
 // Demo data for calendar when no real forecasts/obligations exist
 function buildDemoForecasts() {
-  // Realistic 30-day cashflow: starts tight, payday spikes, bills erode, danger zone at end
-  const baseBalances = [
-    42000, 38000, 35000, 33000, 30000,       // days 0-4: tight (yellow)
-    180000, 178000, 175000, 170000, 165000,   // day 5: payday +£1,500 (green)
-    160000, 155000, 60000, 45000, 43000,      // day 12: rent -£950 (drops to yellow)
-    41000, 39000, 28000, 26000, 24000,        // day 17: energy+water (yellow)
-    21000, 18000, 15000, 13000, 11000,        // getting tight (yellow)
-    8000, 5000, -5000, -8000, -10000,         // day 25-29: danger zone (red)
-  ];
-  const incomes =  [0,0,0,0,0, 150000,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0];
-  const outgoings = [0,4000,3000,2000,3000, 0,2000,3000,5000,5000, 5000,5000,95000,15000,2000, 2000,2000,11000,2000,2000, 3000,3000,3000,2000,2000, 3000,3000,10000,3000,2000];
+  // Generate 180-day cashflow with repeating monthly pattern:
+  // payday on 25th, rent on 1st, bills scattered, gradual spend-down
+  const results: Array<{
+    forecast_date: string;
+    projected_balance_pence: number;
+    is_danger: boolean;
+    confidence_low_pence: number;
+    confidence_high_pence: number;
+    income_expected_pence: number;
+    outgoings_expected_pence: number;
+  }> = [];
 
-  return baseBalances.map((bal, i) => ({
-    forecast_date: demoDate(i),
-    projected_balance_pence: bal,
-    is_danger: bal < 10000,
-    confidence_low_pence: Math.round(bal * 0.85),
-    confidence_high_pence: Math.round(bal * 1.15),
-    income_expected_pence: incomes[i],
-    outgoings_expected_pence: outgoings[i],
-  }));
+  let balance = 42000; // start at £420
+
+  for (let i = 0; i < 180; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() + i);
+    const dom = d.getDate();
+
+    let income = 0;
+    let outgoings = 0;
+
+    // Payday on 25th: +£1,500
+    if (dom === 25) income = 150000;
+
+    // Rent on 1st: -£950
+    if (dom === 1) outgoings += 95000;
+    // Energy+water on 15th: -£130
+    if (dom === 15) outgoings += 13000;
+    // Council tax on 5th: -£142
+    if (dom === 5) outgoings += 14200;
+    // Subscriptions on 10th: -£45
+    if (dom === 10) outgoings += 4500;
+    // Daily irregular spend: ~£15/day
+    outgoings += 1500;
+
+    balance = balance - outgoings + income;
+
+    const uncertainty = 10 * Math.sqrt(i + 1);
+    const uncertaintyPence = Math.round(uncertainty * 100);
+
+    results.push({
+      forecast_date: demoDate(i),
+      projected_balance_pence: balance,
+      is_danger: balance < 10000,
+      confidence_low_pence: balance - uncertaintyPence,
+      confidence_high_pence: balance + uncertaintyPence,
+      income_expected_pence: income,
+      outgoings_expected_pence: outgoings,
+    });
+  }
+
+  return results;
 }
 
 function buildDemoObligations() {
@@ -122,10 +154,10 @@ export default async function BorrowerHomePage() {
     ? Math.round(Number(account.balance_available) * 100)
     : 23902; // demo: £239.02
 
-  // Fetch 30-day forecast for the user (with enhanced fields)
+  // Fetch 180-day forecast for the user (with enhanced fields)
   const today = new Date();
-  const thirtyDaysLater = new Date(today);
-  thirtyDaysLater.setDate(today.getDate() + 30);
+  const forecastEnd = new Date(today);
+  forecastEnd.setDate(today.getDate() + 180);
 
   const { data: rawForecasts } = await supabase
     .from("forecasts")
@@ -134,7 +166,7 @@ export default async function BorrowerHomePage() {
     )
     .eq("user_id", user.id)
     .gte("forecast_date", today.toISOString().split("T")[0])
-    .lte("forecast_date", thirtyDaysLater.toISOString().split("T")[0])
+    .lte("forecast_date", forecastEnd.toISOString().split("T")[0])
     .order("forecast_date", { ascending: true });
 
   // Map to the heatmap component&apos;s expected prop shape (DB stores GBP -> convert to pence)
@@ -154,14 +186,14 @@ export default async function BorrowerHomePage() {
     ),
   }));
 
-  // Fetch upcoming obligations (next 30 days — full calendar range)
+  // Fetch upcoming obligations (next 180 days — full calendar range)
   const { data: obligations } = await supabase
     .from("obligations")
     .select("id, name, amount, frequency, next_expected, confidence, is_essential, category, merchant_name")
     .eq("user_id", user.id)
     .eq("active", true)
     .gte("next_expected", today.toISOString().split("T")[0])
-    .lte("next_expected", thirtyDaysLater.toISOString().split("T")[0])
+    .lte("next_expected", forecastEnd.toISOString().split("T")[0])
     .order("next_expected", { ascending: true });
 
   const upcomingObligations = (obligations ?? []).map((o) => ({
