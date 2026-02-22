@@ -16,6 +16,25 @@ export const TRUELAYER_CONFIG = {
     : "uk-ob-all uk-oauth-all",
 } as const;
 
+/** Resolve the true origin from a request, handling Vercel's forwarded headers
+ *  and falling back to NEXT_PUBLIC_APP_URL or the raw request URL. */
+export function resolveOrigin(request: Request): string {
+  // 1. Prefer configured app URL (guaranteed to match TrueLayer Console)
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    return process.env.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  }
+
+  // 2. Use Vercel's forwarded headers (correct proto + host behind proxy)
+  const proto = request.headers.get("x-forwarded-proto") ?? "https";
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host) {
+    return `${proto}://${host}`;
+  }
+
+  // 3. Fallback to raw request URL origin
+  return new URL(request.url).origin;
+}
+
 /** Build the redirect URI from the request origin so it always matches
  *  the actual URL the user is visiting (localhost, Vercel preview, prod). */
 export function getRedirectUri(origin: string): string {

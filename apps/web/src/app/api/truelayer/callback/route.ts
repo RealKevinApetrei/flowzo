@@ -1,14 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { exchangeCode } from "@/lib/truelayer/auth";
+import { resolveOrigin } from "@/lib/truelayer/config";
 
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
   const code = searchParams.get("code");
   const state = searchParams.get("state");
+  const origin = resolveOrigin(request);
 
   console.log(`[TrueLayer Callback] origin=${origin}, redirect_uri=${origin}/api/truelayer/callback`);
 
@@ -49,7 +51,7 @@ export async function GET(request: Request) {
             Date.now() + tokens.expires_in * 1000,
           ).toISOString(),
         },
-        status: "active",
+        status: "syncing",
       })
       .select("id")
       .single();
@@ -70,62 +72,57 @@ export async function GET(request: Request) {
       data: { truelayer_state: null },
     });
 
-    // Mark as syncing
-    await supabase
-      .from("bank_connections")
-      .update({ status: "syncing" })
-      .eq("id", connection.id);
+    // Run pipeline in background AFTER redirect (prevents Vercel timeout)
+    const userId = user.id;
+    const connectionId = connection.id;
+    after(async () => {
+      const admin = createAdminClient();
+      try {
+        console.log(`[Pipeline] Starting background sync for user ${userId}`);
 
-    // Run pipeline directly using admin client (avoids cookie/auth issues on serverless)
-    const admin = createAdminClient();
-    try {
-      // Step 1: Sync banking data
-      const { error: syncError } = await admin.functions.invoke("sync-banking-data", {
-        body: { user_id: user.id, connection_id: connection.id },
-      });
+        const { error: syncError } = await admin.functions.invoke("sync-banking-data", {
+          body: { user_id: userId, connection_id: connectionId },
+        });
+        if (syncError) {
+          console.error("Pipeline sync-banking-data failed:", syncError.message);
+          await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connectionId);
+          return;
+        }
 
-      if (syncError) {
-        console.error("Pipeline sync-banking-data failed:", syncError.message);
-        await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
-        return NextResponse.redirect(`${origin}/borrower`);
+        // Compute borrower features (non-blocking)
+        const { error: featError } = await admin.functions.invoke("compute-borrower-features", {
+          body: { user_id: userId },
+        });
+        if (featError) {
+          console.warn("Feature computation failed (continuing):", featError.message);
+        }
+
+        const { error: forecastError } = await admin.functions.invoke("run-forecast", {
+          body: { user_id: userId },
+        });
+        if (forecastError) {
+          console.error("Pipeline run-forecast failed:", forecastError.message);
+          await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connectionId);
+          return;
+        }
+
+        const { error: proposalsError } = await admin.functions.invoke("generate-proposals", {
+          body: { user_id: userId },
+        });
+        if (proposalsError) {
+          console.error("Pipeline generate-proposals failed:", proposalsError.message);
+          // Still mark active — sync + forecast succeeded
+        }
+
+        await admin.from("bank_connections").update({ status: "active" }).eq("id", connectionId);
+        console.log(`[Pipeline] Background sync completed for user ${userId}`);
+      } catch (err) {
+        console.error("Pipeline call failed:", err);
+        await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connectionId);
       }
+    });
 
-      // Step 1.5: Compute borrower features (non-blocking)
-      const { error: featError } = await admin.functions.invoke("compute-borrower-features", {
-        body: { user_id: user.id },
-      });
-      if (featError) {
-        console.warn("Feature computation failed (continuing):", featError.message);
-      }
-
-      // Step 2: Run forecast
-      const { error: forecastError } = await admin.functions.invoke("run-forecast", {
-        body: { user_id: user.id },
-      });
-
-      if (forecastError) {
-        console.error("Pipeline run-forecast failed:", forecastError.message);
-        await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
-        return NextResponse.redirect(`${origin}/borrower`);
-      }
-
-      // Step 3: Generate proposals
-      const { error: proposalsError } = await admin.functions.invoke("generate-proposals", {
-        body: { user_id: user.id },
-      });
-
-      if (proposalsError) {
-        console.error("Pipeline generate-proposals failed:", proposalsError.message);
-        // Still mark active — sync + forecast succeeded
-      }
-
-      // Pipeline succeeded
-      await admin.from("bank_connections").update({ status: "active" }).eq("id", connection.id);
-    } catch (err) {
-      console.error("Pipeline call failed:", err);
-      await admin.from("bank_connections").update({ status: "sync_failed" }).eq("id", connection.id);
-    }
-
+    // Redirect immediately — pipeline runs in background
     return NextResponse.redirect(`${origin}/borrower`);
   } catch (error) {
     console.error(
