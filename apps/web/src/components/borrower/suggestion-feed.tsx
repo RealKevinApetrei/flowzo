@@ -37,6 +37,71 @@ interface SuggestionFeedProps {
   marketContext?: MarketContext;
 }
 
+function demoDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().split("T")[0];
+}
+
+const DEMO_PROPOSALS: Proposal[] = [
+  {
+    id: "demo-1",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Electricity",
+      original_date: demoDate(3),
+      shifted_date: demoDate(9),
+      amount_pence: 6750,
+      fee_pence: 55,
+      shift_days: 6,
+    },
+    explanation_text: null,
+  },
+  {
+    id: "demo-2",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Council Tax",
+      original_date: demoDate(9),
+      shifted_date: demoDate(13),
+      amount_pence: 14800,
+      fee_pence: 125,
+      shift_days: 4,
+    },
+    explanation_text: "Your balance dips after rent. Shifting Council Tax past payday saves you from going overdrawn.",
+  },
+  {
+    id: "demo-3",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Car Insurance",
+      original_date: demoDate(5),
+      shifted_date: demoDate(12),
+      amount_pence: 6500,
+      fee_pence: 48,
+      shift_days: 7,
+    },
+    explanation_text: "Two bills overlap this week. Moving Car Insurance to next week keeps your balance above £100.",
+  },
+  {
+    id: "demo-4",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Internet",
+      original_date: demoDate(7),
+      shifted_date: demoDate(14),
+      amount_pence: 3200,
+      fee_pence: 22,
+      shift_days: 7,
+    },
+    explanation_text: null,
+  },
+];
+
 function SkeletonCard() {
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 animate-pulse">
@@ -91,14 +156,15 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
         },
         explanation_text: row.explanation_text,
       }));
-      setProposals(mapped);
+      setProposals(mapped.length > 0 ? mapped : DEMO_PROPOSALS);
     }
     setLoading(false);
   }, [supabase, userId]);
 
-  // Touch swipe refs (must be before early returns to satisfy rules of hooks)
-  const touchStartX = useRef<number | null>(null);
-  const touchDeltaX = useRef(0);
+  // Swipe/drag refs (must be before early returns to satisfy rules of hooks)
+  const dragStartX = useRef<number | null>(null);
+  const dragDeltaX = useRef(0);
+  const isDragging = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -235,30 +301,45 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
     setActiveIndex(Math.max(0, Math.min(index, proposals.length - 1)));
   }
 
-  function handleTouchStart(e: React.TouchEvent) {
-    touchStartX.current = e.touches[0].clientX;
-    touchDeltaX.current = 0;
+  // Shared swipe logic
+  function startDrag(x: number) {
+    dragStartX.current = x;
+    dragDeltaX.current = 0;
+    isDragging.current = true;
   }
 
-  function handleTouchMove(e: React.TouchEvent) {
-    if (touchStartX.current === null) return;
-    touchDeltaX.current = e.touches[0].clientX - touchStartX.current;
+  function moveDrag(x: number) {
+    if (dragStartX.current === null) return;
+    dragDeltaX.current = x - dragStartX.current;
   }
 
-  function handleTouchEnd() {
-    const threshold = 50; // minimum px to count as a swipe
-    if (Math.abs(touchDeltaX.current) > threshold) {
-      if (touchDeltaX.current < 0) {
-        // Swiped left → next
-        goTo(activeIndex + 1);
-      } else {
-        // Swiped right → previous
-        goTo(activeIndex - 1);
-      }
+  function endDrag() {
+    const threshold = 50;
+    if (Math.abs(dragDeltaX.current) > threshold) {
+      if (dragDeltaX.current < 0) goTo(activeIndex + 1);
+      else goTo(activeIndex - 1);
     }
-    touchStartX.current = null;
-    touchDeltaX.current = 0;
+    dragStartX.current = null;
+    dragDeltaX.current = 0;
+    isDragging.current = false;
   }
+
+  // Touch handlers
+  function handleTouchStart(e: React.TouchEvent) { startDrag(e.touches[0].clientX); }
+  function handleTouchMove(e: React.TouchEvent) { moveDrag(e.touches[0].clientX); }
+  function handleTouchEnd() { endDrag(); }
+
+  // Mouse handlers (desktop drag)
+  function handleMouseDown(e: React.MouseEvent) {
+    e.preventDefault();
+    startDrag(e.clientX);
+  }
+  function handleMouseMove(e: React.MouseEvent) {
+    if (!isDragging.current) return;
+    moveDrag(e.clientX);
+  }
+  function handleMouseUp() { if (isDragging.current) endDrag(); }
+  function handleMouseLeave() { if (isDragging.current) endDrag(); }
 
   const activeProposal = proposals[activeIndex];
 
@@ -295,13 +376,17 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
         )}
       </div>
 
-      {/* Active card with touch swipe */}
+      {/* Active card with swipe/drag */}
       <div
         ref={containerRef}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="touch-pan-y"
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseLeave}
+        className="touch-pan-y select-none cursor-grab active:cursor-grabbing"
       >
         {activeProposal && (
           <SuggestionCard
