@@ -1,9 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
 import { DataPageClient } from "@/components/data/data-page-client";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export default async function DataPage() {
-  const supabase = await createClient();
+  // Use admin client for analytics — data page shows platform-wide aggregates
+  const supabase = createAdminClient();
 
   // Fetch all analytics views in parallel
   const [

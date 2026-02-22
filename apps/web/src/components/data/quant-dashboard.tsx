@@ -132,7 +132,18 @@ export function QuantDashboard() {
           if (!res.ok) throw new Error("Failed to fetch lenders");
           const data = await res.json();
           if (data.error) throw new Error(data.error);
-          setLenders(data);
+          // Map backend fields (pot_size_gbp, target_yield_pct) to expected SimLender shape
+          const mappedLenders = (data.lenders ?? []).map((l: Record<string, unknown>) => ({
+            lender_id: String(l.lender_id ?? ""),
+            display_name: `Lender ${l.lender_id} (${l.risk_appetite ?? "Unknown"})`,
+            total_deployed: 0,
+            available: Number(l.pot_size_gbp ?? 0),
+            locked: 0,
+            realized_yield: 0,
+            trade_count: 0,
+            avg_apr_bps: Math.round(Number(l.target_yield_pct ?? 0) * 100),
+          }));
+          setLenders({ lenders: mappedLenders });
           break;
         }
         case "stress": {
