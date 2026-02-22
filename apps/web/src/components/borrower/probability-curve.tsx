@@ -20,6 +20,7 @@ function calculateProbability(currentFee: number, agentFee: number): number {
 export function ProbabilityCurve({
   currentFeePence,
   agentFeePence,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   amountPence,
   riskGrade,
 }: ProbabilityCurveProps) {

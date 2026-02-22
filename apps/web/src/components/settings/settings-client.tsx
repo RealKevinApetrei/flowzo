@@ -87,54 +87,6 @@ export function SettingsClient({
     <div>
       <TopBar title="Profile" />
       <div className="px-4 py-6 space-y-6 max-w-lg sm:max-w-2xl mx-auto">
-        {/* Achievements */}
-        {achievements && (achievements.borrowerSavedPence > 0 || achievements.lenderAmountPence > 0) && (
-          <section className="card-monzo p-5 space-y-4">
-            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
-              Your Impact
-            </h2>
-
-            {achievements.borrowerSavedPence > 0 && (
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-success">
-                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-2xl font-extrabold text-navy">
-                    {formatCurrency(achievements.borrowerSavedPence)}
-                  </p>
-                  <p className="text-sm text-text-secondary">
-                    saved from overdraft across {achievements.borrowerTradeCount} bill {achievements.borrowerTradeCount === 1 ? "shift" : "shifts"}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {achievements.lenderAmountPence > 0 && (
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center shrink-0">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-coral">
-                    <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M22 21v-2a4 4 0 00-3-3.87" />
-                    <path d="M16 3.13a4 4 0 010 7.75" />
-                  </svg>
-                </div>
-                <div>
-                  <p className="text-2xl font-extrabold text-navy">
-                    {achievements.lenderPeopleHelped} {achievements.lenderPeopleHelped === 1 ? "person" : "people"}
-                  </p>
-                  <p className="text-sm text-text-secondary">
-                    helped avoid {formatCurrency(achievements.lenderAmountPence)} in overdraft fees through your lending
-                  </p>
-                </div>
-              </div>
-            )}
-          </section>
-        )}
-
         {/* Account */}
         <section className="card-monzo p-5 space-y-3">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
@@ -200,6 +152,54 @@ export function SettingsClient({
             )}
           </div>
         </section>
+
+        {/* Achievements */}
+        {achievements && (achievements.borrowerSavedPence > 0 || achievements.lenderAmountPence > 0) && (
+          <section className="card-monzo p-5 space-y-4">
+            <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+              Your Impact
+            </h2>
+
+            {achievements.borrowerSavedPence > 0 && (
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-success">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-2xl font-extrabold text-navy">
+                    {formatCurrency(achievements.borrowerSavedPence)}
+                  </p>
+                  <p className="text-sm text-text-secondary">
+                    saved from overdraft across {achievements.borrowerTradeCount} bill {achievements.borrowerTradeCount === 1 ? "shift" : "shifts"}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {achievements.lenderAmountPence > 0 && (
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-coral/10 flex items-center justify-center shrink-0">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5 text-coral">
+                    <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4-4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 00-3-3.87" />
+                    <path d="M16 3.13a4 4 0 010 7.75" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-2xl font-extrabold text-navy">
+                    {achievements.lenderPeopleHelped} {achievements.lenderPeopleHelped === 1 ? "person" : "people"}
+                  </p>
+                  <p className="text-sm text-text-secondary">
+                    helped avoid {formatCurrency(achievements.lenderAmountPence)} in overdraft fees through your lending
+                  </p>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Bank Connections */}
         <section className="card-monzo p-5 space-y-3">

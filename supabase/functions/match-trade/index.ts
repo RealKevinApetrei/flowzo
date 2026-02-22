@@ -133,6 +133,11 @@ serve(async (req: Request) => {
     let tradeRiskGrade = trade.risk_grade as string;
     const tradeShiftDays = Number(trade.shift_days);
 
+    // Senior/Junior tranche fee split: 80% to lenders (senior), 20% to platform (junior)
+    const PLATFORM_FEE_PCT = 0.20;
+    const platformFee = Math.round(tradeFee * PLATFORM_FEE_PCT * 100) / 100;
+    const lenderFee = Math.round((tradeFee - platformFee) * 100) / 100;
+
     // Real-time ML scoring: re-score borrower via Quant API if available
     if (QUANT_API_URL) {
       try {
@@ -330,10 +335,10 @@ serve(async (req: Request) => {
 
       if (allocatable <= 0) continue;
 
-      // Calculate fee slice proportional to allocation
+      // Calculate fee slice proportional to allocation (from lender's 80% share)
       const feeSlice =
         Math.round(
-          (allocatable / tradeAmount) * tradeFee * 100,
+          (allocatable / tradeAmount) * lenderFee * 100,
         ) / 100;
 
       // Create allocation
@@ -406,7 +411,12 @@ serve(async (req: Request) => {
     if (fullyMatched) {
       const { error: statusErr } = await supabase
         .from("trades")
-        .update({ status: "MATCHED", matched_at: new Date().toISOString() })
+        .update({
+          status: "MATCHED",
+          matched_at: new Date().toISOString(),
+          platform_fee: platformFee,
+          lender_fee: lenderFee,
+        })
         .eq("id", trade_id);
 
       if (statusErr) {

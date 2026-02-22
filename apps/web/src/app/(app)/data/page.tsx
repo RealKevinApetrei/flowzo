@@ -17,6 +17,8 @@ export default async function DataPage() {
     { data: matchEfficiency },
     { data: pendingTradesRaw },
     { data: repaidTrades },
+    { data: revenueSummary },
+    { data: revenueMonthly },
   ] = await Promise.all([
     supabase.from("trade_analytics").select("*"),
     supabase.from("risk_distribution").select("*"),
@@ -39,6 +41,12 @@ export default async function DataPage() {
       .eq("status", "REPAID")
       .not("repaid_at", "is", null)
       .order("repaid_at", { ascending: true }),
+    // Platform revenue views
+    supabase.from("platform_revenue_summary").select("*").single(),
+    supabase
+      .from("platform_revenue_monthly")
+      .select("*")
+      .order("month", { ascending: true }),
   ]);
 
   // ── Compose poolHealth from pool_overview + platform_totals ─────────────
@@ -208,6 +216,24 @@ export default async function DataPage() {
           yieldTrends={yieldTrends}
           lenderConcentration={lenderConcentration}
           pendingTrades={pendingTrades}
+          revenueSummary={
+            revenueSummary
+              ? {
+                  total_fee_income: Number(revenueSummary.total_fee_income ?? 0),
+                  total_default_losses: Number(revenueSummary.total_default_losses ?? 0),
+                  net_revenue: Number(revenueSummary.net_revenue ?? 0),
+                  fee_transactions: Number(revenueSummary.fee_transactions ?? 0),
+                  default_events: Number(revenueSummary.default_events ?? 0),
+                }
+              : null
+          }
+          revenueMonthly={(revenueMonthly ?? []).map((r) => ({
+            month: r.month as string,
+            fee_income: Number(r.fee_income ?? 0),
+            default_losses: Number(r.default_losses ?? 0),
+            net_revenue: Number(r.net_revenue ?? 0),
+            trade_count: Number(r.trade_count ?? 0),
+          }))}
         />
       </div>
     </div>
