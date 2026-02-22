@@ -37,6 +37,71 @@ interface SuggestionFeedProps {
   marketContext?: MarketContext;
 }
 
+function demoDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().split("T")[0];
+}
+
+const DEMO_PROPOSALS: Proposal[] = [
+  {
+    id: "demo-1",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Electricity",
+      original_date: demoDate(3),
+      shifted_date: demoDate(9),
+      amount_pence: 6750,
+      fee_pence: 55,
+      shift_days: 6,
+    },
+    explanation_text: null,
+  },
+  {
+    id: "demo-2",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Council Tax",
+      original_date: demoDate(9),
+      shifted_date: demoDate(13),
+      amount_pence: 14800,
+      fee_pence: 125,
+      shift_days: 4,
+    },
+    explanation_text: "Your balance dips after rent. Shifting Council Tax past payday saves you from going overdrawn.",
+  },
+  {
+    id: "demo-3",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Car Insurance",
+      original_date: demoDate(5),
+      shifted_date: demoDate(12),
+      amount_pence: 6500,
+      fee_pence: 48,
+      shift_days: 7,
+    },
+    explanation_text: "Two bills overlap this week. Moving Car Insurance to next week keeps your balance above £100.",
+  },
+  {
+    id: "demo-4",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Internet",
+      original_date: demoDate(7),
+      shifted_date: demoDate(14),
+      amount_pence: 3200,
+      fee_pence: 22,
+      shift_days: 7,
+    },
+    explanation_text: null,
+  },
+];
+
 function SkeletonCard() {
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5 animate-pulse">
@@ -91,7 +156,7 @@ export function SuggestionFeed({ userId, marketContext }: SuggestionFeedProps) {
         },
         explanation_text: row.explanation_text,
       }));
-      setProposals(mapped);
+      setProposals(mapped.length > 0 ? mapped : DEMO_PROPOSALS);
     }
     setLoading(false);
   }, [supabase, userId]);
