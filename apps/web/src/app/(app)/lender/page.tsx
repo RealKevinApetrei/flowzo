@@ -199,6 +199,7 @@ export default async function LenderHomePage() {
         durationOptions={durationOptions}
         initialMaxShiftDays={initialMaxShiftDays}
         impactStats={impactStats}
+        withdrawalQueued={!!pot?.withdrawal_queued}
       />
     </>
   );

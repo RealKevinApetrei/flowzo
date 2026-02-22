@@ -161,9 +161,9 @@ export default async function BorrowerHomePage() {
         )}
 
         {/* Danger Summary + Calendar */}
-        {hasData && (
+        {(hasData || activeShifts.length > 0) && (
           <section>
-            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} />
+            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} repayments={activeShifts} />
           </section>
         )}
 

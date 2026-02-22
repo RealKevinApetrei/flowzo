@@ -44,6 +44,7 @@ interface LenderPageClientProps {
   durationOptions: DurationOption[];
   initialMaxShiftDays: number;
   impactStats: ImpactStats;
+  withdrawalQueued: boolean;
 }
 
 export function LenderPageClient({
@@ -54,6 +55,7 @@ export function LenderPageClient({
   durationOptions,
   initialMaxShiftDays,
   impactStats,
+  withdrawalQueued,
 }: LenderPageClientProps) {
   const router = useRouter();
 
@@ -67,7 +69,7 @@ export function LenderPageClient({
         />
 
         {/* Lending Pot Card */}
-        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} onPotUpdated={() => router.refresh()} />
+        <LendingPotCard pot={initialPot} currentApyBps={currentApyBps} withdrawalQueued={withdrawalQueued} onPotUpdated={() => router.refresh()} />
 
         {/* Duration Preference */}
         <DurationSelector options={durationOptions} initialMaxShiftDays={initialMaxShiftDays} />

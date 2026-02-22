@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@flowzo/shared";
 import { toast } from "sonner";
+import { withdrawAllAvailable, queueWithdrawal, cancelQueuedWithdrawal } from "@/lib/actions/lending";
 
 interface LendingPotCardProps {
   pot: {
@@ -14,6 +15,7 @@ interface LendingPotCardProps {
     realized_yield_pence: number;
   } | null;
   currentApyBps: number;
+  withdrawalQueued?: boolean;
   onPotUpdated?: () => void;
 }
 
@@ -23,7 +25,7 @@ function bpsToPercent(bps: number): string {
   return (bps / 100).toFixed(2) + "%";
 }
 
-export function LendingPotCard({ pot, currentApyBps, onPotUpdated }: LendingPotCardProps) {
+export function LendingPotCard({ pot, currentApyBps, withdrawalQueued = false, onPotUpdated }: LendingPotCardProps) {
   const [loading, setLoading] = useState(false);
   const [customAmount, setCustomAmount] = useState("");
 
@@ -211,6 +213,83 @@ export function LendingPotCard({ pot, currentApyBps, onPotUpdated }: LendingPotC
             </Button>
           </div>
         </div>
+
+        {/* Withdraw + Stop Lending */}
+        {pot && (
+          <div className="space-y-3 pt-3 border-t border-warm-grey">
+            {/* Withdraw available */}
+            {available > 0 && (
+              <Button
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await withdrawAllAvailable();
+                    toast.success(`Withdrew ${formatCurrency(available)}`);
+                    onPotUpdated?.();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Withdrawal failed");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                Withdraw {formatCurrency(available)}
+              </Button>
+            )}
+
+            {/* Stop lending / resume lending */}
+            {withdrawalQueued ? (
+              <Button
+                variant="outline"
+                className="w-full text-success border-success/30 hover:bg-success/5"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await cancelQueuedWithdrawal();
+                    toast.success("Resumed lending");
+                    onPotUpdated?.();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Failed to resume");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                Resume Lending
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full text-danger border-danger/30 hover:bg-danger/5"
+                disabled={loading}
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await queueWithdrawal();
+                    toast.success("Lending stopped. Funds will be returned as trades settle.");
+                    onPotUpdated?.();
+                  } catch (err) {
+                    toast.error(err instanceof Error ? err.message : "Failed to stop lending");
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              >
+                Stop Lending
+              </Button>
+            )}
+
+            {withdrawalQueued && (
+              <p className="text-[10px] text-text-muted text-center">
+                Lending is paused. Locked funds will be returned as active trades settle.
+              </p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -12,12 +12,20 @@ interface ForecastDay {
   outgoings_expected_pence: number;
 }
 
+interface Repayment {
+  id: string;
+  obligation_name: string;
+  amount_pence: number;
+  new_due_date: string;
+}
+
 interface DangerSummaryProps {
   dangerCount: number;
   forecasts: ForecastDay[];
+  repayments?: Repayment[];
 }
 
-export function DangerSummary({ dangerCount, forecasts }: DangerSummaryProps) {
+export function DangerSummary({ dangerCount, forecasts, repayments = [] }: DangerSummaryProps) {
   return (
     <div className="space-y-3">
       {/* Status banner */}
@@ -41,7 +49,7 @@ export function DangerSummary({ dangerCount, forecasts }: DangerSummaryProps) {
       )}
 
       {/* Calendar always visible */}
-      <CalendarHeatmap forecasts={forecasts} />
+      <CalendarHeatmap forecasts={forecasts} repayments={repayments} />
     </div>
   );
 }

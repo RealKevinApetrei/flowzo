@@ -21,9 +21,17 @@ interface Obligation {
   next_expected: string | null;
 }
 
+interface Repayment {
+  id: string;
+  obligation_name: string;
+  amount_pence: number;
+  new_due_date: string;
+}
+
 interface CalendarHeatmapProps {
   forecasts: ForecastDay[];
   obligations?: Obligation[];
+  repayments?: Repayment[];
 }
 
 function getDayColor(balancePence: number): {
@@ -62,6 +70,7 @@ function getMonthName(dateStr: string): string {
 export function CalendarHeatmap({
   forecasts,
   obligations = [],
+  repayments = [],
 }: CalendarHeatmapProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
@@ -108,12 +117,29 @@ export function CalendarHeatmap({
 
   const selectedForecast = selectedDay !== null ? days[selectedDay] : null;
 
+  // Build repayment map by date string
+  const repaymentMap = useMemo(() => {
+    const map = new Map<string, Repayment[]>();
+    for (const r of repayments) {
+      const existing = map.get(r.new_due_date) ?? [];
+      existing.push(r);
+      map.set(r.new_due_date, existing);
+    }
+    return map;
+  }, [repayments]);
+
   // Find obligations due on the selected day
   const selectedDayObligations = useMemo(() => {
     if (!selectedForecast) return [];
     const dayOfMonth = selectedForecast.dayNumber;
     return obligations.filter((o) => o.expected_day === dayOfMonth);
   }, [selectedForecast, obligations]);
+
+  // Find repayments due on the selected day
+  const selectedDayRepayments = useMemo(() => {
+    if (!selectedForecast) return [];
+    return repaymentMap.get(selectedForecast.dateStr) ?? [];
+  }, [selectedForecast, repaymentMap]);
 
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
@@ -166,6 +192,7 @@ export function CalendarHeatmap({
           const isToday = index === 0;
           const isInflowDay =
             day.forecast && day.forecast.income_expected_pence > 0;
+          const hasRepayment = repaymentMap.has(day.dateStr);
 
           return (
             <button
@@ -193,6 +220,10 @@ export function CalendarHeatmap({
               {isInflowDay && (
                 <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-500" />
               )}
+              {/* Repayment indicator */}
+              {hasRepayment && (
+                <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full bg-coral" />
+              )}
             </button>
           );
         })}
@@ -216,69 +247,74 @@ export function CalendarHeatmap({
           <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
           <span>Payday</span>
         </div>
+        <div className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-coral" />
+          <span>Repayment</span>
+        </div>
       </div>
 
       {/* Selected day tooltip */}
-      {selectedForecast && selectedForecast.forecast && (
+      {selectedForecast && (selectedForecast.forecast || selectedDayRepayments.length > 0) && (
         <div className="mt-4 rounded-xl bg-soft-white p-4 border border-warm-grey animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs text-text-secondary">
-                {new Intl.DateTimeFormat("en-GB", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                }).format(selectedForecast.date)}
-              </p>
-              <p className="text-lg font-bold text-navy mt-0.5">
-                {formatCurrency(selectedForecast.forecast.projected_balance_pence)}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-1">
-              {selectedForecast.forecast.is_danger && (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger bg-danger/10 px-2.5 py-1 rounded-full">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 20 20"
-                    fill="currentColor"
-                    className="w-3.5 h-3.5"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Risk
-                </span>
+          <p className="text-xs text-text-secondary">
+            {new Intl.DateTimeFormat("en-GB", {
+              weekday: "short",
+              day: "numeric",
+              month: "short",
+            }).format(selectedForecast.date)}
+          </p>
+
+          {selectedForecast.forecast && (
+            <>
+              <div className="flex items-center justify-between mt-1">
+                <p className="text-lg font-bold text-navy">
+                  {formatCurrency(selectedForecast.forecast.projected_balance_pence)}
+                </p>
+                {selectedForecast.forecast.is_danger && (
+                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger bg-danger/10 px-2.5 py-1 rounded-full">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      className="w-3.5 h-3.5"
+                    >
+                      <path
+                        fillRule="evenodd"
+                        d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Risk
+                  </span>
+                )}
+              </div>
+
+              {/* Income indicator */}
+              {selectedForecast.forecast.income_expected_pence > 0 && (
+                <div className="mt-2 flex items-center gap-2 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-blue-500" />
+                  <span className="text-blue-600 font-medium">
+                    Expected income:{" "}
+                    {formatCurrency(
+                      selectedForecast.forecast.income_expected_pence,
+                    )}
+                  </span>
+                </div>
               )}
-            </div>
-          </div>
 
-          {/* Income indicator */}
-          {selectedForecast.forecast.income_expected_pence > 0 && (
-            <div className="mt-2 flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-blue-500" />
-              <span className="text-blue-600 font-medium">
-                Expected income:{" "}
-                {formatCurrency(
-                  selectedForecast.forecast.income_expected_pence,
-                )}
-              </span>
-            </div>
-          )}
-
-          {/* Outgoings */}
-          {selectedForecast.forecast.outgoings_expected_pence > 0 && (
-            <div className="mt-1 flex items-center gap-2 text-xs">
-              <span className="w-2 h-2 rounded-full bg-danger/50" />
-              <span className="text-text-secondary">
-                Expected outgoings:{" "}
-                {formatCurrency(
-                  selectedForecast.forecast.outgoings_expected_pence,
-                )}
-              </span>
-            </div>
+              {/* Outgoings */}
+              {selectedForecast.forecast.outgoings_expected_pence > 0 && (
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="w-2 h-2 rounded-full bg-danger/50" />
+                  <span className="text-text-secondary">
+                    Expected outgoings:{" "}
+                    {formatCurrency(
+                      selectedForecast.forecast.outgoings_expected_pence,
+                    )}
+                  </span>
+                </div>
+              )}
+            </>
           )}
 
           {/* Obligations due on this day */}
@@ -298,6 +334,34 @@ export function CalendarHeatmap({
                   </span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Repayments due on this day */}
+          {selectedDayRepayments.length > 0 && (
+            <div className="mt-3 pt-2 border-t border-warm-grey space-y-1.5">
+              <div className="flex items-center gap-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3 h-3 text-coral">
+                  <path fillRule="evenodd" d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z" clipRule="evenodd" />
+                </svg>
+                <p className="text-[10px] uppercase tracking-wider text-coral font-semibold">
+                  Auto-repayment (locked)
+                </p>
+              </div>
+              {selectedDayRepayments.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center justify-between text-xs"
+                >
+                  <span className="text-navy font-medium">{r.obligation_name}</span>
+                  <span className="text-coral font-semibold">
+                    -{formatCurrency(r.amount_pence)}
+                  </span>
+                </div>
+              ))}
+              <p className="text-[9px] text-text-muted">
+                This amount will be automatically withdrawn. Cannot be rescheduled.
+              </p>
             </div>
           )}
         </div>
