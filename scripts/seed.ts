@@ -800,10 +800,11 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     // UK-benchmarked pricing: BoE 4.5% + 2% margin = 6.5% base APR
     const riskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
     const effectiveAprPct = 6.5 * riskMult + 0.15 * shiftDays;
-    // Fee = APR-based + minimum £0.50 per trade to cover platform costs
+    // Fee = APR-based, minimum scales with term to prevent yield curve inversion
     const aprFee = amount * (effectiveAprPct / 100) * (shiftDays / 365);
+    const minFee = 0.50 * (shiftDays / 7); // £0.50 at 7d, proportional otherwise
     const fee = Math.max(
-      0.50,
+      minFee,
       Math.round(aprFee * 100) / 100,
     );
 
@@ -1121,8 +1122,9 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
     const propRiskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
     const propAprPct = 6.5 * propRiskMult + 0.15 * shiftDays;
     const aprFee = amount * (propAprPct / 100) * (shiftDays / 365);
+    const propMinFee = 0.50 * (shiftDays / 7);
     const fee = Math.max(
-      0.50,
+      propMinFee,
       Math.round(aprFee * 100) / 100,
     );
 
@@ -1314,17 +1316,19 @@ async function createPlatformRevenue() {
   // Clean up ALL old platform_revenue entries first (seed data only)
   await supabase.from("platform_revenue").delete().neq("id", "00000000-0000-0000-0000-000000000000");
 
-  // Fetch all seeded REPAID and DEFAULTED trades
+  // Fetch all seeded REPAID and DEFAULTED trades (override Supabase 1000-row default)
   const { data: repaidTrades } = await supabase
     .from("trades")
     .select("id, platform_fee, amount, repaid_at")
     .eq("status", "REPAID")
-    .gt("platform_fee", 0);
+    .gt("platform_fee", 0)
+    .limit(50000);
 
   const { data: defaultedTrades } = await supabase
     .from("trades")
     .select("id, amount, platform_fee, defaulted_at")
-    .eq("status", "DEFAULTED");
+    .eq("status", "DEFAULTED")
+    .limit(50000);
 
   const revenueRows: Record<string, unknown>[] = [];
 
