@@ -533,7 +533,7 @@ export default async function BorrowerHomePage() {
             riskGrade={riskGrade}
             creditScore={profile?.credit_score as number | null}
             dangerDays={dangerCount}
-            obligations={upcomingObligations.slice(0, 5).map((o) => ({
+            obligations={displayObligations.slice(0, 5).map((o) => ({
               name: o.name,
               amount_pence: o.amount_pence,
               expected_day: new Date(o.next_expected).getDate(),
@@ -549,7 +549,7 @@ export default async function BorrowerHomePage() {
         {/* AI Bill Priority Ranker + What-If Simulator */}
         <div className="grid grid-cols-2 gap-3">
           <BillPriority
-            obligations={upcomingObligations.slice(0, 8).map((o) => ({
+            obligations={displayObligations.slice(0, 8).map((o) => ({
               name: o.name,
               amount_pence: o.amount_pence,
               expected_day: new Date(o.next_expected).getDate(),
@@ -567,7 +567,7 @@ export default async function BorrowerHomePage() {
             )}
           />
           <WhatIfSimulator
-            obligations={upcomingObligations.slice(0, 8).map((o) => ({
+            obligations={displayObligations.slice(0, 8).map((o) => ({
               name: o.name,
               amount_pence: o.amount_pence,
               expected_day: new Date(o.next_expected).getDate(),
