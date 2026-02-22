@@ -38,8 +38,6 @@ function buildSparklinePath(data: number[]): string {
     .join(" ");
 }
 
-const SAVINGS_ACCOUNT_APR = 450; // 4.50% in bps
-
 export function YieldDashboard({
   stats,
   potAvailablePence,
@@ -57,16 +55,6 @@ export function YieldDashboard({
   const aprDecimal = stats.avgAprBps / 10000;
   const monthlyYieldPence = Math.round((totalPotPence * aprDecimal) / 12);
   const annualYieldPence = Math.round(totalPotPence * aprDecimal);
-
-  // Comparison with savings account
-  const savingsAprDecimal = SAVINGS_ACCOUNT_APR / 10000;
-  const savingsMonthlyPence = Math.round(
-    (totalPotPence * savingsAprDecimal) / 12,
-  );
-  const multiplier =
-    savingsMonthlyPence > 0
-      ? (monthlyYieldPence / savingsMonthlyPence).toFixed(1)
-      : "0";
 
   return (
     <section>
@@ -182,14 +170,6 @@ export function YieldDashboard({
               </div>
             </div>
 
-            {/* Savings comparison */}
-            {Number(multiplier) > 1 && (
-              <p className="text-xs text-text-secondary bg-success/5 border border-success/15 rounded-lg px-3 py-2">
-                <span className="font-bold text-success">{multiplier}x</span>{" "}
-                better than a typical savings account at{" "}
-                {bpsToPercent(SAVINGS_ACCOUNT_APR)} APR
-              </p>
-            )}
           </CardContent>
         </Card>
       )}
