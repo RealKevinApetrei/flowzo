@@ -80,7 +80,7 @@ export function CalendarHeatmap({
   obligations = [],
   repayments = [],
 }: CalendarHeatmapProps) {
-  const [monthOffset, setMonthOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDateStr, setSelectedDateStr] = useState<string | null>(null);
 
   // Forecast range boundaries
@@ -100,39 +100,32 @@ export function CalendarHeatmap({
     return map;
   }, [forecasts]);
 
-  // Current viewed month/year
-  const { viewYear, viewMonth } = useMemo(() => {
+  // Rolling 5-week view starting from Monday of the current week + weekOffset
+  const { startDate, rangeLabel } = useMemo(() => {
     const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
-    return { viewYear: d.getFullYear(), viewMonth: d.getMonth() };
-  }, [monthOffset]);
+    now.setHours(0, 0, 0, 0);
+    // Find Monday of current week
+    const dow = (now.getDay() + 6) % 7; // Mon=0
+    const monday = new Date(now);
+    monday.setDate(monday.getDate() - dow + weekOffset * 7);
+    const end = new Date(monday);
+    end.setDate(end.getDate() + 34); // 5 weeks = 35 days
 
-  const monthLabel = useMemo(() => {
-    const d = new Date(viewYear, viewMonth, 1);
-    return new Intl.DateTimeFormat("en-GB", {
-      month: "long",
-      year: "numeric",
-    }).format(d);
-  }, [viewYear, viewMonth]);
+    const fmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+    const label = `${fmt.format(monday)} – ${fmt.format(end)}`;
+    return { startDate: monday, rangeLabel: label };
+  }, [weekOffset]);
 
-  // Can navigate? Max 5 months forward from current month (6 months total), can't go before current month
-  const canPrev = monthOffset > 0;
-  const canNext = monthOffset < 5;
+  // Can navigate? Don't go before current week, max ~24 weeks forward
+  const canPrev = weekOffset > 0;
+  const canNext = weekOffset < 24;
 
-  // Build calendar days for the viewed month (full weeks, Mon-Sun)
+  // Build 35 calendar days (5 weeks, Mon-Sun)
   const calendarDays = useMemo(() => {
-    const firstOfMonth = new Date(viewYear, viewMonth, 1);
-    const lastOfMonth = new Date(viewYear, viewMonth + 1, 0);
-    const daysInMonth = lastOfMonth.getDate();
-
-    // Day of week for 1st (Mon=0 .. Sun=6)
-    const startDow = (firstOfMonth.getDay() + 6) % 7;
-
     const days: CalendarDay[] = [];
-
-    // Leading days from previous month (greyed out, not in current month)
-    for (let i = startDow - 1; i >= 0; i--) {
-      const d = new Date(viewYear, viewMonth, -i);
+    for (let i = 0; i < 35; i++) {
+      const d = new Date(startDate);
+      d.setDate(startDate.getDate() + i);
       const dateStr = toDateStr(d);
       days.push({
         date: d,
@@ -140,42 +133,11 @@ export function CalendarHeatmap({
         dayNumber: d.getDate(),
         forecast: forecastMap.get(dateStr) ?? null,
         isInRange: dateStr >= todayStr && dateStr <= endStr,
-        isCurrentMonth: false,
+        isCurrentMonth: true, // all days visible in rolling view
       });
     }
-
-    // Current month days
-    for (let day = 1; day <= daysInMonth; day++) {
-      const d = new Date(viewYear, viewMonth, day);
-      const dateStr = toDateStr(d);
-      days.push({
-        date: d,
-        dateStr,
-        dayNumber: day,
-        forecast: forecastMap.get(dateStr) ?? null,
-        isInRange: dateStr >= todayStr && dateStr <= endStr,
-        isCurrentMonth: true,
-      });
-    }
-
-    // Trailing days to fill last week
-    const endDow = (lastOfMonth.getDay() + 6) % 7; // Mon=0
-    const trailingDays = 6 - endDow;
-    for (let i = 1; i <= trailingDays; i++) {
-      const d = new Date(viewYear, viewMonth + 1, i);
-      const dateStr = toDateStr(d);
-      days.push({
-        date: d,
-        dateStr,
-        dayNumber: d.getDate(),
-        forecast: forecastMap.get(dateStr) ?? null,
-        isInRange: dateStr >= todayStr && dateStr <= endStr,
-        isCurrentMonth: false,
-      });
-    }
-
     return days;
-  }, [viewYear, viewMonth, forecastMap, todayStr, endStr]);
+  }, [startDate, forecastMap, todayStr, endStr]);
 
   // Selected day data
   const selectedDay = useMemo(() => {
@@ -225,28 +187,28 @@ export function CalendarHeatmap({
 
   return (
     <div className="rounded-2xl bg-[var(--card-surface)] shadow-sm p-5">
-      {/* Header with month navigation */}
+      {/* Header with week navigation */}
       <div className="flex items-center justify-between mb-4">
         <div>
           <h2 className="text-lg font-bold text-navy">Cash Calendar</h2>
-          <p className="text-sm text-text-secondary">{monthLabel}</p>
+          <p className="text-sm text-text-secondary">{rangeLabel}</p>
         </div>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => setMonthOffset((o) => o - 1)}
+            onClick={() => setWeekOffset((o) => o - 1)}
             disabled={!canPrev}
             className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-warm-grey active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Previous month"
+            aria-label="Previous week"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-navy">
               <path fillRule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clipRule="evenodd" />
             </svg>
           </button>
           <button
-            onClick={() => setMonthOffset((o) => o + 1)}
+            onClick={() => setWeekOffset((o) => o + 1)}
             disabled={!canNext}
             className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-warm-grey active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Next month"
+            aria-label="Next week"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5 text-navy">
               <path fillRule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clipRule="evenodd" />
