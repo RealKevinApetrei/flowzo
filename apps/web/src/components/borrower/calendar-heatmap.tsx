@@ -17,8 +17,9 @@ interface Obligation {
   id: string;
   name: string;
   amount_pence: number;
-  expected_day: number;
-  next_expected: string | null;
+  next_expected: string;
+  is_essential?: boolean;
+  category?: string | null;
 }
 
 interface Repayment {
@@ -128,12 +129,23 @@ export function CalendarHeatmap({
     return map;
   }, [repayments]);
 
+  // Build obligation map by date string
+  const obligationMap = useMemo(() => {
+    const map = new Map<string, Obligation[]>();
+    for (const o of obligations) {
+      if (!o.next_expected) continue;
+      const existing = map.get(o.next_expected) ?? [];
+      existing.push(o);
+      map.set(o.next_expected, existing);
+    }
+    return map;
+  }, [obligations]);
+
   // Find obligations due on the selected day
   const selectedDayObligations = useMemo(() => {
     if (!selectedForecast) return [];
-    const dayOfMonth = selectedForecast.dayNumber;
-    return obligations.filter((o) => o.expected_day === dayOfMonth);
-  }, [selectedForecast, obligations]);
+    return obligationMap.get(selectedForecast.dateStr) ?? [];
+  }, [selectedForecast, obligationMap]);
 
   // Find repayments due on the selected day
   const selectedDayRepayments = useMemo(() => {
@@ -193,6 +205,7 @@ export function CalendarHeatmap({
           const isInflowDay =
             day.forecast && day.forecast.income_expected_pence > 0;
           const hasRepayment = repaymentMap.has(day.dateStr);
+          const hasBills = obligationMap.has(day.dateStr);
 
           return (
             <button
@@ -219,6 +232,10 @@ export function CalendarHeatmap({
               {/* Payday / inflow indicator */}
               {isInflowDay && (
                 <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-500" />
+              )}
+              {/* Bill due indicator (only when no inflow dot) */}
+              {!isInflowDay && hasBills && (
+                <span className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-warning" />
               )}
               {/* Repayment indicator */}
               {hasRepayment && (
@@ -248,13 +265,17 @@ export function CalendarHeatmap({
           <span>Payday</span>
         </div>
         <div className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-warning" />
+          <span>Bills</span>
+        </div>
+        <div className="flex items-center gap-1">
           <span className="w-2.5 h-2.5 rounded-full bg-coral" />
           <span>Repayment</span>
         </div>
       </div>
 
       {/* Selected day tooltip */}
-      {selectedForecast && (selectedForecast.forecast || selectedDayRepayments.length > 0) && (
+      {selectedForecast && (selectedForecast.forecast || selectedDayRepayments.length > 0 || selectedDayObligations.length > 0) && (
         <div className="mt-4 rounded-xl bg-soft-white p-4 border border-warm-grey animate-in fade-in slide-in-from-top-2 duration-200">
           <p className="text-xs text-text-secondary">
             {new Intl.DateTimeFormat("en-GB", {

@@ -68,17 +68,14 @@ export default async function BorrowerHomePage() {
     ),
   }));
 
-  // Fetch upcoming obligations (next 14 days)
-  const fourteenDaysLater = new Date(today);
-  fourteenDaysLater.setDate(today.getDate() + 14);
-
+  // Fetch upcoming obligations (next 30 days — full calendar range)
   const { data: obligations } = await supabase
     .from("obligations")
     .select("id, name, amount, frequency, next_expected, confidence, is_essential, category, merchant_name")
     .eq("user_id", user.id)
     .eq("active", true)
     .gte("next_expected", today.toISOString().split("T")[0])
-    .lte("next_expected", fourteenDaysLater.toISOString().split("T")[0])
+    .lte("next_expected", thirtyDaysLater.toISOString().split("T")[0])
     .order("next_expected", { ascending: true });
 
   const upcomingObligations = (obligations ?? []).map((o) => ({
@@ -163,7 +160,7 @@ export default async function BorrowerHomePage() {
         {/* Danger Summary + Calendar */}
         {(hasData || activeShifts.length > 0) && (
           <section>
-            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} repayments={activeShifts} />
+            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} repayments={activeShifts} obligations={upcomingObligations} />
           </section>
         )}
 

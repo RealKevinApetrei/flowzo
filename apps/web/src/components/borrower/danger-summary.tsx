@@ -19,13 +19,23 @@ interface Repayment {
   new_due_date: string;
 }
 
+interface Obligation {
+  id: string;
+  name: string;
+  amount_pence: number;
+  next_expected: string;
+  is_essential?: boolean;
+  category?: string | null;
+}
+
 interface DangerSummaryProps {
   dangerCount: number;
   forecasts: ForecastDay[];
   repayments?: Repayment[];
+  obligations?: Obligation[];
 }
 
-export function DangerSummary({ dangerCount, forecasts, repayments = [] }: DangerSummaryProps) {
+export function DangerSummary({ dangerCount, forecasts, repayments = [], obligations = [] }: DangerSummaryProps) {
   return (
     <div className="space-y-3">
       {/* Status banner */}
@@ -49,7 +59,7 @@ export function DangerSummary({ dangerCount, forecasts, repayments = [] }: Dange
       )}
 
       {/* Calendar always visible */}
-      <CalendarHeatmap forecasts={forecasts} repayments={repayments} />
+      <CalendarHeatmap forecasts={forecasts} repayments={repayments} obligations={obligations} />
     </div>
   );
 }

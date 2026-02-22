@@ -38,6 +38,19 @@ interface ImpactStats {
   essentialBills: number;
 }
 
+// Demo data shown when lender has no active trades yet
+function demoDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().split("T")[0];
+}
+
+const DEMO_RETURNS = [
+  { trade_id: "demo-1", obligation_name: "Netflix", amount_pence: 1599, fee_pence: 18, new_due_date: demoDate(3), status: "LIVE" },
+  { trade_id: "demo-2", obligation_name: "Council Tax", amount_pence: 14200, fee_pence: 142, new_due_date: demoDate(6), status: "LIVE" },
+  { trade_id: "demo-3", obligation_name: "Energy Bill", amount_pence: 8900, fee_pence: 71, new_due_date: demoDate(9), status: "LIVE" },
+];
+
 interface UpcomingRepayment {
   trade_id: string;
   obligation_name: string;
@@ -98,57 +111,66 @@ export function LenderPageClient({
           usingMarketAvg={usingMarketAvg}
         />
 
-        {/* Upcoming Repayments */}
-        {upcomingRepayments.length > 0 && (
-          <section>
-            <h2 className="text-lg font-bold text-navy mb-3">Upcoming Repayments</h2>
-            <div className="space-y-2">
-              {upcomingRepayments.map((r) => {
-                const repayDate = new Date(r.new_due_date);
-                const now = new Date();
-                now.setHours(0, 0, 0, 0);
-                const daysLeft = Math.max(0, Math.ceil((repayDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
-                const dateLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(repayDate);
-                const isLive = r.status === "LIVE";
+        {/* Upcoming Returns */}
+        <section>
+          <h2 className="text-lg font-bold text-navy mb-3">Upcoming Returns</h2>
+          {(() => {
+            const items = upcomingRepayments.length > 0 ? upcomingRepayments : DEMO_RETURNS;
+            const isDemo = upcomingRepayments.length === 0;
+            return (
+              <>
+                {isDemo && (
+                  <p className="text-xs text-text-muted mb-2">Sample data -- fund trades to see real returns</p>
+                )}
+                <div className="space-y-2">
+                  {items.map((r) => {
+                    const repayDate = new Date(r.new_due_date);
+                    const now = new Date();
+                    now.setHours(0, 0, 0, 0);
+                    const daysLeft = Math.max(0, Math.ceil((repayDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+                    const dateLabel = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(repayDate);
+                    const isLive = r.status === "LIVE";
 
-                return (
-                  <Card key={r.trade_id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-success">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
-                            </svg>
+                    return (
+                      <Card key={r.trade_id} className={isDemo ? "opacity-60" : ""}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-success/10 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-success">
+                                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm.75-11.25a.75.75 0 00-1.5 0v2.5h-2.5a.75.75 0 000 1.5h2.5v2.5a.75.75 0 001.5 0v-2.5h2.5a.75.75 0 000-1.5h-2.5v-2.5z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-navy">{r.obligation_name}</p>
+                                <p className="text-xs text-text-secondary">
+                                  Returns {dateLabel}{" "}
+                                  <span className="text-text-muted">
+                                    ({daysLeft === 0 ? "today" : `in ${daysLeft}d`})
+                                  </span>
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-navy">{formatCurrency(r.amount_pence)}</p>
+                              <p className="text-[10px] text-success font-semibold">+{formatCurrency(r.fee_pence)} yield</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-navy">{r.obligation_name}</p>
-                            <p className="text-xs text-text-secondary">
-                              Repays {dateLabel}{" "}
-                              <span className="text-text-muted">
-                                ({daysLeft === 0 ? "today" : `${daysLeft}d`})
-                              </span>
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-navy">{formatCurrency(r.amount_pence)}</p>
-                          <p className="text-[10px] text-success font-semibold">+{formatCurrency(r.fee_pence)} fee</p>
-                        </div>
-                      </div>
-                      {isLive && (
-                        <div className="mt-2 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-                          <span className="text-[10px] text-success font-medium">Active</span>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-        )}
+                          {isLive && !isDemo && (
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                              <span className="text-[10px] text-success font-medium">Active</span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </>
+            );
+          })()}
+        </section>
 
         {/* Impact Card */}
         {impactStats.peopleHelped > 0 && <ImpactCard stats={impactStats} />}
