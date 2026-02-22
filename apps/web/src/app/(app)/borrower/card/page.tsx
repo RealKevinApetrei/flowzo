@@ -2,6 +2,70 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TopBar } from "@/components/layout/top-bar";
+import { getCards, type TrueLayerCard } from "@/lib/truelayer/client";
+import { refreshToken } from "@/lib/truelayer/auth";
+
+interface CardInfo {
+  nameOnCard: string;
+  lastFour: string;
+  expiry: string;
+  network: string; // VISA, MASTERCARD, etc.
+  type: string; // DEBIT, CREDIT, etc.
+}
+
+async function fetchTrueLayerCard(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string,
+): Promise<TrueLayerCard | null> {
+  const { data: connection } = await supabase
+    .from("bank_connections")
+    .select("id, truelayer_token")
+    .eq("user_id", userId)
+    .eq("provider", "truelayer")
+    .eq("status", "active")
+    .order("last_synced_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!connection?.truelayer_token) return null;
+
+  const token = connection.truelayer_token as {
+    access_token: string;
+    refresh_token: string;
+    expires_at?: string;
+  };
+
+  try {
+    const cards = await getCards(token.access_token);
+    if (cards && cards.length > 0) return cards[0];
+  } catch (err: unknown) {
+    // Try token refresh on 401
+    if (err instanceof Error && err.message.includes("401") && token.refresh_token) {
+      try {
+        const refreshed = await refreshToken(token.refresh_token);
+        const expiresAt = new Date(Date.now() + refreshed.expires_in * 1000).toISOString();
+
+        await supabase
+          .from("bank_connections")
+          .update({
+            truelayer_token: {
+              access_token: refreshed.access_token,
+              refresh_token: refreshed.refresh_token,
+              expires_at: expiresAt,
+            },
+          })
+          .eq("id", connection.id);
+
+        const cards = await getCards(refreshed.access_token);
+        if (cards && cards.length > 0) return cards[0];
+      } catch {
+        // Refresh failed — fall through to demo
+      }
+    }
+  }
+
+  return null;
+}
 
 export default async function CardPage() {
   const supabase = await createClient();
@@ -19,29 +83,58 @@ export default async function CardPage() {
 
   const cardholderName = profile?.display_name ?? "Flowzo User";
 
+  // Try fetching real card data from TrueLayer
+  const tlCard = await fetchTrueLayerCard(supabase, user.id);
+
+  const card: CardInfo = tlCard
+    ? {
+        nameOnCard: tlCard.name_on_card || cardholderName,
+        lastFour: tlCard.partial_card_number || "••••",
+        expiry: tlCard.valid_to || "••/••",
+        network: tlCard.card_network || "MASTERCARD",
+        type: tlCard.card_type || "DEBIT",
+      }
+    : {
+        nameOnCard: cardholderName,
+        lastFour: "4921",
+        expiry: "03/28",
+        network: "MASTERCARD",
+        type: "DEBIT",
+      };
+
+  const isReal = !!tlCard;
+  const isMastercard = card.network === "MASTERCARD";
+
   return (
     <div className="max-w-lg sm:max-w-2xl mx-auto">
       <TopBar title="Card" />
 
       <div className="px-4 py-6 space-y-6">
-        {/* Card visual */}
-        <div className="rounded-2xl bg-coral p-6 text-white aspect-[1.6/1] flex flex-col justify-between shadow-lg">
+        {/* Card visual — compact like Monzo */}
+        <div className="rounded-2xl bg-coral px-5 py-4 text-white flex flex-col justify-between shadow-lg" style={{ aspectRatio: "1.7 / 1", maxHeight: "200px" }}>
           <div className="flex items-start justify-between">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-10 h-10 opacity-80">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-8 h-8 opacity-80">
               <rect x="1" y="4" width="10" height="8" rx="1" />
               <line x1="3" y1="7" x2="9" y2="7" />
               <line x1="3" y1="9" x2="7" y2="9" />
             </svg>
-            <p className="text-2xl font-extrabold tracking-tight">flowzo</p>
+            <p className="text-xl font-extrabold tracking-tight">flowzo</p>
           </div>
           <div className="flex items-end justify-between">
-            <p className="text-sm font-medium opacity-80 tracking-wider">
-              {cardholderName}
-            </p>
-            <div className="flex -space-x-2">
-              <div className="w-8 h-8 rounded-full bg-red-500 opacity-80" />
-              <div className="w-8 h-8 rounded-full bg-yellow-400 opacity-80" />
+            <div>
+              <p className="text-[10px] uppercase tracking-widest opacity-60 mb-0.5">{card.type}</p>
+              <p className="text-xs font-medium opacity-80 tracking-wider">
+                {card.nameOnCard}
+              </p>
             </div>
+            {isMastercard ? (
+              <div className="flex -space-x-2">
+                <div className="w-7 h-7 rounded-full bg-red-500 opacity-80" />
+                <div className="w-7 h-7 rounded-full bg-yellow-400 opacity-80" />
+              </div>
+            ) : (
+              <p className="text-xs font-bold opacity-80 tracking-wider">{card.network}</p>
+            )}
           </div>
         </div>
 
@@ -71,26 +164,30 @@ export default async function CardPage() {
         <section className="card-monzo p-5 space-y-0">
           <div className="flex items-center justify-between pb-3">
             <h2 className="text-sm font-bold text-navy">Card details</h2>
-            <span className="text-xs text-text-muted">Demo</span>
+            {!isReal && <span className="text-xs text-text-muted">Demo</span>}
           </div>
           <div className="divide-y divide-warm-grey">
             <div className="flex items-center justify-between py-3">
               <span className="text-sm text-text-secondary">Name on card</span>
-              <span className="text-sm font-medium text-navy">{cardholderName}</span>
+              <span className="text-sm font-medium text-navy">{card.nameOnCard}</span>
             </div>
             <div className="flex items-center justify-between py-3">
               <span className="text-sm text-text-secondary">Card number</span>
               <span className="text-sm font-medium text-navy font-mono tracking-wider">
-                &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; 4921
+                &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; &bull;&bull;&bull;&bull; {card.lastFour}
               </span>
             </div>
             <div className="flex items-center justify-between py-3">
               <span className="text-sm text-text-secondary">Expiry</span>
-              <span className="text-sm font-medium text-navy">03/28</span>
+              <span className="text-sm font-medium text-navy">{card.expiry}</span>
             </div>
             <div className="flex items-center justify-between py-3">
               <span className="text-sm text-text-secondary">CVC</span>
               <span className="text-sm text-text-muted">&bull;&bull;&bull;</span>
+            </div>
+            <div className="flex items-center justify-between py-3">
+              <span className="text-sm text-text-secondary">Network</span>
+              <span className="text-sm font-medium text-navy">{card.network}</span>
             </div>
           </div>
         </section>
