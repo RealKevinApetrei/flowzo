@@ -100,6 +100,62 @@ const DEMO_PROPOSALS: Proposal[] = [
     },
     explanation_text: null,
   },
+  {
+    id: "demo-5",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Netflix",
+      original_date: demoDate(2),
+      shifted_date: demoDate(8),
+      amount_pence: 1599,
+      fee_pence: 12,
+      shift_days: 6,
+    },
+    explanation_text: "Netflix renews before payday. Shifting 6 days avoids dipping below your safety buffer.",
+  },
+  {
+    id: "demo-6",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Gym Membership",
+      original_date: demoDate(4),
+      shifted_date: demoDate(11),
+      amount_pence: 4999,
+      fee_pence: 38,
+      shift_days: 7,
+    },
+    explanation_text: "Your gym and energy bills land on the same day. Spreading them out keeps your balance healthier.",
+  },
+  {
+    id: "demo-7",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Water Bill",
+      original_date: demoDate(6),
+      shifted_date: demoDate(10),
+      amount_pence: 3800,
+      fee_pence: 28,
+      shift_days: 4,
+    },
+    explanation_text: null,
+  },
+  {
+    id: "demo-8",
+    type: "SHIFT",
+    status: "PENDING",
+    payload: {
+      obligation_name: "Phone Contract",
+      original_date: demoDate(8),
+      shifted_date: demoDate(14),
+      amount_pence: 4500,
+      fee_pence: 35,
+      shift_days: 6,
+    },
+    explanation_text: "Three direct debits cluster mid-month. Moving your phone bill past the 15th eases the squeeze.",
+  },
 ];
 
 function SkeletonCard() {
