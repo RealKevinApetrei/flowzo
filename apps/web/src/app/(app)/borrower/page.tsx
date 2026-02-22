@@ -8,7 +8,6 @@ import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/u
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
-import { AutoScrollAnchor } from "@/components/shared/auto-scroll";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -530,9 +529,6 @@ export default async function BorrowerHomePage() {
           <h2 className="text-lg font-bold text-navy mb-3">Suggestions</h2>
           <SuggestionFeed userId={user.id} marketContext={marketContext} />
         </section>
-
-        {/* Auto-scroll anchor — only for demo mode */}
-        {isDemo && <AutoScrollAnchor delay={800} />}
       </div>
     </div>
   );
