@@ -199,7 +199,7 @@ serve(async (req: Request) => {
     const ninetyDaysAgo = addDays(new Date(), -90);
     const { data: recentTxns } = await supabase
       .from("transactions")
-      .select("amount, booked_at")
+      .select("amount, booked_at, merchant_name, description")
       .eq("user_id", user_id)
       .gte("booked_at", ninetyDaysAgo.toISOString())
       .order("booked_at", { ascending: true });
@@ -245,6 +245,86 @@ serve(async (req: Request) => {
     let minimumProjectedBalance = currentBalance;
     const forecastRows: Record<string, unknown>[] = [];
 
+    // 5a. Compute flat fallback for irregular spend (used if Quant API is down)
+    const oblMerchantKeys = new Set(
+      (obligations ?? [])
+        .map((o) => ((o.merchant_name as string) ?? "").toLowerCase().trim())
+        .filter(Boolean),
+    );
+    const irregularTxnsRaw = (recentTxns ?? []).filter((t) => {
+      if (Number(t.amount) >= 0) return false;
+      const key = (
+        ((t.merchant_name as string) ?? (t.description as string) ?? "")
+          .toLowerCase()
+          .trim()
+          .slice(0, 30)
+      );
+      return !oblMerchantKeys.has(key);
+    });
+    const irregularTotal = irregularTxnsRaw.reduce(
+      (s, t) => s + Math.abs(Number(t.amount)),
+      0,
+    );
+    const fallbackDailyIrregular = irregularTotal > 0 ? irregularTotal / 90 : 0;
+
+    // 5b. Call Quant API for per-day Gamma irregular spend forecast --------
+    const QUANT_API_URL = Deno.env.get("QUANT_API_URL");
+    const irregularByDate: Record<
+      string,
+      { mean_spend: number; p10: number; p90: number }
+    > = {};
+
+    if (QUANT_API_URL && (recentTxns ?? []).length > 0) {
+      try {
+        const txnPayload = (recentTxns ?? []).map((t) => ({
+          user_id,
+          amount: Number(t.amount),
+          transaction_type: Number(t.amount) >= 0 ? "CREDIT" : "DEBIT",
+          description: (t.description as string) ?? "",
+          merchant_name: (t.merchant_name as string) ?? null,
+          booked_at: t.booked_at as string,
+        }));
+        const oblPayload = (obligations ?? []).map((o) => ({
+          merchant_name: (o.merchant_name as string) ?? "",
+        }));
+
+        const quantRes = await fetch(`${QUANT_API_URL}/api/forecast/spending`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transactions: txnPayload,
+            obligations: oblPayload,
+            forecast_start: isoDate(today),
+            horizon_days: FORECAST_DAYS,
+          }),
+          signal: AbortSignal.timeout(8000),
+        });
+
+        if (quantRes.ok) {
+          const quantData = await quantRes.json();
+          for (const row of (quantData.daily_forecasts ?? [])) {
+            irregularByDate[row.forecast_date as string] = {
+              mean_spend: Number(row.mean_spend ?? 0),
+              p10: Number(row.p10 ?? 0),
+              p90: Number(row.p90 ?? 0),
+            };
+          }
+          console.log(
+            `Irregular spend model=${quantData.model}, ` +
+            `irregular_txns=${quantData.irregular_txn_count}, ` +
+            `history_days=${quantData.total_days_history}`,
+          );
+        } else {
+          console.warn(
+            `Quant API returned ${quantRes.status} — using flat fallback for irregular spend`,
+          );
+        }
+      } catch (e) {
+        // Non-fatal: forecast still runs using the flat fallback
+        console.warn("Quant API unreachable, using flat fallback:", e);
+      }
+    }
+
     for (let dayOffset = 0; dayOffset < FORECAST_DAYS; dayOffset++) {
       const forecastDate = addDays(today, dayOffset);
 
@@ -277,38 +357,45 @@ serve(async (req: Request) => {
       }
       incomeExpected = Math.round(incomeExpected * 100) / 100;
 
+      // Irregular spending: Gamma model if available, else flat fallback
+      const dateKey = isoDate(forecastDate);
+      const irreg = irregularByDate[dateKey];
+      const irregularMean = irreg ? irreg.mean_spend : fallbackDailyIrregular;
+      const irregularP10 = irreg ? irreg.p10 : fallbackDailyIrregular * 0.4;
+      const irregularP90 = irreg ? irreg.p90 : fallbackDailyIrregular * 2.0;
+
+      // Total outgoings = known obligations + predicted irregular spend
+      const totalDailyOutgoings = dailyOutgoings + irregularMean;
+
       // Update running balance
-      runningBalance =
-        runningBalance - dailyOutgoings + incomeExpected;
+      runningBalance = runningBalance - totalDailyOutgoings + incomeExpected;
 
       // Track the deepest trough for loan recommendation
       if (runningBalance < minimumProjectedBalance) {
         minimumProjectedBalance = runningBalance;
       }
 
-      // Confidence bands — absolute uncertainty that grows with time
-      // Near term (0-13 days): ±£3/day; further out (14-29 days): ±£6/day
-      const absoluteUncertainty =
-        dayOffset < 14 ? dayOffset * 3 : 13 * 3 + (dayOffset - 13) * 6;
+      // Confidence bands: data-driven from Gamma p10/p90, growing sub-linearly
+      const irregSpread = Math.max(0, irregularP90 - irregularP10);
+      const cumulativeSpread = irregSpread * Math.sqrt(dayOffset + 1);
       const confidenceLow =
-        Math.round((runningBalance - absoluteUncertainty) * 100) / 100;
+        Math.round((runningBalance - cumulativeSpread) * 100) / 100;
       const confidenceHigh =
-        Math.round((runningBalance + absoluteUncertainty) * 100) / 100;
+        Math.round((runningBalance + cumulativeSpread * 0.5) * 100) / 100;
 
-      // Danger flag: balance below 0 or below overdraft buffer
+      // Danger flag: balance below overdraft buffer
       const isDanger = runningBalance < OVERDRAFT_BUFFER;
       if (isDanger) dangerDaysCount++;
 
       forecastRows.push({
         user_id,
-        forecast_date: isoDate(forecastDate),
+        forecast_date: dateKey,
         projected_balance: Math.round(runningBalance * 100) / 100,
         confidence_low: confidenceLow,
         confidence_high: confidenceHigh,
         danger_flag: isDanger,
         income_expected: incomeExpected,
-        outgoings_expected:
-          Math.round(dailyOutgoings * 100) / 100,
+        outgoings_expected: Math.round(totalDailyOutgoings * 100) / 100,
         run_id: runId,
       });
     }
