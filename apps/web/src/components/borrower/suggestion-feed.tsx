@@ -86,6 +86,11 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     setLoading(false);
   }, [supabase, userId]);
 
+  // Touch swipe refs (must be before early returns to satisfy rules of hooks)
+  const touchStartX = useRef<number | null>(null);
+  const touchDeltaX = useRef(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     fetchProposals();
   }, [fetchProposals]);
@@ -188,11 +193,6 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   function goTo(index: number) {
     setActiveIndex(Math.max(0, Math.min(index, proposals.length - 1)));
   }
-
-  // Touch swipe handling
-  const touchStartX = useRef<number | null>(null);
-  const touchDeltaX = useRef(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   function handleTouchStart(e: React.TouchEvent) {
     touchStartX.current = e.touches[0].clientX;
