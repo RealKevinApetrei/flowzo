@@ -97,6 +97,7 @@ export default async function BorrowerHomePage() {
     .single();
 
   const displayName = profile?.display_name ?? "there";
+  const riskGrade = (profile?.risk_grade as string | null) ?? null;
 
   // Check for syncing bank connections
   const { data: syncingConnections } = await supabase
@@ -252,6 +253,26 @@ export default async function BorrowerHomePage() {
     }
   }
 
+  // Everyday spending (forecast outgoings minus scheduled bills)
+  const obligationsByDate = new Map<string, number>();
+  for (const o of displayObligations) {
+    obligationsByDate.set(o.next_expected, (obligationsByDate.get(o.next_expected) ?? 0) + o.amount_pence);
+  }
+  for (const f of displayForecasts) {
+    const scheduledPence = obligationsByDate.get(f.forecast_date) ?? 0;
+    const irregularPence = f.outgoings_expected_pence - scheduledPence;
+    if (irregularPence >= 500) { // at least £5 to show
+      cashflows.push({
+        id: `everyday-${f.forecast_date}`,
+        name: "Everyday spending",
+        amount_pence: irregularPence,
+        date: f.forecast_date,
+        type: "bill",
+        category: "estimated",
+      });
+    }
+  }
+
   // Repayments (active shifts — locked auto-repayments)
   for (const s of displayShifts) {
     cashflows.push({
@@ -298,7 +319,18 @@ export default async function BorrowerHomePage() {
                     {displayName !== "there" ? displayName : "Current Account"}
                   </p>
                 </div>
-                <p className="text-xs font-medium opacity-70">Balance</p>
+                <div className="flex items-center gap-2">
+                  {riskGrade && (
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      riskGrade === "A" ? "bg-green-500/30 text-green-100" :
+                      riskGrade === "B" ? "bg-amber-400/30 text-amber-100" :
+                      "bg-red-400/30 text-red-100"
+                    }`}>
+                      Grade {riskGrade}
+                    </span>
+                  )}
+                  <p className="text-xs font-medium opacity-70">Balance</p>
+                </div>
               </div>
               {/* Action buttons */}
               <div className="flex items-center gap-2 mt-3">

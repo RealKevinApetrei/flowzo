@@ -13,10 +13,11 @@ interface BacktestRow {
 }
 
 interface PortfolioReturns {
-  expected_annual_yield_pct: number;
   sharpe_ratio: number;
-  avg_fee_gbp: number;
-  weighted_default_rate: number;
+  weighted_yield_pct: number;
+  risk_free_rate_pct: number;
+  excess_return_pct: number;
+  total_capital_gbp: number;
 }
 
 interface EdaStats {
@@ -26,12 +27,27 @@ interface EdaStats {
 
 interface ForecastAccuracy {
   mape_pct: number;
-  days: string[];
+  days: number[];
   actual: number[];
   forecasted: number[];
 }
 
-type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress";
+interface SimLender {
+  lender_id: string;
+  display_name: string;
+  total_deployed: number;
+  available: number;
+  locked: number;
+  realized_yield: number;
+  trade_count: number;
+  avg_apr_bps: number;
+}
+
+interface LendersData {
+  lenders: SimLender[];
+}
+
+type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress" | "lenders";
 
 export function QuantDashboard() {
   const [activeSection, setActiveSection] = useState<QuantSection>("backtest");
@@ -49,6 +65,7 @@ export function QuantDashboard() {
     delta: number;
   } | null>(null);
   const [stressMultiplier, setStressMultiplier] = useState(0.7);
+  const [lenders, setLenders] = useState<LendersData | null>(null);
 
   async function fetchSection(section: QuantSection, force = false) {
     setLoading(true);
@@ -92,6 +109,15 @@ export function QuantDashboard() {
           setForecast(data);
           break;
         }
+        case "lenders": {
+          if (lenders && !force) break;
+          const res = await fetch("/api/quant/lenders");
+          if (!res.ok) throw new Error("Failed to fetch lenders");
+          const data = await res.json();
+          if (data.error) throw new Error(data.error);
+          setLenders(data);
+          break;
+        }
         case "stress": {
           const res = await fetch("/api/quant/stress-test", {
             method: "POST",
@@ -133,6 +159,7 @@ export function QuantDashboard() {
     { id: "eda", label: "EDA" },
     { id: "forecast", label: "Forecast" },
     { id: "stress", label: "Stress Test" },
+    { id: "lenders", label: "Liquidity Pool" },
   ];
 
   return (
@@ -183,6 +210,9 @@ export function QuantDashboard() {
           {activeSection === "eda" && eda && <EdaSection data={eda} />}
           {activeSection === "forecast" && forecast && (
             <ForecastSection data={forecast} />
+          )}
+          {activeSection === "lenders" && lenders && (
+            <LendersSection data={lenders} />
           )}
           {activeSection === "stress" && (
             <StressSection
@@ -261,8 +291,8 @@ function ReturnsSection({ data }: { data: PortfolioReturns }) {
       <h3 className="text-sm font-bold text-navy">Portfolio Returns</h3>
       <div className="grid grid-cols-2 gap-3">
         <StatCard
-          label="Expected Yield"
-          value={`${data.expected_annual_yield_pct?.toFixed(2) ?? "—"}%`}
+          label="Weighted Yield"
+          value={`${((data.weighted_yield_pct ?? 0) * 100).toFixed(2)}%`}
           variant="success"
         />
         <StatCard
@@ -270,15 +300,19 @@ function ReturnsSection({ data }: { data: PortfolioReturns }) {
           value={data.sharpe_ratio?.toFixed(2) ?? "—"}
         />
         <StatCard
-          label="Avg Fee"
-          value={`£${data.avg_fee_gbp?.toFixed(2) ?? "—"}`}
+          label="Risk-Free Rate"
+          value={`${((data.risk_free_rate_pct ?? 0) * 100).toFixed(2)}%`}
         />
         <StatCard
-          label="Wtd Default Rate"
-          value={`${((data.weighted_default_rate ?? 0) * 100).toFixed(1)}%`}
-          variant={data.weighted_default_rate > 0.1 ? "danger" : "default"}
+          label="Excess Return"
+          value={`${data.excess_return_pct >= 0 ? "+" : ""}${((data.excess_return_pct ?? 0) * 100).toFixed(2)}%`}
+          variant={data.excess_return_pct >= 0 ? "success" : "danger"}
         />
       </div>
+      <StatCard
+        label="Total Capital"
+        value={`£${(data.total_capital_gbp ?? 0).toFixed(2)}`}
+      />
     </div>
   );
 }
@@ -435,6 +469,10 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
                 .join(" ")}
             />
           </svg>
+          <div className="flex justify-between text-[10px] text-text-muted mt-0.5">
+            <span>Day {data.days[0]}</span>
+            <span>Day {data.days[len - 1]}</span>
+          </div>
           <div className="flex gap-4 text-[10px] text-text-muted mt-1">
             <span className="flex items-center gap-1">
               <span className="w-3 h-0.5 bg-navy inline-block" /> Actual
@@ -445,6 +483,84 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
             </span>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function LendersSection({ data }: { data: LendersData }) {
+  const lenderList = data.lenders ?? [];
+  if (lenderList.length === 0) {
+    return <p className="text-sm text-text-secondary">No simulated lenders available.</p>;
+  }
+
+  const totalCapital = lenderList.reduce((s, l) => s + l.total_deployed + l.available, 0);
+  const totalDeployed = lenderList.reduce((s, l) => s + l.total_deployed, 0);
+  const totalAvailable = lenderList.reduce((s, l) => s + l.available, 0);
+  const avgAprBps = lenderList.length > 0
+    ? lenderList.reduce((s, l) => s + l.avg_apr_bps, 0) / lenderList.length
+    : 0;
+
+  const fmt = (v: number) => "\u00A3" + v.toFixed(2);
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-bold text-navy">Simulated Liquidity Pool</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Total Capital" value={fmt(totalCapital)} />
+        <StatCard label="Deployed" value={fmt(totalDeployed)} variant="warning" />
+        <StatCard label="Available" value={fmt(totalAvailable)} variant="success" />
+        <StatCard label="Avg Target APR" value={`${(avgAprBps / 100).toFixed(1)}%`} />
+      </div>
+
+      <p className="text-xs text-text-muted mt-2">
+        {lenderList.length} simulated lender{lenderList.length !== 1 ? "s" : ""}
+      </p>
+
+      <DataTable
+        columns={[
+          {
+            key: "name",
+            header: "Lender",
+            render: (r: SimLender) => (
+              <span className="text-navy font-medium text-xs">{r.display_name}</span>
+            ),
+          },
+          {
+            key: "deployed",
+            header: "Deployed",
+            align: "right" as const,
+            render: (r: SimLender) => fmt(r.total_deployed),
+          },
+          {
+            key: "available",
+            header: "Available",
+            align: "right" as const,
+            render: (r: SimLender) => (
+              <span className="text-success">{fmt(r.available)}</span>
+            ),
+          },
+          {
+            key: "yield",
+            header: "Yield",
+            align: "right" as const,
+            render: (r: SimLender) => (
+              <span className="text-success font-medium">{fmt(r.realized_yield)}</span>
+            ),
+          },
+          {
+            key: "apr",
+            header: "APR",
+            align: "right" as const,
+            render: (r: SimLender) => `${(r.avg_apr_bps / 100).toFixed(1)}%`,
+          },
+        ]}
+        data={lenderList.slice(0, 10)}
+      />
+      {lenderList.length > 10 && (
+        <p className="text-[10px] text-text-muted text-center">
+          Showing top 10 of {lenderList.length}
+        </p>
       )}
     </div>
   );

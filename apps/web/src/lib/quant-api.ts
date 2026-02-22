@@ -32,10 +32,10 @@ export interface BacktestResponse {
 
 export interface ReturnsResponse {
   sharpe_ratio: number;
-  weighted_yield: number;
-  risk_free_rate: number;
-  excess_return: number;
-  total_capital: number;
+  weighted_yield_pct: number;
+  risk_free_rate_pct: number;
+  excess_return_pct: number;
+  total_capital_gbp: number;
 }
 
 export interface EdaFeatureStats {
@@ -52,10 +52,36 @@ export interface EdaResponse {
 }
 
 export interface ForecastAccuracyResponse {
-  days: string[];
+  days: number[];
   actual: number[];
   forecasted: number[];
   mape_pct: number;
+}
+
+// --- Spending forecast types (used by Edge Function, not called from frontend directly) ---
+
+export interface SpendingForecastRequest {
+  user_id: string;
+  transactions: {
+    date: string;
+    amount: number;
+    category?: string;
+  }[];
+  horizon_days?: number;
+}
+
+export interface DailyForecast {
+  date: string;
+  expected_pence: number;
+  confidence_low_pence: number;
+  confidence_high_pence: number;
+  model_tier: "gamma_dow" | "gamma_flat" | "fallback_flat";
+}
+
+export interface SpendingForecastResponse {
+  user_id: string;
+  forecasts: DailyForecast[];
+  model_tier: string;
 }
 
 export interface LenderStats {
