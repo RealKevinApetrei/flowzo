@@ -157,7 +157,7 @@ export default async function TradeDetailPage({
         {/* Action area */}
         {(status === "DRAFT" || status === "PENDING_MATCH") && (
           <TradeDetailClient
-            trade={{ id: trade.id, fee_pence: feePence }}
+            trade={{ id: trade.id, fee_pence: feePence, created_at: trade.created_at }}
             status={status}
           />
         )}

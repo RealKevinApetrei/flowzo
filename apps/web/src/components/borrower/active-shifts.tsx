@@ -48,6 +48,7 @@ export function ActiveShifts({ shifts }: ActiveShiftsProps) {
           const remaining = daysUntil(shift.new_due_date);
           const progress = progressPercent(shift);
           const isLive = shift.status === "LIVE";
+          const isPending = shift.status === "PENDING_MATCH";
 
           return (
             <div
@@ -69,7 +70,12 @@ export function ActiveShifts({ shifts }: ActiveShiftsProps) {
                     <p className="text-xs text-text-secondary">{formatCurrency(shift.amount_pence)}</p>
                   </div>
                 </div>
-                {isLive ? (
+                {isPending ? (
+                  <span className="flex items-center gap-1 text-[10px] font-bold text-warning bg-warning/10 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse" />
+                    Finding lender
+                  </span>
+                ) : isLive ? (
                   <span className="flex items-center gap-1 text-[10px] font-bold text-success bg-success/10 px-2 py-0.5 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
                     Active
