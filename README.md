@@ -89,7 +89,7 @@ The `spending_forecast.py` module classifies every transaction as INCOME / RECUR
 - **Model tiers** — `gamma_dow` (per-weekday, best) → `gamma_flat` (overall, moderate) → `fallback_flat` (sparse history)
 - **Confidence bands** — p10/p90 from fitted Gamma distribution, replaces the old flat ±£3/day heuristic
 
-### Claude AI Integration (7 features)
+### Claude AI and Gemini Agents Integration (7 features)
 
 | Feature | Location | Description |
 |---------|----------|-------------|
