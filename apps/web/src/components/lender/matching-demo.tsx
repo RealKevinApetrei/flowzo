@@ -116,11 +116,18 @@ export function MatchingDemo() {
     return results;
   }, []);
 
-  // Auto-scroll to latest step
+  // Auto-scroll to keep latest step visible (accounts for fixed bottom nav ~80px)
   useEffect(() => {
     if (currentStep > 0) {
       const id = setTimeout(() => {
-        bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+        const el = bottomRef.current;
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const navHeight = 80;
+        const bottomGap = window.innerHeight - navHeight;
+        if (rect.bottom > bottomGap) {
+          window.scrollBy({ top: rect.bottom - bottomGap + 16, behavior: "smooth" });
+        }
       }, 100);
       return () => clearTimeout(id);
     }
