@@ -10,7 +10,7 @@ export const TRUELAYER_CONFIG = {
     : "https://api.truelayer.com",
   clientId: process.env.TRUELAYER_CLIENT_ID ?? "",
   clientSecret: process.env.TRUELAYER_CLIENT_SECRET ?? "",
-  scopes: ["info", "accounts", "balance", "transactions", "offline_access"],
+  scopes: ["info", "accounts", "balance", "transactions", "direct_debits", "standing_orders", "offline_access"],
   providers: isSandbox
     ? "uk-cs-mock"
     : "uk-ob-all uk-oauth-all",

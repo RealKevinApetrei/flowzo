@@ -270,6 +270,119 @@ serve(async (req: Request) => {
       }
     }
 
+    // 5b. Fetch standing orders & direct debits (real bills from bank) ----
+    let standingOrdersSynced = 0;
+    let directDebitsSynced = 0;
+
+    for (const tlAcct of tlAccounts) {
+      const { data: acct } = await supabase
+        .from("accounts")
+        .select("id")
+        .eq("bank_connection_id", connection_id)
+        .eq("external_account_id", tlAcct.account_id)
+        .single();
+
+      if (!acct) continue;
+
+      // Standing Orders
+      try {
+        const standingOrders = await tlFetch(
+          `/data/v1/accounts/${tlAcct.account_id}/standing_orders`,
+          accessToken,
+          retryCtx,
+        );
+
+        for (const so of standingOrders ?? []) {
+          const soAmount = Math.abs(Number(so.amount ?? so.next_payment_amount ?? 0));
+          if (soAmount <= 0) continue;
+
+          const nextDate = so.next_payment_date ?? so.first_payment_date;
+          const soDay = nextDate ? new Date(nextDate).getDate() : 1;
+          const freq = (so.frequency ?? "").toUpperCase().includes("WEEK") ? "WEEKLY"
+            : (so.frequency ?? "").toUpperCase().includes("MONTH") ? "MONTHLY"
+            : "MONTHLY";
+
+          await supabase.from("obligations").upsert(
+            {
+              user_id,
+              account_id: acct.id,
+              name: so.reference ?? so.payee ?? "Standing Order",
+              merchant_name: so.reference ?? so.payee ?? "Standing Order",
+              amount: soAmount,
+              currency: (so.currency as string) ?? "GBP",
+              expected_day: soDay,
+              frequency: freq,
+              category: "Standing Order",
+              is_essential: true,
+              confidence: 1.0,
+              next_expected: nextDate ? isoDate(new Date(nextDate)) : null,
+              active: true,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,merchant_name", ignoreDuplicates: false },
+          );
+          standingOrdersSynced++;
+        }
+      } catch (e) {
+        console.warn(`Standing orders fetch failed for ${tlAcct.account_id}:`, e);
+      }
+
+      // Direct Debits
+      try {
+        const directDebits = await tlFetch(
+          `/data/v1/accounts/${tlAcct.account_id}/direct_debits`,
+          accessToken,
+          retryCtx,
+        );
+
+        for (const dd of directDebits ?? []) {
+          const ddAmount = Math.abs(Number(dd.previous_payment_amount ?? 0));
+          if (ddAmount <= 0) continue;
+
+          const lastPaid = dd.previous_payment_date;
+          const ddDay = lastPaid ? new Date(lastPaid).getDate() : 1;
+
+          // Estimate next payment: last payment + 1 month
+          let nextExpected: string | null = null;
+          if (lastPaid) {
+            const next = new Date(lastPaid);
+            next.setMonth(next.getMonth() + 1);
+            nextExpected = isoDate(next);
+          }
+
+          await supabase.from("obligations").upsert(
+            {
+              user_id,
+              account_id: acct.id,
+              name: dd.name ?? dd.mandate_id ?? "Direct Debit",
+              merchant_name: dd.name ?? dd.mandate_id ?? "Direct Debit",
+              amount: ddAmount,
+              currency: (dd.currency as string) ?? "GBP",
+              expected_day: ddDay,
+              frequency: "MONTHLY",
+              category: "Direct Debit",
+              is_essential: true,
+              confidence: 1.0,
+              last_paid_at: lastPaid ?? null,
+              next_expected: nextExpected,
+              active: dd.status === "Active" || dd.status === "active" || !dd.status,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "user_id,merchant_name", ignoreDuplicates: false },
+          );
+          directDebitsSynced++;
+        }
+      } catch (e) {
+        console.warn(`Direct debits fetch failed for ${tlAcct.account_id}:`, e);
+      }
+    }
+
+    if (standingOrdersSynced > 0 || directDebitsSynced > 0) {
+      console.log(
+        `Synced ${standingOrdersSynced} standing orders + ${directDebitsSynced} direct debits from bank`,
+      );
+    }
+
     // 6. Detect recurring obligations ------------------------------------
     const { data: allTxns } = await supabase
       .from("transactions")
@@ -393,6 +506,21 @@ serve(async (req: Request) => {
       }
     }
 
+    // 6b. Fetch identity (auto-populate profile name) --------------------
+    try {
+      const identityData = await tlFetch("/data/v1/info", accessToken, retryCtx);
+      const identity = Array.isArray(identityData) ? identityData[0] : identityData;
+      if (identity?.full_name) {
+        await supabase
+          .from("profiles")
+          .update({ display_name: identity.full_name })
+          .eq("id", user_id);
+        console.log(`Updated profile display_name: ${identity.full_name}`);
+      }
+    } catch (e) {
+      console.warn("Identity fetch failed (non-critical):", e);
+    }
+
     // 7. Update last_synced_at -------------------------------------------
     await supabase
       .from("bank_connections")
@@ -409,6 +537,8 @@ serve(async (req: Request) => {
       accounts_synced: accountsSynced,
       transactions_synced: transactionsSynced,
       obligations_detected: obligationsDetected,
+      standing_orders_synced: standingOrdersSynced,
+      direct_debits_synced: directDebitsSynced,
       obligation_errors: obligationErrors.length > 0 ? obligationErrors : undefined,
       synced_at: new Date().toISOString(),
     };
