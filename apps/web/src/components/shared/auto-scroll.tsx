@@ -3,19 +3,15 @@
 import { useEffect } from "react";
 
 /**
- * Auto-scrolls to a target element on mount with a short delay.
- * Scrolls smoothly to bring the target into view without going to the very bottom.
+ * Auto-scrolls to the bottom of the page on mount with a short delay.
  */
-export function AutoScroll({ targetId, delay = 500 }: { targetId: string; delay?: number }) {
+export function AutoScroll({ delay = 500 }: { delay?: number }) {
   useEffect(() => {
     const timer = setTimeout(() => {
-      const el = document.getElementById(targetId);
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     }, delay);
     return () => clearTimeout(timer);
-  }, [targetId, delay]);
+  }, [delay]);
 
   return null;
 }

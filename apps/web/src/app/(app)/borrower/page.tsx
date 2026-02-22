@@ -406,11 +406,11 @@ export default async function BorrowerHomePage() {
           );
         })()}
 
-        {/* Auto-scroll past balance card to content */}
-        <AutoScroll targetId="main-content" delay={600} />
+        {/* Auto-scroll to bottom on load */}
+        <AutoScroll delay={600} />
 
         {/* Greeting */}
-        <div id="main-content">
+        <div>
           <h1 className="text-2xl font-extrabold text-navy">
             {getGreeting()}, {displayName}
           </h1>
