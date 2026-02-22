@@ -98,19 +98,59 @@
 
 ---
 
-## Act 4 — The Data Angle (45 seconds)
+## Act 4 — Credit Risk & Order Book (1.5 minutes)
 
-**Switch back to the pitch deck — Slide 3 / 4**
+**Navigate to `/data` → Credit Risk tab**
 
-> "The forecast runs a 30-day balance projection with confidence bands. MAPE target under 15%. The risk grades have been backtested against 303k Home Credit Default Risk loans — Grade A default rate is lower than Grade B, which is lower than Grade C. The signal is real."
+> "Flowzo doesn't just classify risk — it enforces it. Borrowers below a 500 credit score are automatically blocked at the database level."
 
-**Go through rest of slides**
+- **Show**: Eligibility summary (eligible vs ineligible), grade distribution bars, score ranges
+- **Show**: Eligibility rules (score threshold, default history, credit limits)
+
+> "Credit limits scale with income regularity. Erratic income means lower limits, even within the same grade."
+
+**Switch to Order Book tab**
+
+> "This is a real two-sided market. The blue curve is lender supply — standing orders at different APR levels. The coloured curves are borrower demand."
+
+- **Show**: Market rate cards (bid/ask/spread per grade, liquidity ratios)
+- **Show**: Two-sided depth chart with market clearing point
+
+---
+
+## Act 5 — ML/Quant Analytics (1 minute)
+
+**Navigate to `/data` → ML / Quant tab**
+
+> "We validate everything against 303K real loans."
+
+- **Show**: Backtest (Grade A < B < C default rates)
+- **Show**: Portfolio Returns (Sharpe ratio, yield, excess return)
+- **Show**: Credit Score explorer (score a borrower, see SHAP feature importance)
+- **Show**: Stress Test (0.5x income shock → score delta)
+- **Show**: Forecast accuracy (MAPE ~4%)
+
+> "Signal extraction from noisy transaction data. Same discipline as quant finance."
+
+---
+
+## Act 6 — Revenue & Yield (30 seconds)
+
+**Navigate to `/data` → Revenue tab**
+
+> "Platform takes a 20% junior tranche — absorbing first loss to protect lender capital."
+
+- **Show**: Monthly fee income + default losses chart
+
+**Switch to Yield tab**
+
+- **Show**: Monthly yield trends, cumulative fees
 
 ---
 
 ## Closing Line
 
-> "Flowzo turns 90 days of bank transactions into a credit signal that predicts cash flow 30 days out, prices risk dynamically, and matches supply with demand — all in under 10 seconds. That's the Best Use of Data."
+> "Flowzo turns 90 days of bank transactions into a credit signal that predicts cash flow 30 days out, prices risk continuously based on exact credit score, enforces eligibility gates, and matches supply with demand in under 10 seconds — all validated against 303K real loans. That's the Best Use of Data."
 
 ---
 
@@ -121,9 +161,13 @@
 | Login fails | Use `taylor@flowzo.demo` — same password |
 | Bubble board is empty | Refresh — seed data should populate. If not, show demo bubble board mode |
 | Proposal feed is empty | Log in as `sam@flowzo.demo` instead |
+| Trade stuck PENDING_MATCH | Use admin endpoint: `curl -X POST /api/admin/match -H "Authorization: Bearer $CRON_SECRET" -d '{"trade_id":"..."}'` |
+| Need to advance settlement | Use admin endpoint: `curl -X POST /api/admin/settle -H "Authorization: Bearer $CRON_SECRET"` |
+| ML/Quant tab empty | Check QUANT_API_URL is set in Vercel env vars |
 | Live demo crashes entirely | Switch to the backup demo video |
 | Judge asks about real money | "All payments are stubbed — this is a sandbox demo. GoCardless and Stripe integrations exist but are not live." |
 | Judge asks about FCA regulation | "As a hackathon prototype, Flowzo is not FCA regulated. A production version would require authorisation as a P2P lending platform under FCA COBS 18." |
+| Judge asks about credit scoring | "XGBoost model trained on Home Credit dataset. 300-850 score range. Continuous pricing within grades — not just A/B/C buckets." |
 
 ---
 
@@ -131,8 +175,27 @@
 
 | Metric | Value |
 |---|---|
+| Trades in database | 12,000+ |
+| Median match time | 7 seconds |
+| Credit score range | 300-850 (XGBoost) |
+| Eligibility threshold | Score >= 500 |
 | Forecast horizon | 30 days |
+| Forecast accuracy | MAPE ~4% |
 | Pipeline latency | < 10 seconds |
-| Backtest dataset | 303k Home Credit Default Risk loans |
-| Auto-match target | > 80% within 30 seconds |
+| Backtest dataset | 303K Home Credit Default Risk loans |
+| Platform fee | 20% junior tranche (first loss) |
+| Analytics tabs | 8 (Overview, Order Book, Performance, Yield, Credit Risk, Revenue, Lenders, ML/Quant) |
+| Edge Functions | 6 (sync, forecast, proposals, match, settle, explain) |
 | Demo password | `flowzo123` |
+
+---
+
+## Pre-Demo Seed Command
+
+```bash
+# Re-seed fresh data (~3 min)
+source apps/web/.env.local && npx tsx scripts/seed.ts
+
+# Verify Quant API is healthy
+curl -s https://flowzo-quant-api-production.up.railway.app/health
+```
