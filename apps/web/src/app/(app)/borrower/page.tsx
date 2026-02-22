@@ -23,17 +23,17 @@ function demoDate(daysFromNow: number): string {
 
 // Demo data for calendar when no real forecasts/obligations exist
 function buildDemoForecasts() {
-  // Simulate a realistic 30-day cash flow: starts ~£1,200, salary on day 5, dips around bills
+  // Realistic 30-day cashflow: starts tight, payday spikes, bills erode, danger zone at end
   const baseBalances = [
-    120000, 115000, 108000, 102000, 96000,   // days 0-4: declining
-    245000, 243000, 240000, 235000, 228000,  // day 5: payday +£1,500, then spend
-    222000, 218000, 195000, 190000, 185000,  // day 12: rent -£25k
-    180000, 175000, 168000, 160000, 155000,  // steady decline
-    148000, 140000, 135000, 128000, 120000,  // getting tight
-    115000, 108000, 95000,  85000,  78000,   // day 27-29: danger zone
+    42000, 38000, 35000, 33000, 30000,       // days 0-4: tight (yellow)
+    180000, 178000, 175000, 170000, 165000,   // day 5: payday +£1,500 (green)
+    160000, 155000, 60000, 45000, 43000,      // day 12: rent -£950 (drops to yellow)
+    41000, 39000, 28000, 26000, 24000,        // day 17: energy+water (yellow)
+    21000, 18000, 15000, 13000, 11000,        // getting tight (yellow)
+    8000, 5000, -5000, -8000, -10000,         // day 25-29: danger zone (red)
   ];
   const incomes =  [0,0,0,0,0, 150000,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0];
-  const outgoings = [0,5000,7000,6000,6000, 0,2000,3000,5000,7000, 6000,4000,25000,5000,5000, 5000,5000,7000,8000,5000, 7000,8000,5000,7000,8000, 5000,7000,13000,10000,7000];
+  const outgoings = [0,4000,3000,2000,3000, 0,2000,3000,5000,5000, 5000,5000,95000,15000,2000, 2000,2000,11000,2000,2000, 3000,3000,3000,2000,2000, 3000,3000,10000,3000,2000];
 
   return baseBalances.map((bal, i) => ({
     forecast_date: demoDate(i),
