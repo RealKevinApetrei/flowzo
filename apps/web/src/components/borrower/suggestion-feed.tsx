@@ -95,10 +95,8 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
   useEffect(() => {
     if (!scrollRef.current) return;
     const container = scrollRef.current;
-    const card = container.children[activeIndex] as HTMLElement | undefined;
-    if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-    }
+    const cardWidth = container.offsetWidth;
+    container.scrollTo({ left: activeIndex * cardWidth, behavior: "smooth" });
   }, [activeIndex]);
 
   // Track scroll position to update active dot
@@ -215,8 +213,8 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
     setActiveIndex(clamped);
     const container = scrollRef.current;
     if (container) {
-      const card = container.children[clamped] as HTMLElement;
-      card?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+      const cardWidth = container.offsetWidth;
+      container.scrollTo({ left: clamped * cardWidth, behavior: "smooth" });
     }
   }
 
@@ -257,7 +255,7 @@ export function SuggestionFeed({ userId }: SuggestionFeedProps) {
 
         <div
           ref={scrollRef}
-          className="flex overflow-x-auto snap-x snap-mandatory gap-4 scrollbar-hide"
+          className="flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
         >
         {proposals.map((proposal) => (
           <div key={proposal.id} className="min-w-full snap-center">
