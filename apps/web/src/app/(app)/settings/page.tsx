@@ -61,6 +61,22 @@ export default async function SettingsPage() {
       .filter(Boolean),
   );
 
+  // Fall back to mock data when no real achievements exist
+  const hasRealAchievements = borrowerSavedPence > 0 || lenderAmountPence > 0;
+  const achievements = hasRealAchievements
+    ? {
+        borrowerSavedPence,
+        borrowerTradeCount,
+        lenderAmountPence,
+        lenderPeopleHelped: uniqueBorrowers.size,
+      }
+    : {
+        borrowerSavedPence: 124350,   // £1,243.50
+        borrowerTradeCount: 8,
+        lenderAmountPence: 351200,    // £3,512.00
+        lenderPeopleHelped: 14,
+      };
+
   return (
     <SettingsClient
       email={user?.email ?? ""}
@@ -69,12 +85,7 @@ export default async function SettingsPage() {
       connections={connections ?? []}
       onboardingCompleted={profile?.onboarding_completed ?? false}
       lenderPrefs={lenderPrefs ?? undefined}
-      achievements={{
-        borrowerSavedPence,
-        borrowerTradeCount,
-        lenderAmountPence,
-        lenderPeopleHelped: uniqueBorrowers.size,
-      }}
+      achievements={achievements}
     />
   );
 }
