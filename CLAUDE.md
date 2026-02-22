@@ -121,6 +121,9 @@ Member A (Pipeline) ──► Member B (needs real data for backtest + EDA)
 - Vercel redirect URI must be registered in TrueLayer Console: `https://<domain>/api/truelayer/callback`
 - Production: set `TRUELAYER_ENV=production` to switch to real banks (uk-ob-all uk-oauth-all)
 
+### Edge Function Deployment (2026-02-22)
+All 3 updated Edge Functions deployed: generate-proposals (market pricing + eligibility), compute-borrower-features (credit persistence), settle-trade (atomicity).
+
 ### Credit Risk System (Production-Level)
 - **Eligibility gate**: score >= 500 required (DB trigger `check_borrower_eligibility`)
 - **Credit limits enforced at DB level**: A=£500/5 trades, B=£200/3 trades, C=£75/1 trade
