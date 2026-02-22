@@ -4,7 +4,7 @@
 
 Flowzo is a Monzo-native fintech webapp that uses Open Banking data to power an AI-driven P2P micro-lending platform. It forecasts cash flow shortfalls using a day-of-week Gamma statistical model, proposes bill-date shifts with ML credit scoring, and matches borrowers with lenders through a real-time order book — all validated against 307K real Home Credit loans.
 
-**Live:** https://flowzo-web.vercel.app | **Pitch:** https://flowzo-web.vercel.app/pitch
+**Live User App:** https://flowzo-web.vercel.app | **Data Analytics Dashboard:** https://flowzo-web.vercel.app/data | **Pitch:** https://flowzo-web.vercel.app/pitch
 
 ---
 
