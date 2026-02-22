@@ -25,7 +25,8 @@ function calculateFee(
   riskGrade: string,
 ): number {
   const riskMult = RISK_MULTIPLIERS[riskGrade] ?? 1.5;
-  const rawFee = BASE_RATE * amount * (shiftDays / 365) * riskMult;
+  const termPremium = 1 + (shiftDays / 14) * 0.15; // +15% per 14-day period
+  const rawFee = BASE_RATE * amount * (shiftDays / 365) * riskMult * termPremium;
   const cap = Math.min(amount * 0.05, 10.0); // GBP 10 cap
   const fee = Math.min(rawFee, cap);
   return Math.round(Math.max(fee, 0.01) * 100) / 100;
