@@ -34,6 +34,15 @@ import os
 # Allow running from project root: `uvicorn api.main:app`
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
+from src.spending_forecast import (
+    TxnRecord,
+    ObligationRecord,
+    classify_transactions,
+    _aggregate_daily_spend,
+    forecast_irregular_spending,
+)
+from datetime import date as _Date
+
 from src.analytics import (
     calculate_backtest_stats,
     calculate_mape_mock,
@@ -144,6 +153,7 @@ class Transaction(BaseModel):
     amount: float = Field(..., description="Positive = credit, negative = debit (GBP)")
     transaction_type: str = Field(..., description="CREDIT or DEBIT")
     description: Optional[str] = Field(None, description="Merchant/payment narrative")
+    merchant_name: Optional[str] = Field(None, description="Merchant name (if available)")
     booked_at: datetime = Field(..., description="ISO 8601 booking timestamp")
 
     @field_validator("booked_at", mode="before")
@@ -165,6 +175,26 @@ class TransactionBatch(BaseModel):
         ..., min_length=1, max_length=5000,
         description="List of transactions — send oldest-first for correct date tracking.",
     )
+
+
+class ObligationIn(BaseModel):
+    merchant_name: str = Field(..., description="Merchant name (lowercase) from obligations table")
+
+
+class SpendingForecastRequest(BaseModel):
+    transactions: list[Transaction] = Field(
+        ..., min_length=1, max_length=5000,
+        description="Historical transactions (all types). Send oldest-first.",
+    )
+    obligations: list[ObligationIn] = Field(
+        default_factory=list,
+        description="Active recurring obligations — used to exclude known bills from irregular spend.",
+    )
+    forecast_start: Optional[str] = Field(
+        None,
+        description="ISO date string (YYYY-MM-DD) for day 1 of forecast. Defaults to today (UTC).",
+    )
+    horizon_days: int = Field(30, ge=1, le=90, description="Number of forecast days")
 
 
 def _update_state(state: dict, txn: Transaction) -> None:
@@ -390,3 +420,78 @@ def eda():
 def forecast_accuracy():
     """Return 30-day mock cash-flow time series and MAPE score."""
     return calculate_mape_mock()
+
+
+@app.post("/api/forecast/spending")
+def spending_forecast(body: SpendingForecastRequest):
+    """
+    Classify historical transactions as RECURRING vs IRREGULAR, fit per-weekday
+    Gamma distributions to irregular spend, and return a probabilistic daily forecast.
+
+    Classification rules (first match wins):
+    - amount >= 0              → INCOME (excluded from irregular)
+    - merchant_name / first-30-chars of description matches an obligation → RECURRING (excluded)
+    - description appears ≥2× with gap CV < 0.5 → RECURRING (excluded)
+    - everything else          → IRREGULAR (modelled)
+
+    Model tiers (reported in response.model):
+    - gamma_dow   : per-weekday Gamma fits (best — needs ≥4 samples per weekday)
+    - gamma_flat  : single overall Gamma fit (moderate history)
+    - fallback_flat: flat mean ± percentile factors (very sparse history)
+    """
+    import numpy as np
+
+    txn_records = [
+        TxnRecord(
+            amount=t.amount,
+            booked_at=t.booked_at.date(),
+            merchant_name=t.merchant_name,
+            description=t.description,
+        )
+        for t in body.transactions
+    ]
+    obl_records = [
+        ObligationRecord(merchant_name=o.merchant_name)
+        for o in body.obligations
+    ]
+
+    start = (
+        _Date.fromisoformat(body.forecast_start)
+        if body.forecast_start
+        else _Date.today()
+    )
+
+    forecasts = forecast_irregular_spending(
+        transactions=txn_records,
+        obligations=obl_records,
+        forecast_start=start,
+        horizon_days=body.horizon_days,
+    )
+
+    # Determine which model tier was used (for observability)
+    irregular = classify_transactions(txn_records, obl_records)
+    daily = _aggregate_daily_spend(irregular)
+    dow_buckets: dict[int, list] = {}
+    for d, spend in daily.items():
+        dow_buckets.setdefault(d.weekday(), []).append(spend)
+    has_dow_fit = any(len(v) >= 4 for v in dow_buckets.values())
+    model_tier = (
+        "gamma_dow" if has_dow_fit
+        else "gamma_flat" if len(daily) >= 2
+        else "fallback_flat"
+    )
+
+    return {
+        "model": model_tier,
+        "irregular_txn_count": len(irregular),
+        "total_days_history": len(daily),
+        "daily_forecasts": [
+            {
+                "forecast_date": f.forecast_date,
+                "mean_spend": f.mean_spend,
+                "p10": f.p10,
+                "p90": f.p90,
+            }
+            for f in forecasts
+        ],
+    }
