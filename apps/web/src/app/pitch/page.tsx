@@ -94,13 +94,13 @@ const slides = [
               step: "01",
               title: "Connect",
               subtitle: "TrueLayer Open Banking",
-              desc: "User connects their bank. We pull 90 days of real transaction history in seconds.",
+              desc: "User connects their bank. We pull 90 days of transactions, standing orders, direct debits, and verified identity — all in seconds.",
             },
             {
               step: "02",
               title: "Analyse",
               subtitle: "Feature Engineering",
-              desc: "We detect recurring bills, classify income patterns, and flag danger days on a 30-day forecast.",
+              desc: "Real bills from your bank — standing orders and direct debits — plus inferred recurring payments. Income classified, danger days flagged on a 30-day forecast.",
             },
             {
               step: "03",

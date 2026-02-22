@@ -44,6 +44,8 @@
 
 > "Alex is a Grade C borrower — irregular income, the calendar shows days that are tighter or in overdraft."
 
+> "When Alex connected their bank, we didn't just read transactions — we pulled their actual standing orders and direct debit mandates directly from the bank via Open Banking. These are real bills, not inferred patterns."
+
 ---
 
 ### Step 2 — Show the calendar heatmap
