@@ -348,9 +348,7 @@ def get_lenders():
 def backtest():
     """Return historical default rates by Risk Grade (A / B / C)."""
     df = _state["df"]
-    # Sample for speed — backtest on 5 000 rows
-    sample = df.sample(n=min(5_000, len(df)), random_state=1).reset_index(drop=True)
-    stats = calculate_backtest_stats(sample)
+    stats = calculate_backtest_stats(df)
     return {"backtest": stats}
 
 
@@ -402,8 +400,7 @@ def ingest_transaction_batch(body: TransactionBatch):
 def portfolio_returns():
     """Return portfolio yield metrics and Sharpe ratio."""
     df = _state["df"]
-    sample = df.sample(n=min(2_000, len(df)), random_state=2).reset_index(drop=True)
-    backtest_stats = calculate_backtest_stats(sample)
+    backtest_stats = calculate_backtest_stats(df)
     returns = calculate_portfolio_returns(_state["lenders"], backtest_stats)
     return returns
 

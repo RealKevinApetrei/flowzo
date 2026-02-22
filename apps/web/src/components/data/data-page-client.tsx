@@ -5,6 +5,7 @@ import { StatCard } from "./stat-card";
 import { DataTable, GradeBadge } from "./data-table";
 import { QuantDashboard } from "./quant-dashboard";
 import { DepthChart } from "./depth-chart";
+import { AnomalyDetector } from "./anomaly-detector";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -300,6 +301,9 @@ function OverviewTab({
 
   return (
     <div className="space-y-4">
+      {/* AI Anomaly Detection */}
+      <AnomalyDetector />
+
       {/* Hero Stats */}
       <div className="grid grid-cols-2 gap-3">
         <StatCard

@@ -1,8 +1,8 @@
 """
 data_prep.py — Data loading and proxy column mapping.
 
-Loads from pre-serialized models/sample_data.joblib if available,
-otherwise loads the full CSV (300k+ rows, slower on first run).
+Loads the full application_train.csv dataset (~307k rows).
+Falls back to pre-serialized models/sample_data.joblib if CSV is missing.
 """
 
 from pathlib import Path
@@ -44,7 +44,7 @@ def _load_sample() -> pd.DataFrame | None:
 
 
 def _load_from_csv() -> pd.DataFrame:
-    """Load and process from the full CSV — fallback path."""
+    """Load and process from the full CSV (~307k rows)."""
     print(f"Loading from CSV: {DATA_PATH}")
     df = pd.read_csv(DATA_PATH)
 
@@ -66,9 +66,14 @@ def _load_from_csv() -> pd.DataFrame:
 
 def load_data() -> pd.DataFrame:
     """
-    Load dataset — uses pre-serialized sample if available, otherwise CSV.
+    Load full dataset — prefers CSV for complete data, falls back to joblib.
     """
+    if DATA_PATH.exists():
+        return _load_from_csv()
     sample = _load_sample()
     if sample is not None:
+        print("CSV not found, using pre-serialized sample_data.joblib")
         return sample
-    return _load_from_csv()
+    raise FileNotFoundError(
+        f"No data source found. Place application_train.csv at {DATA_PATH}"
+    )

@@ -223,7 +223,10 @@ export function MatchingDemo() {
           {/* Step 0: Trade submitted */}
           {currentStep >= 0 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 0 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">Incoming Trade</p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Incoming Trade</p>
+              </div>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold text-navy">{DEMO_TRADE.obligation} -- {DEMO_TRADE.borrower}</p>
@@ -242,7 +245,10 @@ export function MatchingDemo() {
           {/* Step 1: ML scoring */}
           {currentStep >= 1 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 1 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">ML Re-scoring</p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">2</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">ML Re-scoring</p>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-indigo-600">
@@ -261,9 +267,10 @@ export function MatchingDemo() {
           {/* Step 2: Filter eligible */}
           {currentStep >= 2 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 2 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">
-                Eligibility Filter ({eligibleLenders.length}/{scoredLenders.length} pass)
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Eligibility Filter ({eligibleLenders.length}/{scoredLenders.length} pass)</p>
+              </div>
               <div className="space-y-1.5">
                 {scoredLenders.map((l) => (
                   <div key={l.id} className="flex items-center justify-between text-xs">
@@ -284,9 +291,10 @@ export function MatchingDemo() {
           {/* Step 3: Score & Rank */}
           {currentStep >= 3 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 3 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">
-                Lender Scoring (scored_v2)
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">4</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Lender Scoring (scored_v2)</p>
+              </div>
               <div className="text-[9px] text-text-muted flex gap-4 mb-2">
                 <span>APR compat: 40%</span>
                 <span>Headroom: 30%</span>
@@ -343,9 +351,10 @@ export function MatchingDemo() {
           {/* Step 4: Allocate */}
           {currentStep >= 4 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 4 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">
-                Fund Allocation (max {MAX_SINGLE_LENDER_PCT * 100}% per lender)
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">5</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Fund Allocation (max {MAX_SINGLE_LENDER_PCT * 100}% per lender)</p>
+              </div>
               {/* Allocation bar */}
               <div className="h-6 rounded-full bg-warm-grey overflow-hidden flex mb-2">
                 {allocatedLenders.map((l, i) => {
@@ -390,9 +399,10 @@ export function MatchingDemo() {
           {/* Step 5: Fee tranche */}
           {currentStep >= 5 && (
             <div className={`rounded-xl bg-soft-white p-3 mt-2 transition-opacity duration-300 ${currentStep === 5 ? "ring-2 ring-coral/30" : ""}`}>
-              <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">
-                Fee Split (Senior / Junior Tranche)
-              </p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-5 h-5 rounded-full bg-coral text-white text-[10px] font-bold flex items-center justify-center shrink-0">6</span>
+                <p className="text-[10px] font-bold text-text-muted uppercase tracking-wide">Fee Split (Senior / Junior Tranche)</p>
+              </div>
               <div className="flex items-center gap-3">
                 <div className="flex-1 rounded-lg bg-success/10 p-2.5 text-center">
                   <p className="text-[10px] text-success font-bold">Lender Pool (80%)</p>
@@ -426,7 +436,10 @@ export function MatchingDemo() {
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <p className="text-sm font-bold text-success">Fully Matched</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-success text-white text-[10px] font-bold flex items-center justify-center shrink-0">7</span>
+                        <p className="text-sm font-bold text-success">Fully Matched</p>
+                      </div>
                       <p className="text-[10px] text-text-secondary">
                         Status: PENDING_MATCH → MATCHED | {allocatedLenders.length} lender{allocatedLenders.length !== 1 ? "s" : ""} allocated
                       </p>
@@ -438,7 +451,10 @@ export function MatchingDemo() {
                       <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5A.75.75 0 0110 5zm0 10a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
                     </svg>
                     <div>
-                      <p className="text-sm font-bold text-warning">Partial Match</p>
+                      <div className="flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-full bg-warning text-white text-[10px] font-bold flex items-center justify-center shrink-0">7</span>
+                        <p className="text-sm font-bold text-warning">Partial Match</p>
+                      </div>
                       <p className="text-[10px] text-text-secondary">
                         {formatCurrency(totalAllocated)} of {formatCurrency(DEMO_TRADE.amount_pence)} funded -- waiting for more lenders
                       </p>

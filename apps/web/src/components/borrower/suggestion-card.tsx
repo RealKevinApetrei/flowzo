@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { formatCurrency, formatDate } from "@flowzo/shared";
 import { Button } from "@/components/ui/button";
 import { RangeSlider } from "@/components/ui/range-slider";
@@ -80,10 +80,41 @@ export function SuggestionCard({
     if (matchProbability >= 45) return { range: "bg-warning", thumb: "border-warning focus-visible:ring-warning/50", text: "text-warning", label: "Medium" };
     return { range: "bg-danger", thumb: "border-danger focus-visible:ring-danger/50", text: "text-danger", label: "Low" };
   }, [matchProbability]);
-  // Build a specific explanation fallback
-  const explanation =
-    proposal.explanation_text ??
-    `Your ${payload.obligation_name} payment of ${formatCurrency(payload.amount_pence)} is due on ${formatDate(payload.original_date)}. Shifting it to ${formatDate(payload.shifted_date)} gives your balance more breathing room.`;
+  // Claude-powered explanation — fetch on mount if not already generated
+  const fallbackText = `Your ${payload.obligation_name} payment of ${formatCurrency(payload.amount_pence)} is due on ${formatDate(payload.original_date)}. Shifting it to ${formatDate(payload.shifted_date)} gives your balance more breathing room.`;
+  const [claudeExplanation, setClaudeExplanation] = useState<string | null>(
+    proposal.explanation_text,
+  );
+
+  useEffect(() => {
+    if (claudeExplanation) return; // Already have one
+    let cancelled = false;
+
+    fetch("/api/claude/explain", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        billName: payload.obligation_name,
+        originalDate: payload.original_date,
+        shiftedDate: payload.shifted_date,
+        amountPence: payload.amount_pence,
+        feePence: adjustedFee,
+        reason: `${payload.shift_days}-day shift to avoid shortfall`,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.explanation) {
+          setClaudeExplanation(data.explanation);
+        }
+      })
+      .catch(() => {}); // Fail silently — fallback text is fine
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const explanation = claudeExplanation ?? fallbackText;
 
   async function handleAccept() {
     setIsAccepting(true);

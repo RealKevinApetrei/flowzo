@@ -8,7 +8,9 @@ import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/u
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
-import { AutoScrollAnchor } from "@/components/shared/auto-scroll";
+import { ClaudeInsights } from "@/components/borrower/claude-insights";
+import { BillPriority } from "@/components/borrower/bill-priority";
+import { WhatIfSimulator } from "@/components/borrower/what-if-simulator";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -525,14 +527,64 @@ export default async function BorrowerHomePage() {
           </section>
         )}
 
+        {/* Claude AI Financial Insight */}
+        {riskGrade && (
+          <ClaudeInsights
+            riskGrade={riskGrade}
+            creditScore={profile?.credit_score as number | null}
+            dangerDays={dangerCount}
+            obligations={displayObligations.slice(0, 5).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+            }))}
+            avgBalancePence={Math.round(
+              (displayForecasts.reduce((s, f) => s + f.projected_balance_pence, 0) /
+                Math.max(displayForecasts.length, 1)),
+            )}
+            incomePattern="monthly salary"
+          />
+        )}
+
+        {/* AI Bill Priority Ranker + What-If Simulator */}
+        <div className="grid grid-cols-2 gap-3">
+          <BillPriority
+            obligations={displayObligations.slice(0, 8).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+              category: "Bill",
+            }))}
+            dangerDays={displayForecasts
+              .filter((f) => f.is_danger)
+              .map((f) => ({
+                day: new Date(f.forecast_date).getDate(),
+                deficit_pence: Math.abs(f.projected_balance_pence),
+              }))}
+            avgBalancePence={Math.round(
+              displayForecasts.reduce((s, f) => s + f.projected_balance_pence, 0) /
+                Math.max(displayForecasts.length, 1),
+            )}
+          />
+          <WhatIfSimulator
+            obligations={displayObligations.slice(0, 8).map((o) => ({
+              name: o.name,
+              amount_pence: o.amount_pence,
+              expected_day: new Date(o.next_expected).getDate(),
+            }))}
+            forecasts={displayForecasts.map((f) => ({
+              day: new Date(f.forecast_date).getDate(),
+              balance_pence: f.projected_balance_pence,
+              is_danger: f.is_danger,
+            }))}
+          />
+        </div>
+
         {/* AI Suggestions -- primary actionable content */}
         <section id="suggestions">
           <h2 className="text-lg font-bold text-navy mb-3">Suggestions</h2>
           <SuggestionFeed userId={user.id} marketContext={marketContext} />
         </section>
-
-        {/* Auto-scroll anchor — only for demo mode */}
-        {isDemo && <AutoScrollAnchor delay={800} />}
       </div>
     </div>
   );

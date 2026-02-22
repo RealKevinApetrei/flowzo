@@ -409,6 +409,7 @@ serve(async (req: Request) => {
     const fullyMatched = remainingAmount <= 0;
 
     if (fullyMatched) {
+      // CAS: only transition if still PENDING_MATCH (prevents race with cancelTrade)
       const { error: statusErr } = await supabase
         .from("trades")
         .update({
@@ -417,7 +418,8 @@ serve(async (req: Request) => {
           platform_fee: platformFee,
           lender_fee: lenderFee,
         })
-        .eq("id", trade_id);
+        .eq("id", trade_id)
+        .eq("status", "PENDING_MATCH");
 
       if (statusErr) {
         console.error("Trade status update error:", statusErr);

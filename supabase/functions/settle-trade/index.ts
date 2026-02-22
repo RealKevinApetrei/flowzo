@@ -114,14 +114,18 @@ serve(async (req: Request) => {
             continue;
           }
 
-          const { error: statusErr } = await supabase
+          // CAS: only transition if still MATCHED (prevents concurrent settlement)
+          const { data: liveUpdate, error: statusErr } = await supabase
             .from("trades")
             .update({ status: "LIVE" })
-            .eq("id", trade.id);
+            .eq("id", trade.id)
+            .eq("status", "MATCHED")
+            .select("id")
+            .single();
 
-          if (statusErr) {
+          if (statusErr || !liveUpdate) {
             results.errors.push(
-              `Disburse status update failed for ${trade.id}: ${statusErr.message}`,
+              `Disburse status update failed for ${trade.id}: ${statusErr?.message ?? "CAS conflict"}`,
             );
             continue;
           }
@@ -344,14 +348,18 @@ serve(async (req: Request) => {
             continue;
           }
 
-          const { error: statusErr } = await supabase
+          // CAS: only transition if still LIVE (prevents concurrent settlement)
+          const { data: repaidUpdate, error: statusErr } = await supabase
             .from("trades")
             .update({ status: "REPAID" })
-            .eq("id", trade.id);
+            .eq("id", trade.id)
+            .eq("status", "LIVE")
+            .select("id")
+            .single();
 
-          if (statusErr) {
+          if (statusErr || !repaidUpdate) {
             results.errors.push(
-              `Repay status update failed for ${trade.id}: ${statusErr.message}`,
+              `Repay status update failed for ${trade.id}: ${statusErr?.message ?? "CAS conflict"}`,
             );
             continue;
           }
@@ -497,17 +505,21 @@ serve(async (req: Request) => {
             continue;
           }
 
-          const { error: statusErr } = await supabase
+          // CAS: only transition if still LIVE (prevents concurrent settlement)
+          const { data: defaultUpdate, error: statusErr } = await supabase
             .from("trades")
             .update({
               status: "DEFAULTED",
               defaulted_at: new Date().toISOString(),
             })
-            .eq("id", trade.id);
+            .eq("id", trade.id)
+            .eq("status", "LIVE")
+            .select("id")
+            .single();
 
-          if (statusErr) {
+          if (statusErr || !defaultUpdate) {
             results.errors.push(
-              `Default status update failed for ${trade.id}: ${statusErr.message}`,
+              `Default status update failed for ${trade.id}: ${statusErr?.message ?? "CAS conflict"}`,
             );
             continue;
           }

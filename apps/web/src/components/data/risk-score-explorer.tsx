@@ -4,8 +4,8 @@ import { useState } from "react";
 
 interface ScoreResult {
   credit_score: number;
-  grade: string;
-  pd: number;
+  risk_grade: string;
+  probability_of_default: number;
 }
 
 interface ShapFeature {
@@ -15,16 +15,17 @@ interface ShapFeature {
 
 interface ExplainResult {
   base_value: number;
-  shap_values: ShapFeature[];
+  positive: { feature: string; shap_value: number }[];
+  negative: { feature: string; shap_value: number }[];
 }
 
 const FEATURE_NAMES: Record<string, string> = {
   annual_inflow: "Annual Inflow",
   avg_monthly_balance: "Avg Monthly Balance",
-  days_since_open: "Days Since Open",
-  primary_bank_health: "Primary Bank Health",
-  secondary_bank_health: "Secondary Bank Health",
-  failed_payment_cluster: "Failed Payment Risk",
+  days_since_account_open: "Days Since Open",
+  primary_bank_health_score: "Primary Bank Health",
+  secondary_bank_health_score: "Secondary Bank Health",
+  failed_payment_cluster_risk: "Failed Payment Risk",
 };
 
 function humanName(key: string): string {
@@ -34,10 +35,10 @@ function humanName(key: string): string {
 const DEFAULTS = {
   annual_inflow: 35000,
   avg_monthly_balance: 2500,
-  days_since_open: 365,
-  primary_bank_health: 0.75,
-  secondary_bank_health: 0.6,
-  failed_payment_cluster: 1,
+  days_since_account_open: 365,
+  primary_bank_health_score: 0.75,
+  secondary_bank_health_score: 0.6,
+  failed_payment_cluster_risk: 1,
 };
 
 export function RiskScoreExplorer() {
@@ -45,6 +46,7 @@ export function RiskScoreExplorer() {
   const [loading, setLoading] = useState(false);
   const [score, setScore] = useState<ScoreResult | null>(null);
   const [explain, setExplain] = useState<ExplainResult | null>(null);
+  const [claudeNarrative, setClaudeNarrative] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   function updateField(key: keyof typeof DEFAULTS, val: number) {
@@ -56,22 +58,52 @@ export function RiskScoreExplorer() {
     setError(null);
     setScore(null);
     setExplain(null);
+    setClaudeNarrative(null);
 
     try {
-      const body = JSON.stringify({ features: form });
+      // Backend expects flat fields, not wrapped in "features"
+      const body = JSON.stringify(form);
       const [scoreRes, explainRes] = await Promise.all([
         fetch("/api/quant/score", { method: "POST", headers: { "Content-Type": "application/json" }, body }),
         fetch("/api/quant/explain", { method: "POST", headers: { "Content-Type": "application/json" }, body }),
       ]);
 
       if (scoreRes.ok) {
-        setScore(await scoreRes.json());
+        const data = await scoreRes.json();
+        setScore({
+          credit_score: data.credit_score,
+          risk_grade: data.risk_grade,
+          probability_of_default: data.probability_of_default,
+        });
       }
       if (explainRes.ok) {
-        setExplain(await explainRes.json());
+        const data = await explainRes.json();
+        setExplain(data);
       }
       if (!scoreRes.ok && !explainRes.ok) {
         setError("Could not reach scoring API.");
+      }
+
+      // Fetch Claude narrative explanation (non-blocking)
+      if (scoreRes.ok && explainRes.ok) {
+        const scoreData = score ?? { credit_score: 0, risk_grade: "B", probability_of_default: 0 };
+        const explainData = explain;
+        const shapForClaude = [
+          ...(explainData?.positive ?? []).map((s: { feature: string; shap_value: number }) => ({ feature: s.feature, value: 0, impact: s.shap_value })),
+          ...(explainData?.negative ?? []).map((s: { feature: string; shap_value: number }) => ({ feature: s.feature, value: 0, impact: s.shap_value })),
+        ];
+        fetch("/api/claude/risk-explain", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            creditScore: scoreData.credit_score,
+            riskGrade: scoreData.risk_grade,
+            shapValues: shapForClaude,
+          }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((data) => { if (data?.explanation) setClaudeNarrative(data.explanation); })
+          .catch(() => {});
       }
     } catch {
       setError("Network error — try again.");
@@ -85,8 +117,11 @@ export function RiskScoreExplorer() {
   const gradeBg = (g: string) =>
     g === "A" ? "bg-success/15" : g === "B" ? "bg-warning/15" : "bg-danger/15";
 
-  // SHAP waterfall
-  const shapValues = explain?.shap_values ?? [];
+  // SHAP waterfall — combine positive and negative into unified list
+  const shapValues: ShapFeature[] = [
+    ...(explain?.positive ?? []).map((s) => ({ feature: s.feature, value: s.shap_value })),
+    ...(explain?.negative ?? []).map((s) => ({ feature: s.feature, value: s.shap_value })),
+  ].sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
   const maxAbsShap = Math.max(...shapValues.map((s) => Math.abs(s.value)), 0.1);
   const barMaxW = 120;
 
@@ -123,8 +158,8 @@ export function RiskScoreExplorer() {
           <label className="text-[10px] text-text-muted block mb-1">Days Since Account Open</label>
           <input
             type="number"
-            value={form.days_since_open}
-            onChange={(e) => updateField("days_since_open", Number(e.target.value))}
+            value={form.days_since_account_open}
+            onChange={(e) => updateField("days_since_account_open", Number(e.target.value))}
             className="w-full h-10 px-3 rounded-xl border-2 border-cool-grey bg-[var(--card-surface)] text-sm font-medium text-navy focus:border-coral focus:outline-none transition-colors"
           />
         </div>
@@ -134,36 +169,36 @@ export function RiskScoreExplorer() {
             type="number"
             min={1}
             max={3}
-            value={form.failed_payment_cluster}
-            onChange={(e) => updateField("failed_payment_cluster", Number(e.target.value))}
+            value={form.failed_payment_cluster_risk}
+            onChange={(e) => updateField("failed_payment_cluster_risk", Number(e.target.value))}
             className="w-full h-10 px-3 rounded-xl border-2 border-cool-grey bg-[var(--card-surface)] text-sm font-medium text-navy focus:border-coral focus:outline-none transition-colors"
           />
         </div>
         <div className="col-span-2">
           <label className="text-[10px] text-text-muted block mb-1">
-            Primary Bank Health: {form.primary_bank_health.toFixed(2)}
+            Primary Bank Health: {form.primary_bank_health_score.toFixed(2)}
           </label>
           <input
             type="range"
             min={0}
             max={1}
             step={0.01}
-            value={form.primary_bank_health}
-            onChange={(e) => updateField("primary_bank_health", Number(e.target.value))}
+            value={form.primary_bank_health_score}
+            onChange={(e) => updateField("primary_bank_health_score", Number(e.target.value))}
             className="w-full accent-coral"
           />
         </div>
         <div className="col-span-2">
           <label className="text-[10px] text-text-muted block mb-1">
-            Secondary Bank Health: {form.secondary_bank_health.toFixed(2)}
+            Secondary Bank Health: {form.secondary_bank_health_score.toFixed(2)}
           </label>
           <input
             type="range"
             min={0}
             max={1}
             step={0.01}
-            value={form.secondary_bank_health}
-            onChange={(e) => updateField("secondary_bank_health", Number(e.target.value))}
+            value={form.secondary_bank_health_score}
+            onChange={(e) => updateField("secondary_bank_health_score", Number(e.target.value))}
             className="w-full accent-coral"
           />
         </div>
@@ -189,15 +224,15 @@ export function RiskScoreExplorer() {
             <div>
               <p className="text-xs text-text-muted">Credit Score</p>
               <p className="text-4xl font-extrabold text-navy tracking-tight">
-                {score.credit_score}
+                {Math.round(score.credit_score)}
               </p>
             </div>
             <div className="text-right">
-              <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-lg font-bold ${gradeBg(score.grade)} ${gradeColor(score.grade)}`}>
-                {score.grade}
+              <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-lg font-bold ${gradeBg(score.risk_grade)} ${gradeColor(score.risk_grade)}`}>
+                {score.risk_grade}
               </span>
               <p className="text-xs text-text-muted mt-1">
-                PD: {(score.pd * 100).toFixed(2)}%
+                PD: {(score.probability_of_default * 100).toFixed(2)}%
               </p>
             </div>
           </div>
@@ -245,6 +280,14 @@ export function RiskScoreExplorer() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Claude AI narrative explanation */}
+      {claudeNarrative && (
+        <div className="rounded-xl bg-coral/5 border border-coral/10 p-3 mt-2">
+          <p className="text-[10px] font-bold text-coral uppercase tracking-wider mb-1">AI Explanation</p>
+          <p className="text-xs text-text-secondary leading-relaxed">{claudeNarrative}</p>
         </div>
       )}
     </section>
