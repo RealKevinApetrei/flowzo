@@ -8,6 +8,7 @@ import { UpcomingTransactions, type CashflowItem } from "@/components/borrower/u
 import { ActiveShifts } from "@/components/borrower/active-shifts";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { SyncStatusBanner } from "@/components/borrower/sync-status-banner";
+import { AutoScroll } from "@/components/shared/auto-scroll";
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -405,8 +406,11 @@ export default async function BorrowerHomePage() {
           );
         })()}
 
+        {/* Auto-scroll past balance card to content */}
+        <AutoScroll targetId="main-content" delay={600} />
+
         {/* Greeting */}
-        <div>
+        <div id="main-content">
           <h1 className="text-2xl font-extrabold text-navy">
             {getGreeting()}, {displayName}
           </h1>
