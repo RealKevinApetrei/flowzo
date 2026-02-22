@@ -273,7 +273,7 @@ export default async function BorrowerHomePage() {
                 <p className="text-xs font-medium opacity-70">Balance</p>
               </div>
               {/* Action buttons */}
-              <div className="flex items-center gap-2.5 mt-4">
+              <div className="flex items-center gap-2 mt-3">
                 <Link
                   href="#suggestions"
                   className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 transition-colors px-4 py-2 rounded-full text-sm font-semibold"
@@ -368,7 +368,7 @@ export default async function BorrowerHomePage() {
         )}
 
         {/* AI Suggestions -- primary actionable content */}
-        <section>
+        <section id="suggestions">
           <h2 className="text-lg font-bold text-navy mb-3">Suggestions</h2>
           <SuggestionFeed userId={user.id} />
         </section>
