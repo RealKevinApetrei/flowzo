@@ -43,6 +43,24 @@ export function SuggestionCard({
     return { min, max };
   }, [suggestedFee]);
   const [adjustedFee, setAdjustedFee] = useState(suggestedFee);
+
+  // Match probability based on fee position in range
+  // TODO: Replace with real order book data from backend (see Issue #51)
+  // Backend should expose: GET /api/trades/match-probability?fee_pence=X&shift_days=Y
+  const matchProbability = useMemo(() => {
+    const range = feeRange.max - feeRange.min;
+    if (range <= 0) return 1;
+    const position = (adjustedFee - feeRange.min) / range; // 0..1
+    // Placeholder curve: generous near top, drops at bottom
+    return Math.round(Math.pow(position, 0.6) * 100);
+  }, [adjustedFee, feeRange]);
+
+  // Dynamic color based on match probability
+  const feeColor = useMemo(() => {
+    if (matchProbability >= 75) return { range: "bg-success", thumb: "border-success focus-visible:ring-success/50", text: "text-success", label: "High" };
+    if (matchProbability >= 45) return { range: "bg-warning", thumb: "border-warning focus-visible:ring-warning/50", text: "text-warning", label: "Medium" };
+    return { range: "bg-danger", thumb: "border-danger focus-visible:ring-danger/50", text: "text-danger", label: "Low" };
+  }, [matchProbability]);
   // Build a specific explanation fallback
   const explanation =
     proposal.explanation_text ??
@@ -145,13 +163,22 @@ export function SuggestionCard({
               </div>
             </div>
             {editingFee && (
-              <div className="mt-2">
+              <div className="mt-3">
+                {/* Match probability indicator */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-text-muted">Match likelihood</span>
+                  <span className={`text-xs font-bold ${feeColor.text}`}>
+                    {matchProbability}% -- {feeColor.label}
+                  </span>
+                </div>
                 <RangeSlider
                   value={[adjustedFee]}
                   min={feeRange.min}
                   max={feeRange.max}
                   step={1}
                   onValueChange={([v]) => setAdjustedFee(v)}
+                  rangeClassName={feeColor.range}
+                  thumbClassName={feeColor.thumb}
                 />
                 <div className="flex items-center justify-between mt-1.5">
                   <span className="text-[10px] text-text-muted">{formatCurrency(feeRange.min)}</span>
