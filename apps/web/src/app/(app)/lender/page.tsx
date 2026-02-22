@@ -123,17 +123,17 @@ export default async function LenderHomePage() {
     activeTrades: activeTrades.length,
   };
 
-  // Fetch yield curve for duration selector (dynamic APR per term bucket)
-  const { data: yieldCurve } = await supabase
-    .from("yield_curve")
+  // Fetch aggregated yield curve (volume-weighted across all grades per bucket)
+  const { data: yieldCurveAgg } = await supabase
+    .from("yield_curve_agg")
     .select("term_bucket, avg_apr_pct, trade_count");
 
   const potPence = Math.round(Number(pot?.available ?? 0) * 100);
   const fallbackApr = currentApyBps / 100; // bps → percent
 
-  // Map yield_curve buckets to duration options
-  const shortBucket = yieldCurve?.find((r) => r.term_bucket === "0-7d");
-  const midBucket = yieldCurve?.find((r) => r.term_bucket === "8-14d");
+  // Map yield_curve_agg buckets to duration options (one row per bucket, no grade ambiguity)
+  const shortBucket = yieldCurveAgg?.find((r) => r.term_bucket === "0-7d");
+  const midBucket = yieldCurveAgg?.find((r) => r.term_bucket === "8-14d");
 
   const shortApr = Number(shortBucket?.avg_apr_pct ?? fallbackApr);
   const midApr = Number(midBucket?.avg_apr_pct ?? fallbackApr);

@@ -15,7 +15,7 @@ const RISK_MULTIPLIERS: Record<string, number> = {
 };
 
 /**
- * Calculate the fee for shifting a bill.
+ * Calculate the fee for shifting a bill using the deterministic formula.
  * amount is in GBP (decimal). Returns fee in GBP (decimal).
  * Cap: lesser of 5% of amount or GBP 10.
  */
@@ -29,6 +29,60 @@ function calculateFee(
   const cap = Math.min(amount * 0.05, 10.0); // GBP 10 cap
   const fee = Math.min(rawFee, cap);
   return Math.round(Math.max(fee, 0.01) * 100) / 100;
+}
+
+/**
+ * Market-aware fee calculation using order book liquidity.
+ * Queries market_rates view for bid-ask spread, uses midpoint when liquid.
+ * Falls back to deterministic formula when supply is thin.
+ */
+async function calculateMarketFee(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  amount: number,
+  shiftDays: number,
+  riskGrade: string,
+): Promise<{ fee: number; source: "market" | "formula"; apr: number; supplyCount: number }> {
+  try {
+    const { data: marketRate } = await supabase
+      .from("market_rates")
+      .select("ask_apr, best_bid_apr, weighted_avg_bid_apr, liquidity_ratio, supply_count")
+      .eq("risk_grade", riskGrade)
+      .single();
+
+    if (
+      marketRate?.weighted_avg_bid_apr &&
+      marketRate.liquidity_ratio != null &&
+      marketRate.liquidity_ratio >= 0.5
+    ) {
+      // Use midpoint of bid-ask spread
+      const bidApr = Number(marketRate.weighted_avg_bid_apr);
+      const askApr = Number(marketRate.ask_apr) || bidApr * 1.2;
+      const midpointApr = (askApr + bidApr) / 2;
+
+      const rawFee = amount * (midpointApr / 100) * (shiftDays / 365);
+      const cap = Math.min(amount * 0.05, 10.0);
+      const fee = Math.round(Math.max(Math.min(rawFee, cap), 0.01) * 100) / 100;
+
+      return {
+        fee,
+        source: "market",
+        apr: midpointApr,
+        supplyCount: Number(marketRate.supply_count ?? 0),
+      };
+    }
+  } catch {
+    // Fall through to formula
+  }
+
+  const fee = calculateFee(amount, shiftDays, riskGrade);
+  const riskMult = RISK_MULTIPLIERS[riskGrade] ?? 1.5;
+  return {
+    fee,
+    source: "formula",
+    apr: BASE_RATE * riskMult * 100,
+    supplyCount: 0,
+  };
 }
 
 function isoDate(d: Date): string {
@@ -218,11 +272,15 @@ serve(async (req: Request) => {
 
         if (shiftDays < 1) continue;
 
-        // Calculate fee
-        const feePence = Math.round(
-          calculateFee(oblAmount, shiftDays, riskGrade) * 100,
+        // Calculate fee using market-aware pricing (falls back to formula)
+        const marketResult = await calculateMarketFee(
+          supabase,
+          oblAmount,
+          shiftDays,
+          riskGrade,
         );
-        const fee = feePence / 100;
+        const fee = marketResult.fee;
+        const feePence = Math.round(fee * 100);
 
         const payload = {
           obligation_id: obl.id,
@@ -233,10 +291,17 @@ serve(async (req: Request) => {
           fee_pence: feePence,
           shift_days: shiftDays,
           risk_grade: riskGrade,
+          fee_source: marketResult.source,
+          market_apr: marketResult.apr,
         };
 
+        const rateContext =
+          marketResult.source === "market"
+            ? ` (market rate: ${marketResult.apr.toFixed(1)}% APR, ${marketResult.supplyCount} lenders ready)`
+            : ` (${marketResult.apr.toFixed(1)}% APR)`;
+
         const explanationText =
-          `Move ${obl.name} from ${isoDate(originalDate)} to ${isoDate(shiftedDate)} to avoid a shortfall. Fee: \u00a3${formatGBP(fee)}`;
+          `Move ${obl.name} from ${isoDate(originalDate)} to ${isoDate(shiftedDate)} to avoid a shortfall. Fee: \u00a3${formatGBP(fee)}${rateContext}`;
 
         proposals.push({
           user_id,
