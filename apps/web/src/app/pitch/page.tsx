@@ -139,17 +139,7 @@ const slides = [
         <p className="text-xl text-white/70 max-w-2xl mx-auto mb-8 leading-relaxed">
           When Flowzo detects a shortfall, Claude AI proposes the exact bill to move, the exact date to move it to, and the exact fee — in plain English.
         </p>
-        <div className="bg-white/10 rounded-2xl px-8 py-6 max-w-lg w-full mx-auto text-left border border-white/20 mb-8">
-          <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-3">Live Proposal Example</p>
-          <p className="text-white text-lg font-semibold leading-snug">
-            "E.g. Move your rent back 7 days to avoid going into your overdraft."
-          </p>
-          <div className="mt-4 flex gap-3">
-            <span className="bg-success/20 text-success text-xs font-bold px-3 py-1 rounded-full">Accept</span>
-            <span className="bg-white/10 text-white/50 text-xs font-bold px-3 py-1 rounded-full">Dismiss</span>
-          </div>
-        </div>
-        <div className="grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
+<div className="grid grid-cols-3 gap-8 w-full max-w-2xl mx-auto">
           {[
             { stat: "< 10s", label: "Sync → forecast → proposal" },
             { stat: "85%+", label: "30-day balance forecast accuracy" },
