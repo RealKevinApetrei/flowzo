@@ -225,15 +225,34 @@ serve(async (req: Request) => {
         if (scoreRes.ok) {
           mlScore = await scoreRes.json();
 
-          // Update profile risk_grade with ML-derived grade
+          // Update profile with risk grade + credit limits + eligibility
           if (mlScore?.risk_grade) {
+            const creditLimits: Record<string, { max_trade_amount: number; max_active_trades: number }> = {
+              A: { max_trade_amount: 500, max_active_trades: 5 },
+              B: { max_trade_amount: 200, max_active_trades: 3 },
+              C: { max_trade_amount: 75, max_active_trades: 1 },
+            };
+            const limits = creditLimits[mlScore.risk_grade] ?? { max_trade_amount: 0, max_active_trades: 0 };
+            const isEligible = (mlScore.credit_score ?? 0) >= 500;
+
+            // Scale credit limit by income regularity (inflow confidence)
+            const inflowConfidence = Math.max(0.5, primary_bank_health_score);
+            const adjustedLimit = Math.round(limits.max_trade_amount * inflowConfidence);
+
             const { error: profileErr } = await supabase
               .from("profiles")
-              .update({ risk_grade: mlScore.risk_grade })
+              .update({
+                risk_grade: mlScore.risk_grade,
+                credit_score: mlScore.credit_score,
+                max_trade_amount: adjustedLimit,
+                max_active_trades: limits.max_active_trades,
+                eligible_to_borrow: isEligible,
+                last_scored_at: new Date().toISOString(),
+              })
               .eq("id", user_id);
 
             if (profileErr) {
-              console.error("Failed to update profile risk_grade:", profileErr);
+              console.error("Failed to update profile credit data:", profileErr);
             }
           }
 
@@ -281,10 +300,25 @@ serve(async (req: Request) => {
           risk_grade: heuristic.grade,
         };
 
-        // Update profile
+        // Update profile with heuristic grade + credit limits
+        const heuristicLimits: Record<string, { max_trade_amount: number; max_active_trades: number }> = {
+          A: { max_trade_amount: 500, max_active_trades: 5 },
+          B: { max_trade_amount: 200, max_active_trades: 3 },
+          C: { max_trade_amount: 75, max_active_trades: 1 },
+        };
+        const hLimits = heuristicLimits[heuristic.grade] ?? { max_trade_amount: 0, max_active_trades: 0 };
+        const hScore = mlScore?.credit_score ?? heuristic.score * 10;
+
         await supabase
           .from("profiles")
-          .update({ risk_grade: heuristic.grade })
+          .update({
+            risk_grade: heuristic.grade,
+            credit_score: hScore,
+            max_trade_amount: hLimits.max_trade_amount,
+            max_active_trades: hLimits.max_active_trades,
+            eligible_to_borrow: hScore >= 500,
+            last_scored_at: new Date().toISOString(),
+          })
           .eq("id", user_id);
       }
     }

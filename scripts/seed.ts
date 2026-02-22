@@ -446,19 +446,37 @@ async function updateProfiles(users: SeedUser[]) {
   for (let i = 0; i < users.length; i += BATCH_SIZE) {
     const batch = users.slice(i, i + BATCH_SIZE);
     await Promise.all(
-      batch.map((u) =>
-        supabase
+      batch.map((u) => {
+        // Generate credit score within grade range
+        const scoreRanges: Record<string, [number, number]> = { A: [700, 850], B: [600, 699], C: [500, 599] };
+        const [low, high] = scoreRanges[u.riskGrade] ?? [500, 700];
+        const score = randomInt(low, high);
+        const creditLimits: Record<string, { max_trade_amount: number; max_active_trades: number }> = {
+          A: { max_trade_amount: 500, max_active_trades: 5 },
+          B: { max_trade_amount: 200, max_active_trades: 3 },
+          C: { max_trade_amount: 75, max_active_trades: 1 },
+        };
+        const limits = creditLimits[u.riskGrade] ?? { max_trade_amount: 0, max_active_trades: 0 };
+        const isBorrower = u.role === "BORROWER_ONLY" || u.role === "BOTH";
+
+        return supabase
           .from("profiles")
           .update({
             risk_grade: u.riskGrade,
             role_preference: u.role,
             onboarding_completed: true,
+            credit_score: isBorrower ? score : null,
+            max_trade_amount: limits.max_trade_amount,
+            max_active_trades: limits.max_active_trades,
+            eligible_to_borrow: isBorrower && score >= 500,
+            last_scored_at: new Date().toISOString(),
           })
           .eq("id", u.id)
           .then(({ error }) => {
             if (error)
               console.error(`  Profile update error for ${u.email}:`, error.message);
-          }),
+          });
+      },
       ),
     );
   }
@@ -755,9 +773,21 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const borrower = pick(borrowers);
     const tradeId = uuid();
     const shiftDays = randomInt(1, 14);
-    const amount = randomFloat(10, 500);
-    const riskMult = borrower.riskGrade === "A" ? 1 : borrower.riskGrade === "B" ? 1.5 : 2;
-    const termPremium = 1 + (shiftDays / 14) * 0.15; // +15% premium per 14-day period
+    // Credit-limit-aware amount: cap by grade
+    const maxAmounts: Record<string, number> = { A: 500, B: 200, C: 75 };
+    const maxAmount = maxAmounts[borrower.riskGrade] ?? 75;
+    const amount = randomFloat(10, maxAmount);
+    // Continuous score-adjusted pricing
+    const scoreRanges: Record<string, [number, number]> = { A: [700, 850], B: [600, 699], C: [500, 599] };
+    const [sLow, sHigh] = scoreRanges[borrower.riskGrade] ?? [500, 700];
+    const creditScore = randomInt(sLow, sHigh);
+    const baseMult: Record<string, number> = { A: 0.8, B: 1.2, C: 1.8 };
+    const capMult: Record<string, number> = { A: 1.2, B: 1.8, C: 2.5 };
+    const bm = baseMult[borrower.riskGrade] ?? 1.2;
+    const cm = capMult[borrower.riskGrade] ?? 2.0;
+    const t = Math.max(0, Math.min(1, (creditScore - sLow) / (sHigh - sLow)));
+    const riskMult = cm - t * (cm - bm);
+    const termPremium = 1 + (shiftDays / 14) * 0.15;
     const feeRate = 0.049 * riskMult * termPremium;
     const fee = Math.max(
       0.01,
