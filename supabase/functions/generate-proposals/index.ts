@@ -6,40 +6,43 @@ import { createAdminClient } from "../_shared/supabase.ts";
 // Fee calculation
 // ---------------------------------------------------------------------------
 
-const BASE_RATE = 0.049; // 4.9% APR
+// UK-benchmarked pricing: BoE 4.5% + 2% margin = 6.5% base APR
+// Must stay in sync with packages/shared/src/constants/fees.ts
+const BASE_APR_PCT = 6.5;
+const TERM_PREMIUM_PER_DAY = 0.15;
 
 const RISK_MULTIPLIERS: Record<string, number> = {
   A: 1.0,
-  B: 1.5,
-  C: 2.0,
+  B: 1.8,
+  C: 2.8,
 };
 
 /**
  * Continuous score-adjusted multiplier: borrowers within the same grade
  * pay different rates based on their exact credit score.
- * Higher score → lower multiplier (better pricing).
+ * Higher score -> lower multiplier (better pricing).
  */
 function scoreAdjustedMultiplier(riskGrade: string, creditScore: number | null): number {
-  if (!creditScore) return RISK_MULTIPLIERS[riskGrade] ?? 1.5;
+  if (!creditScore) return RISK_MULTIPLIERS[riskGrade] ?? 1.8;
 
   const BASE: Record<string, number> = { A: 0.8, B: 1.2, C: 1.8 };
-  const CAP: Record<string, number> = { A: 1.2, B: 1.8, C: 2.5 };
+  const CAP: Record<string, number> = { A: 1.2, B: 2.2, C: 3.5 };
   const RANGE: Record<string, [number, number]> = { A: [700, 850], B: [600, 699], C: [500, 599] };
 
   const base = BASE[riskGrade] ?? 1.2;
-  const cap = CAP[riskGrade] ?? 2.0;
+  const cap = CAP[riskGrade] ?? 2.2;
   const [low, high] = RANGE[riskGrade] ?? [500, 700];
 
-  // Linear interpolation: higher score → lower multiplier
+  // Linear interpolation: higher score -> lower multiplier
   const t = Math.max(0, Math.min(1, (creditScore - low) / (high - low)));
   return cap - t * (cap - base);
 }
 
 /**
- * Calculate the fee for shifting a bill using the deterministic formula.
+ * Calculate the fee for shifting a bill using UK-benchmarked pricing.
  * Uses continuous score-adjusted pricing when credit score is available.
  * amount is in GBP (decimal). Returns fee in GBP (decimal).
- * Cap: lesser of 5% of amount or GBP 10.
+ * Cap: 8% of principal or GBP 20.
  */
 function calculateFee(
   amount: number,
@@ -48,9 +51,9 @@ function calculateFee(
   creditScore: number | null = null,
 ): number {
   const riskMult = scoreAdjustedMultiplier(riskGrade, creditScore);
-  const termPremium = 1 + (shiftDays / 14) * 0.15; // +15% per 14-day period
-  const rawFee = BASE_RATE * amount * (shiftDays / 365) * riskMult * termPremium;
-  const cap = Math.min(amount * 0.05, 10.0); // GBP 10 cap
+  const effectiveAprPct = BASE_APR_PCT * riskMult + TERM_PREMIUM_PER_DAY * shiftDays;
+  const rawFee = amount * (effectiveAprPct / 100) * (shiftDays / 365);
+  const cap = Math.min(amount * 0.08, 20.0);
   const fee = Math.min(rawFee, cap);
   return Math.round(Math.max(fee, 0.01) * 100) / 100;
 }
@@ -86,7 +89,7 @@ async function calculateMarketFee(
       const midpointApr = (askApr + bidApr) / 2;
 
       const rawFee = amount * (midpointApr / 100) * (shiftDays / 365);
-      const cap = Math.min(amount * 0.05, 10.0);
+      const cap = Math.min(amount * 0.08, 20.0);
       const fee = Math.round(Math.max(Math.min(rawFee, cap), 0.01) * 100) / 100;
 
       return {
@@ -105,7 +108,7 @@ async function calculateMarketFee(
   return {
     fee,
     source: "formula",
-    apr: BASE_RATE * riskMult * 100,
+    apr: BASE_APR_PCT * riskMult + TERM_PREMIUM_PER_DAY * shiftDays,
     supplyCount: 0,
   };
 }

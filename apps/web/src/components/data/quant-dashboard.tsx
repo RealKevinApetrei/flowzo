@@ -443,9 +443,9 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           label="MAPE"
-          value={`${data.mape_pct.toFixed(1)}%`}
+          value={`${(data.mape_pct ?? 0).toFixed(1)}%`}
           subtitle="Mean Abs % Error"
-          variant={data.mape_pct > 15 ? "warning" : "success"}
+          variant={(data.mape_pct ?? 0) > 15 ? "warning" : "success"}
         />
         <StatCard
           label="Forecast Days"

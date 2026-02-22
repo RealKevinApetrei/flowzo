@@ -517,8 +517,14 @@ async function createLendingData(users: SeedUser[]) {
       ["A"],
       ["B", "C"],
     ]) as string[];
-    const minApr = randomFloat(2, 8);
-    const targetApr = randomFloat(minApr + 0.5, minApr + 2);
+    // UK-benchmarked min APR — must exceed savings rates to attract capital
+    const highestBand = riskBands.includes("C") ? "C" : riskBands.includes("B") ? "B" : "A";
+    const minApr = highestBand === "A"
+      ? randomFloat(4, 7)     // Above UK savings rate (4-4.5% AER)
+      : highestBand === "B"
+        ? randomFloat(7, 12)
+        : randomFloat(12, 20);
+    const targetApr = randomFloat(minApr + 0.5, minApr + 3);
     return {
       user_id: u.id,
       min_apr: minApr,
@@ -787,21 +793,12 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
     const maxAmounts: Record<string, number> = { A: 500, B: 200, C: 75 };
     const maxAmount = maxAmounts[borrower.riskGrade] ?? 75;
     const amount = randomFloat(10, maxAmount);
-    // Continuous score-adjusted pricing
-    const scoreRanges: Record<string, [number, number]> = { A: [700, 850], B: [600, 699], C: [500, 599] };
-    const [sLow, sHigh] = scoreRanges[borrower.riskGrade] ?? [500, 700];
-    const creditScore = randomInt(sLow, sHigh);
-    const baseMult: Record<string, number> = { A: 0.8, B: 1.2, C: 1.8 };
-    const capMult: Record<string, number> = { A: 1.2, B: 1.8, C: 2.5 };
-    const bm = baseMult[borrower.riskGrade] ?? 1.2;
-    const cm = capMult[borrower.riskGrade] ?? 2.0;
-    const t = Math.max(0, Math.min(1, (creditScore - sLow) / (sHigh - sLow)));
-    const riskMult = cm - t * (cm - bm);
-    const termPremium = 1 + (shiftDays / 14) * 0.15;
-    const feeRate = 0.049 * riskMult * termPremium;
+    // UK-benchmarked pricing: BoE 4.5% + 2% margin = 6.5% base APR
+    const riskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
+    const effectiveAprPct = 6.5 * riskMult + 0.15 * shiftDays;
     const fee = Math.max(
       0.01,
-      Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
+      Math.round(amount * (effectiveAprPct / 100) * (shiftDays / 365) * 100) / 100,
     );
 
     let originalDueDate: Date;
@@ -887,7 +884,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsM
       original_due_date: isoDate(originalDueDate),
       new_due_date: isoDate(newDueDate),
       fee,
-      fee_rate: Number(feeRate.toFixed(4)),
+      fee_rate: Number((effectiveAprPct / 100).toFixed(4)),
       platform_fee: platformFee,
       lender_fee: lenderFee,
       risk_grade: borrower.riskGrade,
@@ -1114,17 +1111,12 @@ async function createProposals(users: SeedUser[], obligationsMap: Map<string, Se
     }
 
     const shiftedDate = addDays(originalDate, shiftDays);
-    const feeRate =
-      0.049 *
-      (borrower.riskGrade === "A"
-        ? 1
-        : borrower.riskGrade === "B"
-          ? 1.5
-          : 2);
-    // Fee = rate * amount * days/365 — no flat % cap so APR stays consistent across term lengths
+    // UK-benchmarked pricing (same formula as trade creation)
+    const propRiskMult = borrower.riskGrade === "A" ? 1.0 : borrower.riskGrade === "B" ? 1.8 : 2.8;
+    const propAprPct = 6.5 * propRiskMult + 0.15 * shiftDays;
     const fee = Math.max(
       0.01,
-      Math.round(feeRate * amount * (shiftDays / 365) * 100) / 100,
+      Math.round(amount * (propAprPct / 100) * (shiftDays / 365) * 100) / 100,
     );
 
     // Pick and fill a template
@@ -1312,6 +1304,9 @@ async function createForecasts(
 async function createPlatformRevenue() {
   console.log("Creating platform revenue entries...");
 
+  // Clean up ALL old platform_revenue entries first (seed data only)
+  await supabase.from("platform_revenue").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
   // Fetch all seeded REPAID and DEFAULTED trades
   const { data: repaidTrades } = await supabase
     .from("trades")
@@ -1321,7 +1316,7 @@ async function createPlatformRevenue() {
 
   const { data: defaultedTrades } = await supabase
     .from("trades")
-    .select("id, amount, defaulted_at")
+    .select("id, amount, platform_fee, defaulted_at")
     .eq("status", "DEFAULTED");
 
   const revenueRows: Record<string, unknown>[] = [];
@@ -1337,11 +1332,11 @@ async function createPlatformRevenue() {
     });
   }
 
-  // DEFAULT_LOSS entries for defaulted trades (negative amount)
+  // DEFAULT_LOSS entries for defaulted trades — platform only loses its 20% fee share (junior tranche)
   for (const t of defaultedTrades ?? []) {
     revenueRows.push({
       entry_type: "DEFAULT_LOSS",
-      amount: -Number(t.amount),
+      amount: -Number(t.platform_fee ?? 0),
       trade_id: t.id,
       description: `Default loss absorbed (junior tranche): trade ${t.id}`,
       created_at: t.defaulted_at,

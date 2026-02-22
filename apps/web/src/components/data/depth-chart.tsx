@@ -2,13 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-interface DepthBucket {
-  aprBucket: number;
-  riskGrade: string;
-  tradeCount: number;
-  totalVolume: number;
-}
-
 interface SupplyOrder {
   risk_grade: string;
   apr_bucket: number;
@@ -30,56 +23,76 @@ interface DepthChartProps {
 }
 
 const GRADE_COLORS: Record<string, { fill: string; stroke: string; label: string }> = {
-  A: { fill: "rgba(16, 185, 129, 0.3)", stroke: "#10B981", label: "Grade A" },
-  B: { fill: "rgba(245, 158, 11, 0.3)", stroke: "#F59E0B", label: "Grade B" },
-  C: { fill: "rgba(239, 68, 68, 0.3)", stroke: "#EF4444", label: "Grade C" },
+  A: { fill: "rgba(16, 185, 129, 0.35)", stroke: "#10B981", label: "Grade A" },
+  B: { fill: "rgba(245, 158, 11, 0.35)", stroke: "#F59E0B", label: "Grade B" },
+  C: { fill: "rgba(239, 68, 68, 0.35)", stroke: "#EF4444", label: "Grade C" },
 };
 
 const BID_COLOR = { fill: "rgba(59, 130, 246, 0.2)", stroke: "#3B82F6" };
 
-const BUCKET_WIDTH = 2; // 2% APR buckets for granularity
+const BUCKET_WIDTH = 2; // 2% APR buckets for high-resolution depth
 
 export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps) {
   const [hoveredBucket, setHoveredBucket] = useState<{
     apr: number;
-    grade: string;
     side: "bid" | "ask";
     x: number;
     y: number;
-    count: number;
-    volume: number;
+    breakdown: { grade: string; volume: number; count: number }[];
     cumVolume: number;
   } | null>(null);
 
-  const { cumulativeByGrade, bidCumulative, maxCumVolume, aprRange, aprStats, crossingApr } = useMemo(() => {
-    // === ASK SIDE (demand — pending trades) ===
-    const bucketMap = new Map<string, DepthBucket>();
+  const { stackedAsk, bidCumulative, maxCumVolume, aprBounds, crossingApr } = useMemo(() => {
+    const grades = ["A", "B", "C"];
+
+    // === ASK SIDE: stacked aggregate by APR bucket ===
+    const askBuckets = new Map<number, Record<string, { volume: number; count: number }>>();
 
     for (const trade of pendingTrades) {
       if (!trade.amount || !trade.shift_days || trade.shift_days === 0 || trade.fee == null) continue;
       const apr = (trade.fee / trade.amount) * (365 / trade.shift_days) * 100;
-      if (!isFinite(apr)) continue;
+      if (!isFinite(apr) || apr <= 0) continue;
       const bucket = Math.floor(apr / BUCKET_WIDTH) * BUCKET_WIDTH;
-      const key = `${bucket}-${trade.risk_grade}`;
 
-      const existing = bucketMap.get(key) ?? {
-        aprBucket: bucket,
-        riskGrade: trade.risk_grade,
-        tradeCount: 0,
-        totalVolume: 0,
-      };
-      existing.tradeCount += 1;
-      existing.totalVolume += trade.amount;
-      bucketMap.set(key, existing);
+      if (!askBuckets.has(bucket)) {
+        askBuckets.set(bucket, { A: { volume: 0, count: 0 }, B: { volume: 0, count: 0 }, C: { volume: 0, count: 0 } });
+      }
+      const gradeData = askBuckets.get(bucket)![trade.risk_grade];
+      if (gradeData) {
+        gradeData.volume += trade.amount;
+        gradeData.count += 1;
+      }
     }
 
-    const allBuckets = Array.from(bucketMap.values()).sort(
-      (a, b) => a.aprBucket - b.aprBucket,
-    );
+    // Sort buckets ascending by APR and build cumulative stacked data
+    const sortedBuckets = Array.from(askBuckets.entries()).sort(([a], [b]) => a - b);
 
-    // === BID SIDE (supply — lender standing orders) ===
-    // Aggregate supply across all grades per APR bucket
-    const bidBucketMap = new Map<number, { apr: number; volume: number; count: number }>();
+    const cumVolByGrade: Record<string, number> = { A: 0, B: 0, C: 0 };
+    const stackedAskData: {
+      apr: number;
+      cumByGrade: Record<string, number>;
+      totalCum: number;
+      breakdown: { grade: string; volume: number; count: number }[];
+    }[] = [];
+
+    for (const [apr, gradeMap] of sortedBuckets) {
+      const breakdown: { grade: string; volume: number; count: number }[] = [];
+      for (const g of grades) {
+        cumVolByGrade[g] += gradeMap[g]?.volume ?? 0;
+        if (gradeMap[g]?.count) {
+          breakdown.push({ grade: g, volume: gradeMap[g].volume, count: gradeMap[g].count });
+        }
+      }
+      stackedAskData.push({
+        apr,
+        cumByGrade: { ...cumVolByGrade },
+        totalCum: grades.reduce((s, g) => s + cumVolByGrade[g], 0),
+        breakdown,
+      });
+    }
+
+    // === BID SIDE: aggregate supply across grades per APR bucket ===
+    const bidBucketMap = new Map<number, { volume: number; count: number }>();
     for (const order of supplyOrders) {
       const bucket = Math.floor(order.apr_bucket / BUCKET_WIDTH) * BUCKET_WIDTH;
       const existing = bidBucketMap.get(bucket);
@@ -87,117 +100,54 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
         existing.volume += order.available_volume;
         existing.count += order.lender_count;
       } else {
-        bidBucketMap.set(bucket, {
-          apr: bucket,
-          volume: order.available_volume,
-          count: order.lender_count,
-        });
+        bidBucketMap.set(bucket, { volume: order.available_volume, count: order.lender_count });
       }
     }
 
     // Build cumulative bid (descending — at high APR, all lenders participate)
-    const bidBuckets = Array.from(bidBucketMap.values()).sort((a, b) => b.apr - a.apr);
-    const bidCumulativeDesc = bidBuckets.reduce<{ apr: number; cumVolume: number; volume: number; count: number }[]>(
-      (acc, b) => {
-        const prev = acc.length > 0 ? acc[acc.length - 1].cumVolume : 0;
-        acc.push({ apr: b.apr, cumVolume: prev + b.volume, volume: b.volume, count: b.count });
-        return acc;
-      },
-      [],
-    );
-    // Reverse so it's ascending by APR for rendering
+    const bidBuckets = Array.from(bidBucketMap.entries())
+      .sort(([a], [b]) => b - a);
+    let bidCum = 0;
+    const bidCumulativeDesc = bidBuckets.map(([apr, data]) => {
+      bidCum += data.volume;
+      return { apr, cumVolume: bidCum, volume: data.volume, count: data.count };
+    });
     const bidCumAsc = [...bidCumulativeDesc].reverse();
 
-    // Get combined APR range
-    const askAprs = allBuckets.map((b) => b.aprBucket);
-    const bidAprs = bidCumAsc.map((b) => b.apr);
+    // === Auto-zoom: compute actual data range ===
+    const askAprs = stackedAskData.map((d) => d.apr);
+    const bidAprs = bidCumAsc.map((d) => d.apr);
     const allAprs = [...askAprs, ...bidAprs];
-    const minApr = Math.max(Math.min(...allAprs, 0), 0);
-    const maxApr = Math.min(Math.max(...allAprs, 20) + BUCKET_WIDTH, 50);
 
-    // Build cumulative ask volume per grade (ascending by APR)
-    const grades = ["A", "B", "C"];
-    const cumByGrade: Record<string, { apr: number; cumVolume: number; volume: number; count: number }[]> = {};
+    const dataMinApr = allAprs.length > 0 ? Math.min(...allAprs) : 0;
+    const dataMaxApr = allAprs.length > 0 ? Math.max(...allAprs) + BUCKET_WIDTH : 30;
+    const aprPadding = Math.max((dataMaxApr - dataMinApr) * 0.1, BUCKET_WIDTH);
+    const minApr = Math.max(0, dataMinApr - aprPadding);
+    const maxApr = dataMaxApr + aprPadding;
 
-    for (const grade of grades) {
-      const gradeBuckets = allBuckets
-        .filter((b) => b.riskGrade === grade)
-        .sort((a, b) => a.aprBucket - b.aprBucket);
+    // Max cumulative volume
+    const askMaxCum = stackedAskData.length > 0 ? stackedAskData[stackedAskData.length - 1].totalCum : 0;
+    const bidMaxCum = bidCumAsc.length > 0 ? bidCumAsc[0]?.cumVolume ?? 0 : 0;
+    const maxCum = Math.max(askMaxCum, bidMaxCum, 1);
 
-      let cumVol = 0;
-      cumByGrade[grade] = gradeBuckets.map((b) => {
-        cumVol += b.totalVolume;
-        return {
-          apr: b.aprBucket,
-          cumVolume: cumVol,
-          volume: b.totalVolume,
-          count: b.tradeCount,
-        };
-      });
-    }
-
-    // Max cumulative volume across all grades + bid side
-    let maxCum = 0;
-    for (const grade of grades) {
-      const last = cumByGrade[grade]?.[cumByGrade[grade].length - 1];
-      if (last && last.cumVolume > maxCum) maxCum = last.cumVolume;
-    }
-    if (bidCumAsc.length > 0) {
-      const bidMax = bidCumAsc[0]?.cumVolume ?? 0; // First element has highest cumulative
-      if (bidMax > maxCum) maxCum = bidMax;
-    }
-
-    // Compute APR statistics from individual trades
-    const allTradeAprs: number[] = [];
-    for (const trade of pendingTrades) {
-      if (!trade.amount || !trade.shift_days || trade.shift_days === 0 || trade.fee == null) continue;
-      const tradeApr = (trade.fee / trade.amount) * (365 / trade.shift_days) * 100;
-      if (isFinite(tradeApr)) allTradeAprs.push(tradeApr);
-    }
-    allTradeAprs.sort((a, b) => a - b);
-
-    const aprStats = allTradeAprs.length > 0
-      ? {
-          median: allTradeAprs[Math.floor(allTradeAprs.length / 2)],
-          q1: allTradeAprs[Math.floor(allTradeAprs.length * 0.25)],
-          q3: allTradeAprs[Math.floor(allTradeAprs.length * 0.75)],
-          mean: allTradeAprs.reduce((s, v) => s + v, 0) / allTradeAprs.length,
-        }
-      : null;
-
-    // Find crossing point (where bid cumVolume ≈ total ask cumVolume at same APR)
-    let crossingApr: number | null = null;
-    if (bidCumAsc.length > 0 && allBuckets.length > 0) {
-      // Total ask volume (all grades combined) ascending
-      const totalAskByBucket = new Map<number, number>();
-      for (const b of allBuckets) {
-        totalAskByBucket.set(b.aprBucket, (totalAskByBucket.get(b.aprBucket) ?? 0) + b.totalVolume);
-      }
-      const askCumArr = Array.from(totalAskByBucket.entries())
-        .sort(([a], [b]) => a - b)
-        .reduce<{ apr: number; cumVolume: number }[]>((acc, [apr, vol]) => {
-          const prev = acc.length > 0 ? acc[acc.length - 1].cumVolume : 0;
-          acc.push({ apr, cumVolume: prev + vol });
-          return acc;
-        }, []);
-
-      // Find where bid (descending from right) crosses ask (ascending from left)
-      for (const askPoint of askCumArr) {
+    // Find crossing point
+    let crossing: number | null = null;
+    if (bidCumAsc.length > 0 && stackedAskData.length > 0) {
+      for (const askPoint of stackedAskData) {
         const bidPoint = bidCumAsc.find((b) => b.apr <= askPoint.apr + BUCKET_WIDTH);
-        if (bidPoint && bidPoint.cumVolume >= askPoint.cumVolume) {
-          crossingApr = askPoint.apr;
+        if (bidPoint && bidPoint.cumVolume >= askPoint.totalCum) {
+          crossing = askPoint.apr;
           break;
         }
       }
     }
 
     return {
-      cumulativeByGrade: cumByGrade,
+      stackedAsk: stackedAskData,
       bidCumulative: bidCumAsc,
-      maxCumVolume: maxCum || 1,
-      aprRange: { min: minApr, max: maxApr },
-      aprStats,
-      crossingApr,
+      maxCumVolume: maxCum,
+      aprBounds: { min: minApr, max: maxApr },
+      crossingApr: crossing,
     };
   }, [pendingTrades, supplyOrders]);
 
@@ -216,32 +166,68 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
-  // Scales
   const xScale = (apr: number) =>
-    PAD.left + ((apr - aprRange.min) / (aprRange.max - aprRange.min)) * plotW;
+    PAD.left + ((apr - aprBounds.min) / (aprBounds.max - aprBounds.min)) * plotW;
   const yScale = (vol: number) =>
     PAD.top + plotH - (vol / maxCumVolume) * plotH;
 
-  // Build stepped area paths
   const grades = ["A", "B", "C"];
 
-  function buildSteppedPath(
-    points: { apr: number; cumVolume: number }[],
-  ): string {
-    if (points.length === 0) return "";
+  // Build stacked area paths (bottom to top: A, then B on top of A, then C on top of B)
+  function buildStackedPath(gradeIndex: number): string {
+    if (stackedAsk.length === 0) return "";
+    const gradesUpTo = grades.slice(0, gradeIndex + 1);
+
     const parts: string[] = [];
-    const firstX = xScale(points[0].apr);
+    const firstX = xScale(stackedAsk[0].apr);
     parts.push(`M ${firstX} ${yScale(0)}`);
 
-    for (let i = 0; i < points.length; i++) {
-      const x1 = xScale(points[i].apr);
-      const x2 = xScale(points[i].apr + BUCKET_WIDTH);
-      const y = yScale(points[i].cumVolume);
+    // Top edge
+    for (let i = 0; i < stackedAsk.length; i++) {
+      const x1 = xScale(stackedAsk[i].apr);
+      const x2 = xScale(stackedAsk[i].apr + BUCKET_WIDTH);
+      const cumTop = gradesUpTo.reduce((s, g) => s + (stackedAsk[i].cumByGrade[g] ?? 0), 0);
+      const y = yScale(cumTop);
       parts.push(`L ${x1} ${y}`);
       parts.push(`L ${x2} ${y}`);
     }
 
-    const lastX = xScale(points[points.length - 1].apr + BUCKET_WIDTH);
+    // Bottom edge
+    if (gradeIndex === 0) {
+      const lastX = xScale(stackedAsk[stackedAsk.length - 1].apr + BUCKET_WIDTH);
+      parts.push(`L ${lastX} ${yScale(0)}`);
+    } else {
+      const gradesBelow = grades.slice(0, gradeIndex);
+      for (let i = stackedAsk.length - 1; i >= 0; i--) {
+        const x2 = xScale(stackedAsk[i].apr + BUCKET_WIDTH);
+        const x1 = xScale(stackedAsk[i].apr);
+        const cumBottom = gradesBelow.reduce((s, g) => s + (stackedAsk[i].cumByGrade[g] ?? 0), 0);
+        const y = yScale(cumBottom);
+        parts.push(`L ${x2} ${y}`);
+        parts.push(`L ${x1} ${y}`);
+      }
+    }
+
+    parts.push("Z");
+    return parts.join(" ");
+  }
+
+  // Bid side stepped path
+  function buildBidPath(): string {
+    if (bidCumulative.length === 0) return "";
+    const parts: string[] = [];
+    const firstX = xScale(bidCumulative[0].apr);
+    parts.push(`M ${firstX} ${yScale(0)}`);
+
+    for (let i = 0; i < bidCumulative.length; i++) {
+      const x1 = xScale(bidCumulative[i].apr);
+      const x2 = xScale(bidCumulative[i].apr + BUCKET_WIDTH);
+      const y = yScale(bidCumulative[i].cumVolume);
+      parts.push(`L ${x1} ${y}`);
+      parts.push(`L ${x2} ${y}`);
+    }
+
+    const lastX = xScale(bidCumulative[bidCumulative.length - 1].apr + BUCKET_WIDTH);
     parts.push(`L ${lastX} ${yScale(0)}`);
     parts.push("Z");
     return parts.join(" ");
@@ -253,15 +239,29 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
 
   // X-axis tick values
   const xTicks: number[] = [];
-  const maxTickCount = 6;
-  const aprSpan = aprRange.max - aprRange.min;
-  const rawStep = aprSpan / maxTickCount;
+  const aprSpan = aprBounds.max - aprBounds.min;
+  const rawStep = aprSpan / 6;
   const niceStep = Math.max(BUCKET_WIDTH, Math.ceil(rawStep / BUCKET_WIDTH) * BUCKET_WIDTH);
-  for (let apr = aprRange.min; apr <= aprRange.max; apr += niceStep) {
+  for (let apr = Math.ceil(aprBounds.min / niceStep) * niceStep; apr <= aprBounds.max; apr += niceStep) {
     xTicks.push(apr);
   }
 
   const hasBidData = bidCumulative.length > 0;
+
+  // Compute per-grade totals for summary
+  const gradeTotals = grades.map((g) => {
+    let volume = 0;
+    let count = 0;
+    for (const bucket of stackedAsk) {
+      for (const bd of bucket.breakdown) {
+        if (bd.grade === g) {
+          volume += bd.volume;
+          count += bd.count;
+        }
+      }
+    }
+    return { grade: g, volume, count };
+  });
 
   return (
     <div className="space-y-2">
@@ -345,44 +345,34 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
             Implied APR
           </text>
 
-          {/* Q1-Q3 shaded band */}
-          {aprStats && (
-            <rect
-              x={xScale(aprStats.q1)}
-              y={PAD.top}
-              width={Math.max(0, xScale(aprStats.q3) - xScale(aprStats.q1))}
-              height={plotH}
-              style={{ fill: "var(--navy)", opacity: 0.08 }}
-              rx="2"
-            />
-          )}
-
-          {/* Bid side fill (supply — blue, rendered first so asks draw on top) */}
+          {/* Bid side fill */}
           {hasBidData && (
             <path
-              d={buildSteppedPath(bidCumulative)}
+              d={buildBidPath()}
               fill={BID_COLOR.fill}
               stroke={BID_COLOR.stroke}
               strokeWidth="1.5"
             />
           )}
 
-          {/* Ask side fills (demand — grade colors, C first so A on top) */}
-          {[...grades].reverse().map((grade) => {
-            const points = cumulativeByGrade[grade] ?? [];
-            if (points.length === 0) return null;
+          {/* Stacked ask area — render C first (back), then B, then A (front) */}
+          {[...grades].reverse().map((_, revIdx) => {
+            const gradeIdx = grades.length - 1 - revIdx;
+            const grade = grades[gradeIdx];
+            const path = buildStackedPath(gradeIdx);
+            if (!path) return null;
             return (
               <path
-                key={`fill-${grade}`}
-                d={buildSteppedPath(points)}
+                key={`stack-${grade}`}
+                d={path}
                 fill={GRADE_COLORS[grade].fill}
                 stroke={GRADE_COLORS[grade].stroke}
-                strokeWidth="1.5"
+                strokeWidth="1"
               />
             );
           })}
 
-          {/* Crossing point (market clearing rate) */}
+          {/* Crossing point */}
           {crossingApr != null && (
             <>
               <line
@@ -406,59 +396,32 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
             </>
           )}
 
-          {/* Median APR line (only if no crossing point) */}
-          {crossingApr == null && aprStats && (
-            <>
-              <line
-                x1={xScale(aprStats.median)}
-                y1={PAD.top}
-                x2={xScale(aprStats.median)}
-                y2={PAD.top + plotH}
-                style={{ stroke: "var(--navy)" }}
-                strokeWidth="1"
-                strokeDasharray="4,3"
-              />
-              <text
-                x={xScale(aprStats.median) + 3}
-                y={PAD.top + 10}
-                fontSize="7"
-                className="fill-navy"
-              >
-                Median {aprStats.median.toFixed(0)}%
-              </text>
-            </>
-          )}
-
           {/* Interactive hover zones — ask side */}
-          {grades.map((grade) =>
-            (cumulativeByGrade[grade] ?? []).map((point, i) => {
-              const x1 = xScale(point.apr);
-              const x2 = xScale(point.apr + BUCKET_WIDTH);
-              return (
-                <rect
-                  key={`hover-ask-${grade}-${i}`}
-                  x={x1}
-                  y={PAD.top}
-                  width={x2 - x1}
-                  height={plotH}
-                  fill="transparent"
-                  onMouseEnter={(e) => {
-                    const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
-                    setHoveredBucket({
-                      apr: point.apr,
-                      grade,
-                      side: "ask",
-                      x: svgRect ? ((x1 + x2) / 2 / W) * svgRect.width : 0,
-                      y: svgRect ? (yScale(point.cumVolume) / H) * svgRect.height : 0,
-                      count: point.count,
-                      volume: point.volume,
-                      cumVolume: point.cumVolume,
-                    });
-                  }}
-                />
-              );
-            }),
-          )}
+          {stackedAsk.map((point, i) => {
+            const x1 = xScale(point.apr);
+            const x2 = xScale(point.apr + BUCKET_WIDTH);
+            return (
+              <rect
+                key={`hover-ask-${i}`}
+                x={x1}
+                y={PAD.top}
+                width={Math.max(x2 - x1, 1)}
+                height={plotH}
+                fill="transparent"
+                onMouseEnter={(e) => {
+                  const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
+                  setHoveredBucket({
+                    apr: point.apr,
+                    side: "ask",
+                    x: svgRect ? ((x1 + x2) / 2 / W) * svgRect.width : 0,
+                    y: svgRect ? (yScale(point.totalCum) / H) * svgRect.height : 0,
+                    breakdown: point.breakdown,
+                    cumVolume: point.totalCum,
+                  });
+                }}
+              />
+            );
+          })}
 
           {/* Interactive hover zones — bid side */}
           {bidCumulative.map((point, i) => {
@@ -469,19 +432,17 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
                 key={`hover-bid-${i}`}
                 x={x1}
                 y={PAD.top}
-                width={x2 - x1}
+                width={Math.max(x2 - x1, 1)}
                 height={plotH}
                 fill="transparent"
                 onMouseEnter={(e) => {
                   const svgRect = e.currentTarget.ownerSVGElement?.getBoundingClientRect();
                   setHoveredBucket({
                     apr: point.apr,
-                    grade: "ALL",
                     side: "bid",
                     x: svgRect ? ((x1 + x2) / 2 / W) * svgRect.width : 0,
                     y: svgRect ? (yScale(point.cumVolume) / H) * svgRect.height : 0,
-                    count: point.count,
-                    volume: point.volume,
+                    breakdown: [{ grade: "ALL", volume: point.volume, count: point.count }],
                     cumVolume: point.cumVolume,
                   });
                 }}
@@ -503,11 +464,15 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
             <div className="font-bold">
               {hoveredBucket.apr}–{hoveredBucket.apr + BUCKET_WIDTH}% APR
             </div>
-            <div>
-              {hoveredBucket.side === "bid" ? "Supply" : `Demand (Grade ${hoveredBucket.grade})`}:{" "}
-              {hoveredBucket.count} {hoveredBucket.side === "bid" ? "lenders" : "trades"}
-            </div>
-            <div>Volume: £{hoveredBucket.volume.toFixed(0)}</div>
+            {hoveredBucket.side === "bid" ? (
+              <div>Supply: {hoveredBucket.breakdown[0]?.count ?? 0} lenders</div>
+            ) : (
+              hoveredBucket.breakdown.map((bd) => (
+                <div key={bd.grade}>
+                  Grade {bd.grade}: {bd.count} trades (£{bd.volume.toFixed(0)})
+                </div>
+              ))
+            )}
             <div>Cumulative: £{hoveredBucket.cumVolume.toFixed(0)}</div>
           </div>
         )}
@@ -528,39 +493,29 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
             </p>
           </div>
         )}
-        {grades.map((grade) => {
-          const data = cumulativeByGrade[grade] ?? [];
-          const totalVol = data[data.length - 1]?.cumVolume ?? 0;
-          const totalCount = data.reduce((s, d) => s + d.count, 0);
-          return (
-            <div
-              key={grade}
-              className="flex-1 rounded-lg py-2"
-              style={{ backgroundColor: GRADE_COLORS[grade].fill }}
+        {gradeTotals.map(({ grade, volume, count }) => (
+          <div
+            key={grade}
+            className="flex-1 rounded-lg py-2"
+            style={{ backgroundColor: GRADE_COLORS[grade].fill }}
+          >
+            <p
+              className="text-sm font-bold"
+              style={{ color: GRADE_COLORS[grade].stroke }}
             >
-              <p
-                className="text-sm font-bold"
-                style={{ color: GRADE_COLORS[grade].stroke }}
-              >
-                £{totalVol.toFixed(0)}
-              </p>
-              <p className="text-[10px] text-text-muted">
-                {totalCount} Grade {grade}
-              </p>
-            </div>
-          );
-        })}
+              £{volume.toFixed(0)}
+            </p>
+            <p className="text-[10px] text-text-muted">
+              {count} Grade {grade}
+            </p>
+          </div>
+        ))}
       </div>
 
-      {/* APR statistics */}
-      {aprStats && (
-        <div className="flex gap-4 text-[10px] text-text-muted justify-center">
-          <span>Q1: {aprStats.q1.toFixed(0)}%</span>
-          <span>Median: {aprStats.median.toFixed(0)}%</span>
-          <span>Q3: {aprStats.q3.toFixed(0)}%</span>
-          {crossingApr != null && (
-            <span className="font-bold text-purple-500">Clear: {crossingApr}%</span>
-          )}
+      {/* Crossing point callout */}
+      {crossingApr != null && (
+        <div className="text-center text-[10px] text-purple-500 font-bold">
+          Market Clearing Rate: {crossingApr}% APR
         </div>
       )}
     </div>
