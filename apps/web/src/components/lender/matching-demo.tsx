@@ -135,7 +135,7 @@ export function MatchingDemo() {
     }
     const timer = setTimeout(() => {
       setCurrentStep((s) => Math.min(6, s + 1) as Step);
-    }, 1500);
+    }, 5000);
     return () => clearTimeout(timer);
   }, [isPlaying, currentStep]);
 
