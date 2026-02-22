@@ -35,19 +35,19 @@ interface CalendarHeatmapProps {
   repayments?: Repayment[];
 }
 
-function getDayColor(balancePence: number): {
+function getDayColor(balancePence: number, isDanger?: boolean): {
   bg: string;
   border: string;
   dot: string;
 } {
-  if (balancePence < 0) {
+  if (isDanger || balancePence < 0) {
     return {
       bg: "bg-danger/20",
       border: "border-danger",
       dot: "bg-danger",
     };
   }
-  if (balancePence <= 10000) {
+  if (balancePence <= 50000) {
     return {
       bg: "bg-warning/20",
       border: "border-warning",
@@ -193,7 +193,7 @@ export function CalendarHeatmap({
 
           const colors =
             balancePence !== null
-              ? getDayColor(balancePence)
+              ? getDayColor(balancePence, day.forecast?.is_danger)
               : {
                   bg: "bg-warm-grey",
                   border: "border-transparent",
