@@ -138,6 +138,41 @@ const FREQUENCIES = [
   "QUARTERLY",
 ] as const;
 
+// Realistic UK bill templates for obligation seeding
+interface ObligationTemplate {
+  name: string;
+  merchant_name: string;
+  amount_min: number; // GBP
+  amount_max: number; // GBP
+  frequency: "WEEKLY" | "FORTNIGHTLY" | "MONTHLY" | "QUARTERLY";
+  category: string;
+  is_essential: boolean;
+  confidence: number;
+}
+
+const OBLIGATION_TEMPLATES: ObligationTemplate[] = [
+  { name: "Netflix", merchant_name: "Netflix", amount_min: 6.99, amount_max: 17.99, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.95 },
+  { name: "Spotify", merchant_name: "Spotify", amount_min: 10.99, amount_max: 16.99, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.95 },
+  { name: "Sky TV", merchant_name: "Sky TV", amount_min: 26.0, amount_max: 65.0, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.90 },
+  { name: "Virgin Media", merchant_name: "Virgin Media", amount_min: 33.0, amount_max: 60.0, frequency: "MONTHLY", category: "Internet", is_essential: true, confidence: 0.92 },
+  { name: "BT Broadband", merchant_name: "BT Broadband", amount_min: 29.99, amount_max: 45.99, frequency: "MONTHLY", category: "Internet", is_essential: true, confidence: 0.92 },
+  { name: "EE Mobile", merchant_name: "EE Mobile", amount_min: 15.0, amount_max: 55.0, frequency: "MONTHLY", category: "Mobile", is_essential: true, confidence: 0.93 },
+  { name: "Three Mobile", merchant_name: "Three Mobile", amount_min: 12.0, amount_max: 40.0, frequency: "MONTHLY", category: "Mobile", is_essential: true, confidence: 0.91 },
+  { name: "British Gas", merchant_name: "British Gas", amount_min: 80.0, amount_max: 180.0, frequency: "MONTHLY", category: "Energy", is_essential: true, confidence: 0.88 },
+  { name: "Octopus Energy", merchant_name: "Octopus Energy", amount_min: 60.0, amount_max: 150.0, frequency: "MONTHLY", category: "Energy", is_essential: true, confidence: 0.87 },
+  { name: "Thames Water", merchant_name: "Thames Water", amount_min: 25.0, amount_max: 50.0, frequency: "MONTHLY", category: "Water", is_essential: true, confidence: 0.90 },
+  { name: "Council Tax", merchant_name: "Council Tax", amount_min: 100.0, amount_max: 250.0, frequency: "MONTHLY", category: "Tax", is_essential: true, confidence: 0.95 },
+  { name: "TV Licence", merchant_name: "TV Licence", amount_min: 13.25, amount_max: 13.25, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.95 },
+  { name: "Amazon Prime", merchant_name: "Amazon Prime", amount_min: 8.99, amount_max: 8.99, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.93 },
+  { name: "Disney+", merchant_name: "Disney+", amount_min: 7.99, amount_max: 13.99, frequency: "MONTHLY", category: "Entertainment", is_essential: false, confidence: 0.92 },
+  { name: "PureGym", merchant_name: "PureGym", amount_min: 14.99, amount_max: 29.99, frequency: "MONTHLY", category: "Fitness", is_essential: false, confidence: 0.85 },
+  { name: "Aviva Insurance", merchant_name: "Aviva Insurance", amount_min: 30.0, amount_max: 80.0, frequency: "MONTHLY", category: "Insurance", is_essential: true, confidence: 0.93 },
+  { name: "Student Loan", merchant_name: "Student Loans Company", amount_min: 50.0, amount_max: 300.0, frequency: "MONTHLY", category: "Debt", is_essential: true, confidence: 0.90 },
+  { name: "Mortgage", merchant_name: "Nationwide Mortgage", amount_min: 400.0, amount_max: 1200.0, frequency: "MONTHLY", category: "Housing", is_essential: true, confidence: 0.97 },
+  { name: "AA Breakdown", merchant_name: "AA Breakdown", amount_min: 15.0, amount_max: 40.0, frequency: "QUARTERLY", category: "Motoring", is_essential: false, confidence: 0.80 },
+  { name: "Self Assessment", merchant_name: "HMRC Self Assessment", amount_min: 200.0, amount_max: 2000.0, frequency: "QUARTERLY", category: "Tax", is_essential: true, confidence: 0.75 },
+];
+
 const EXPLANATION_TEMPLATES = [
   "Your {merchant} bill of {amount} is due on {original_date}, but your balance will be low that day. Shifting to {shifted_date} gives you {shift_days} more days — your account should be healthier by then. The fee is just {fee}.",
   "We noticed {merchant} ({amount}) falls on a tight day. Moving it to {shifted_date} avoids a potential shortfall. A small {fee} fee applies for the {shift_days}-day shift.",
@@ -196,6 +231,11 @@ async function cleanup() {
         DELETE FROM public.pool_ledger WHERE user_id = ANY(demo_ids);
         DELETE FROM public.lender_preferences WHERE user_id = ANY(demo_ids);
         DELETE FROM public.lending_pots WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.forecasts WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.forecast_snapshots WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.obligations WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.accounts WHERE user_id = ANY(demo_ids);
+        DELETE FROM public.bank_connections WHERE user_id = ANY(demo_ids);
         DELETE FROM auth.users WHERE id = ANY(demo_ids);
       END $$;
     `,
@@ -303,6 +343,11 @@ async function createUsers(): Promise<SeedUser[]> {
       "agent_runs",
       "lender_preferences",
       "lending_pots",
+      "forecasts",
+      "forecast_snapshots",
+      "obligations",
+      "accounts",
+      "bank_connections",
     ]) {
       await supabase.from(table).delete().in("user_id", demoIds);
     }
@@ -468,10 +513,204 @@ async function createLendingData(users: SeedUser[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Step 4b: Create Bank Connections + Accounts for Borrowers
+// ---------------------------------------------------------------------------
+
+interface SeedAccount {
+  userId: string;
+  accountId: string;
+  bankConnectionId: string;
+  balance: number; // GBP
+}
+
+async function createAccountsForSeedUsers(users: SeedUser[]): Promise<SeedAccount[]> {
+  console.log("Creating bank connections and accounts for borrowers...");
+
+  const borrowers = users.filter(
+    (u) => u.role === "BORROWER_ONLY" || u.role === "BOTH",
+  );
+
+  const connections: Record<string, unknown>[] = [];
+  const accounts: Record<string, unknown>[] = [];
+  const seedAccounts: SeedAccount[] = [];
+
+  for (const b of borrowers) {
+    const connId = uuid();
+    const acctId = uuid();
+
+    // Balance based on risk grade
+    let balance: number;
+    switch (b.riskGrade) {
+      case "A": balance = randomFloat(1500, 3000); break;
+      case "B": balance = randomFloat(800, 1800); break;
+      case "C": balance = randomFloat(200, 900); break;
+    }
+
+    connections.push({
+      id: connId,
+      user_id: b.id,
+      provider: "seed",
+      truelayer_token: {},
+      status: "active",
+    });
+
+    accounts.push({
+      id: acctId,
+      user_id: b.id,
+      bank_connection_id: connId,
+      external_account_id: `seed-${b.id}`,
+      account_type: "CURRENT",
+      display_name: "Current Account",
+      currency: "GBP",
+      balance_current: balance,
+      balance_available: balance,
+      balance_updated_at: new Date().toISOString(),
+    });
+
+    seedAccounts.push({ userId: b.id, accountId: acctId, bankConnectionId: connId, balance });
+  }
+
+  // Insert bank connections in batches
+  for (let i = 0; i < connections.length; i += 50) {
+    const { error } = await supabase
+      .from("bank_connections")
+      .insert(connections.slice(i, i + 50));
+    if (error) console.error("  Bank connection insert error:", error.message);
+  }
+
+  // Insert accounts in batches
+  for (let i = 0; i < accounts.length; i += 50) {
+    const { error } = await supabase
+      .from("accounts")
+      .insert(accounts.slice(i, i + 50));
+    if (error) console.error("  Account insert error:", error.message);
+  }
+
+  console.log(`  ${connections.length} bank connections created.`);
+  console.log(`  ${accounts.length} accounts created.`);
+  return seedAccounts;
+}
+
+// ---------------------------------------------------------------------------
+// Step 4c: Create Obligations for Borrowers
+// ---------------------------------------------------------------------------
+
+interface SeedObligation {
+  id: string;
+  userId: string;
+  name: string;
+  merchantName: string;
+  amount: number; // GBP
+  expectedDay: number;
+  nextExpected: string; // YYYY-MM-DD
+  frequency: string;
+}
+
+async function createObligations(users: SeedUser[]): Promise<Map<string, SeedObligation[]>> {
+  console.log("Creating obligations for borrowers...");
+
+  const borrowers = users.filter(
+    (u) => u.role === "BORROWER_ONLY" || u.role === "BOTH",
+  );
+
+  const obligationRows: Record<string, unknown>[] = [];
+  const obligationsMap = new Map<string, SeedObligation[]>();
+  const now = new Date();
+  const currentDay = now.getDate();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+
+  for (const b of borrowers) {
+    const numObligations = randomInt(3, 8);
+    // Shuffle templates and take N (ensures no duplicate merchants per user)
+    const shuffled = [...OBLIGATION_TEMPLATES].sort(() => Math.random() - 0.5);
+    const selected = shuffled.slice(0, numObligations);
+
+    const userObls: SeedObligation[] = [];
+
+    // Should we cluster bills on the same day? ~30% chance
+    const shouldCluster = Math.random() < 0.3;
+    let clusterDay = 0;
+    if (shouldCluster) {
+      clusterDay = randomInt(1, 28);
+    }
+
+    for (let i = 0; i < selected.length; i++) {
+      const tpl = selected[i];
+      const oblId = uuid();
+      const amount = randomFloat(tpl.amount_min, tpl.amount_max);
+
+      // Determine expected_day
+      let expectedDay: number;
+      if (shouldCluster && i < 3) {
+        // First 2-3 obligations share the cluster day
+        expectedDay = clusterDay;
+      } else {
+        expectedDay = randomInt(1, 28);
+      }
+
+      // Compute next_expected from expected_day (timezone-safe string formatting)
+      let nextMonth = currentMonth;
+      let nextYear = currentYear;
+      if (expectedDay <= currentDay) {
+        // Already passed this month, use next month
+        nextMonth++;
+        if (nextMonth > 11) {
+          nextMonth = 0;
+          nextYear++;
+        }
+      }
+      const nextExpected = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(expectedDay).padStart(2, "0")}`;
+
+      const obl: SeedObligation = {
+        id: oblId,
+        userId: b.id,
+        name: tpl.name,
+        merchantName: tpl.merchant_name,
+        amount,
+        expectedDay,
+        nextExpected,
+        frequency: tpl.frequency,
+      };
+      userObls.push(obl);
+
+      obligationRows.push({
+        id: oblId,
+        user_id: b.id,
+        name: tpl.name,
+        merchant_name: tpl.merchant_name,
+        amount,
+        currency: "GBP",
+        expected_day: expectedDay,
+        frequency: tpl.frequency,
+        category: tpl.category,
+        is_essential: tpl.is_essential,
+        confidence: tpl.confidence,
+        next_expected: nextExpected,
+        active: true,
+      });
+    }
+
+    obligationsMap.set(b.id, userObls);
+  }
+
+  // Insert in batches
+  for (let i = 0; i < obligationRows.length; i += 50) {
+    const { error } = await supabase
+      .from("obligations")
+      .insert(obligationRows.slice(i, i + 50));
+    if (error) console.error(`  Obligation insert error (batch ${i}):`, error.message);
+  }
+
+  console.log(`  ${obligationRows.length} obligations created for ${borrowers.length} borrowers.`);
+  return obligationsMap;
+}
+
+// ---------------------------------------------------------------------------
 // Step 5: Create Trades + Allocations + Transitions + Events
 // ---------------------------------------------------------------------------
 
-async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
+async function createTrades(users: SeedUser[], lenders: SeedUser[], obligationsMap: Map<string, SeedObligation[]>) {
   console.log("Creating trades, allocations, transitions, and events...");
 
   const borrowers = users.filter(
@@ -570,9 +809,19 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
 
     const newDueDate = addDays(originalDueDate, shiftDays);
 
+    // Link ~50% of MATCHED/LIVE trades to an obligation
+    let obligationId: string | null = null;
+    if (["MATCHED", "LIVE"].includes(status) && Math.random() < 0.5) {
+      const userObls = obligationsMap.get(borrower.id);
+      if (userObls && userObls.length > 0) {
+        obligationId = pick(userObls).id;
+      }
+    }
+
     trades.push({
       id: tradeId,
       borrower_id: borrower.id,
+      obligation_id: obligationId,
       amount,
       currency: "GBP",
       original_due_date: isoDate(originalDueDate),
@@ -769,7 +1018,7 @@ async function createTrades(users: SeedUser[], lenders: SeedUser[]) {
 // Step 6: Create Agent Proposals
 // ---------------------------------------------------------------------------
 
-async function createProposals(users: SeedUser[]) {
+async function createProposals(users: SeedUser[], obligationsMap: Map<string, SeedObligation[]>) {
   console.log("Creating agent proposals...");
 
   const borrowers = users.filter(
@@ -780,11 +1029,28 @@ async function createProposals(users: SeedUser[]) {
 
   for (let i = 0; i < PROPOSAL_COUNT; i++) {
     const borrower = pick(borrowers);
-    const merchant = pick(MERCHANTS);
-    const amount = randomFloat(10, 300);
+    const userObls = obligationsMap.get(borrower.id);
     const shiftDays = randomInt(1, 14);
     const now = new Date();
-    const originalDate = addDays(now, randomInt(-30, 30));
+
+    // Use a real obligation if available, otherwise fall back to random merchant
+    let merchant: string;
+    let amount: number;
+    let originalDate: Date;
+    let obligationId: string | null = null;
+
+    if (userObls && userObls.length > 0) {
+      const obl = pick(userObls);
+      merchant = obl.name;
+      amount = obl.amount;
+      originalDate = new Date(obl.nextExpected);
+      obligationId = obl.id;
+    } else {
+      merchant = pick(MERCHANTS);
+      amount = randomFloat(10, 300);
+      originalDate = addDays(now, randomInt(-30, 30));
+    }
+
     const shiftedDate = addDays(originalDate, shiftDays);
     const feeRate =
       0.049 *
@@ -819,8 +1085,10 @@ async function createProposals(users: SeedUser[]) {
     proposals.push({
       user_id: borrower.id,
       type: "SHIFT_BILL",
+      obligation_id: obligationId,
       status,
       payload: {
+        obligation_id: obligationId,
         obligation_name: merchant,
         original_date: isoDate(originalDate),
         shifted_date: isoDate(shiftedDate),
@@ -852,6 +1120,130 @@ async function createProposals(users: SeedUser[]) {
   }
 
   console.log(`  ${proposals.length} agent proposals created.`);
+}
+
+// ---------------------------------------------------------------------------
+// Step 6b: Pre-generate Forecasts for Demo Borrowers
+// ---------------------------------------------------------------------------
+
+const FORECAST_DAYS = 30;
+const OVERDRAFT_BUFFER = 100.0;
+const DEMO_FORECAST_COUNT = 20; // first N borrowers get pre-generated forecasts
+
+async function createForecasts(
+  users: SeedUser[],
+  seedAccounts: SeedAccount[],
+  obligationsMap: Map<string, SeedObligation[]>,
+) {
+  console.log("Pre-generating 30-day forecasts for demo borrowers...");
+
+  const borrowers = users.filter(
+    (u) => u.role === "BORROWER_ONLY" || u.role === "BOTH",
+  );
+  const demoBorrowers = borrowers.slice(0, DEMO_FORECAST_COUNT);
+
+  const allForecastRows: Record<string, unknown>[] = [];
+  const allSnapshots: Record<string, unknown>[] = [];
+
+  // Use local date parts to avoid timezone drift with isoDate/toISOString
+  const now = new Date();
+  const todayYear = now.getFullYear();
+  const todayMonth = now.getMonth();
+  const todayDay = now.getDate();
+
+  for (const b of demoBorrowers) {
+    const acct = seedAccounts.find((a) => a.userId === b.id);
+    if (!acct) continue;
+
+    const obls = obligationsMap.get(b.id) ?? [];
+    const runId = uuid();
+    let runningBalance = acct.balance;
+    let dangerDaysCount = 0;
+
+    // Income pattern: primary payday on 25th, 1-2 small irregular income days
+    const payday = 25;
+    const payAmount = randomFloat(1800, 3000);
+    const irregularDays = [randomInt(5, 12), randomInt(15, 22)];
+    const irregularAmount = randomFloat(50, 200);
+
+    for (let dayOffset = 0; dayOffset < FORECAST_DAYS; dayOffset++) {
+      // Build date string directly from local date parts to avoid UTC shift
+      const d = new Date(todayYear, todayMonth, todayDay + dayOffset);
+      const forecastDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const dayOfMonth = d.getDate();
+
+      // Outgoings: sum obligations due on this day
+      let dailyOutgoings = 0;
+      for (const obl of obls) {
+        if (dayOfMonth === obl.expectedDay) {
+          dailyOutgoings += obl.amount;
+        }
+      }
+
+      // Income: payday + irregular
+      let incomeExpected = 0;
+      if (dayOfMonth === payday) {
+        incomeExpected = payAmount;
+      } else if (irregularDays.includes(dayOfMonth)) {
+        incomeExpected = irregularAmount;
+      }
+
+      incomeExpected = Math.round(incomeExpected * 100) / 100;
+      dailyOutgoings = Math.round(dailyOutgoings * 100) / 100;
+
+      runningBalance = runningBalance - dailyOutgoings + incomeExpected;
+
+      // Confidence bands
+      const uncertainty =
+        dayOffset < 14 ? dayOffset * 3 : 13 * 3 + (dayOffset - 13) * 6;
+      const confidenceLow = Math.round((runningBalance - uncertainty) * 100) / 100;
+      const confidenceHigh = Math.round((runningBalance + uncertainty) * 100) / 100;
+
+      const isDanger = runningBalance < OVERDRAFT_BUFFER;
+      if (isDanger) dangerDaysCount++;
+
+      allForecastRows.push({
+        user_id: b.id,
+        forecast_date: forecastDateStr,
+        projected_balance: Math.round(runningBalance * 100) / 100,
+        confidence_low: confidenceLow,
+        confidence_high: confidenceHigh,
+        danger_flag: isDanger,
+        income_expected: incomeExpected,
+        outgoings_expected: dailyOutgoings,
+        run_id: runId,
+      });
+    }
+
+    allSnapshots.push({
+      id: runId,
+      user_id: b.id,
+      starting_balance: Math.round(acct.balance * 100) / 100,
+      obligations_count: obls.length,
+      danger_days_count: dangerDaysCount,
+      model_version: "v1_heuristic",
+      completed_at: new Date().toISOString(),
+    });
+  }
+
+  // Insert snapshots
+  for (let i = 0; i < allSnapshots.length; i += 50) {
+    const { error } = await supabase
+      .from("forecast_snapshots")
+      .insert(allSnapshots.slice(i, i + 50));
+    if (error) console.error("  Snapshot insert error:", error.message);
+  }
+
+  // Insert forecast rows
+  for (let i = 0; i < allForecastRows.length; i += 50) {
+    const { error } = await supabase
+      .from("forecasts")
+      .insert(allForecastRows.slice(i, i + 50));
+    if (error) console.error(`  Forecast insert error (batch ${i}):`, error.message);
+  }
+
+  console.log(`  ${allSnapshots.length} forecast snapshots created.`);
+  console.log(`  ${allForecastRows.length} forecast rows created.`);
 }
 
 // ---------------------------------------------------------------------------
@@ -1037,6 +1429,13 @@ async function validate() {
     supabase
       .from("agent_proposals")
       .select("id", { count: "exact", head: true }),
+    supabase.from("obligations").select("id", { count: "exact", head: true }),
+    supabase.from("bank_connections").select("id", { count: "exact", head: true }),
+    supabase.from("accounts").select("id", { count: "exact", head: true }),
+    supabase.from("forecasts").select("id", { count: "exact", head: true }),
+    supabase
+      .from("forecast_snapshots")
+      .select("id", { count: "exact", head: true }),
   ]);
 
   const labels = [
@@ -1048,6 +1447,11 @@ async function validate() {
     "Trade Transitions",
     "Flowzo Events",
     "Agent Proposals",
+    "Obligations",
+    "Bank Connections",
+    "Accounts",
+    "Forecasts",
+    "Forecast Snapshots",
   ];
 
   for (let i = 0; i < labels.length; i++) {
@@ -1114,8 +1518,11 @@ async function main() {
 
   await updateProfiles(users);
   const lenders = await createLendingData(users);
-  await createTrades(users, lenders);
-  await createProposals(users);
+  const seedAccounts = await createAccountsForSeedUsers(users);
+  const obligationsMap = await createObligations(users);
+  await createTrades(users, lenders, obligationsMap);
+  await createProposals(users, obligationsMap);
+  await createForecasts(users, seedAccounts, obligationsMap);
   await reconcileLendingPots(lenders);
   await validate();
 
