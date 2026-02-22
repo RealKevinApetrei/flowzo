@@ -16,7 +16,7 @@ export function DataTable<T>({
   data,
   emptyMessage = "No data available.",
 }: DataTableProps<T>) {
-  if (data.length === 0) {
+  if (!Array.isArray(data) || data.length === 0) {
     return <p className="text-sm text-text-secondary">{emptyMessage}</p>;
   }
 

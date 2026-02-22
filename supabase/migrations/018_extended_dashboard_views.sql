@@ -41,7 +41,7 @@ from trades
 group by risk_grade;
 
 grant select on public.matching_efficiency to authenticated;
-alter view public.matching_efficiency set (security_invoker = true);
+alter view public.matching_efficiency set (security_invoker = false);
 
 -- Extend trade_performance with live_count, avg_days_to_repay, defaulted volume, total fees
 drop view if exists public.trade_performance cascade;
@@ -83,7 +83,7 @@ where status in ('REPAID', 'DEFAULTED', 'LIVE')
 group by risk_grade;
 
 grant select on public.trade_performance to authenticated;
-alter view public.trade_performance set (security_invoker = true);
+alter view public.trade_performance set (security_invoker = false);
 
 -- Extend platform_totals with matched/cancelled counts and total fees
 drop view if exists public.platform_totals cascade;
@@ -100,7 +100,7 @@ select
 from trades;
 
 grant select on public.platform_totals to authenticated;
-alter view public.platform_totals set (security_invoker = true);
+alter view public.platform_totals set (security_invoker = false);
 
 -- Fix lender names: rename dual-role users showing as "Borrower" in leaderboard
 update profiles

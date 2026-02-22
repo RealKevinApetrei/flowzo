@@ -412,7 +412,7 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
             {/* Actual line */}
             <polyline
               fill="none"
-              stroke="#1B1B3A"
+              style={{ stroke: "var(--navy)" }}
               strokeWidth="1.5"
               points={data.actual
                 .map(
