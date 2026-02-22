@@ -6,6 +6,7 @@ import { LendingPotCard } from "./lending-pot-card";
 import { DurationSelector } from "./duration-selector";
 import { YieldDashboard } from "./yield-dashboard";
 import { ImpactCard } from "./impact-card";
+import { MatchingDemo } from "./matching-demo";
 import { FirstVisitBanner } from "@/components/shared/first-visit-banner";
 import { formatCurrency } from "@flowzo/shared";
 import { Card, CardContent } from "@/components/ui/card";
@@ -171,6 +172,9 @@ export function LenderPageClient({
             );
           })()}
         </section>
+
+        {/* Matching Engine Dev View */}
+        <MatchingDemo />
 
         {/* Impact Card */}
         {impactStats.peopleHelped > 0 && <ImpactCard stats={impactStats} />}
