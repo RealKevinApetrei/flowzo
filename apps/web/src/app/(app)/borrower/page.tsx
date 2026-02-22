@@ -97,6 +97,19 @@ export default async function BorrowerHomePage() {
 
   const displayName = profile?.display_name ?? "there";
 
+  // Fetch primary account balance
+  const { data: account } = await supabase
+    .from("accounts")
+    .select("balance_available, display_name, currency")
+    .eq("user_id", user.id)
+    .order("balance_updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const balancePence = account
+    ? Math.round(Number(account.balance_available) * 100)
+    : 23902; // demo: £239.02
+
   // Fetch 30-day forecast for the user (with enhanced fields)
   const today = new Date();
   const thirtyDaysLater = new Date(today);
@@ -231,6 +244,32 @@ export default async function BorrowerHomePage() {
       <TopBar title="Flowzo" />
 
       <div className="px-4 py-6 space-y-6">
+        {/* Monzo-style balance card */}
+        {(() => {
+          const pounds = Math.floor(Math.abs(balancePence) / 100);
+          const pence = Math.abs(balancePence) % 100;
+          const isNegative = balancePence < 0;
+          return (
+            <div className="rounded-2xl bg-coral p-5 text-white">
+              <div className="flex items-start justify-between">
+                <p className="text-lg font-extrabold tracking-tight opacity-90">flowzo</p>
+                <div className="text-right">
+                  <p className="text-3xl font-extrabold tracking-tight">
+                    {isNegative && "-"}£{pounds.toLocaleString("en-GB")}
+                    <span className="text-lg font-bold opacity-80">.{String(pence).padStart(2, "0")}</span>
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-end justify-between mt-1">
+                <p className="text-xs font-medium opacity-70">
+                  {displayName !== "there" ? displayName : "Current Account"}
+                </p>
+                <p className="text-xs font-medium opacity-70">Balance</p>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Greeting */}
         <div>
           <h1 className="text-2xl font-extrabold text-navy">
