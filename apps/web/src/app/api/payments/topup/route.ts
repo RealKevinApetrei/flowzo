@@ -80,6 +80,7 @@ export async function POST(request: Request) {
       .update({
         balance_available: newBalance,
         balance_current: cardCurrentGBP - amountGBP,
+        balance_updated_at: new Date().toISOString(),
       })
       .eq("id", account.id);
 

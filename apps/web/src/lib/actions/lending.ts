@@ -239,6 +239,7 @@ export async function topUpPot(amountPence: number) {
       .update({
         balance_available: newBalance,
         balance_current: cardCurrentGBP - amountGBP,
+        balance_updated_at: new Date().toISOString(),
       })
       .eq("id", account.id);
 
@@ -286,6 +287,7 @@ export async function withdrawFromPot(amountPence: number) {
       .update({
         balance_available: newBalance,
         balance_current: Number(account.balance_current) + amountGBP,
+        balance_updated_at: new Date().toISOString(),
       })
       .eq("id", account.id);
 
@@ -344,6 +346,7 @@ export async function queueWithdrawal() {
         .update({
           balance_available: newBalance,
           balance_current: Number(acct.balance_current) + amountGBP,
+          balance_updated_at: new Date().toISOString(),
         })
         .eq("id", acct.id);
 
@@ -421,6 +424,7 @@ export async function withdrawAllAvailable() {
       .update({
         balance_available: newBalance,
         balance_current: Number(account.balance_current) + amountGBP,
+        balance_updated_at: new Date().toISOString(),
       })
       .eq("id", account.id);
 
