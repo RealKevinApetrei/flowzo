@@ -97,11 +97,14 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
 
     // Build cumulative bid (descending — at high APR, all lenders participate)
     const bidBuckets = Array.from(bidBucketMap.values()).sort((a, b) => b.apr - a.apr);
-    let bidCum = 0;
-    const bidCumulativeDesc = bidBuckets.map((b) => {
-      bidCum += b.volume;
-      return { apr: b.apr, cumVolume: bidCum, volume: b.volume, count: b.count };
-    });
+    const bidCumulativeDesc = bidBuckets.reduce<{ apr: number; cumVolume: number; volume: number; count: number }[]>(
+      (acc, b) => {
+        const prev = acc.length > 0 ? acc[acc.length - 1].cumVolume : 0;
+        acc.push({ apr: b.apr, cumVolume: prev + b.volume, volume: b.volume, count: b.count });
+        return acc;
+      },
+      [],
+    );
     // Reverse so it's ascending by APR for rendering
     const bidCumAsc = [...bidCumulativeDesc].reverse();
 
@@ -170,13 +173,13 @@ export function DepthChart({ pendingTrades, supplyOrders = [] }: DepthChartProps
       for (const b of allBuckets) {
         totalAskByBucket.set(b.aprBucket, (totalAskByBucket.get(b.aprBucket) ?? 0) + b.totalVolume);
       }
-      let askCum = 0;
       const askCumArr = Array.from(totalAskByBucket.entries())
         .sort(([a], [b]) => a - b)
-        .map(([apr, vol]) => {
-          askCum += vol;
-          return { apr, cumVolume: askCum };
-        });
+        .reduce<{ apr: number; cumVolume: number }[]>((acc, [apr, vol]) => {
+          const prev = acc.length > 0 ? acc[acc.length - 1].cumVolume : 0;
+          acc.push({ apr, cumVolume: prev + vol });
+          return acc;
+        }, []);
 
       // Find where bid (descending from right) crosses ask (ascending from left)
       for (const askPoint of askCumArr) {
