@@ -60,13 +60,13 @@ const slides = [
           No product has been<br />
           <span className="text-coral">built to solve this.</span>
         </h1>
-        <div className="text-center mb-10">
+        <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed mb-10">
+          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity.
+        </p>
+        <div className="text-center">
           <div className="text-5xl sm:text-6xl font-extrabold text-coral">0</div>
           <p className="text-sm text-white/50 mt-3">Products using Open Banking data to predict and prevent overdrafts via P2P lending</p>
         </div>
-        <p className="text-lg text-white/60 max-w-xl mx-auto leading-relaxed">
-          Flowzo fixes this with AI-driven bill shifting, backed by a <span className="text-white font-semibold">democratised P2P lending pool</span> — giving anyone access to affordable short-term liquidity.
-        </p>
       </div>
     ),
   },
@@ -176,7 +176,7 @@ const slides = [
           {[
             { step: "Forecast", color: "bg-coral" },
             { step: "→", color: "" },
-            { step: "Propose", color: "bg-navy" },
+            { step: "Propose", color: "bg-gray-500" },
             { step: "→", color: "" },
             { step: "Match", color: "bg-success" },
             { step: "→", color: "" },
@@ -244,7 +244,7 @@ const slides = [
           </div>
         </div>
         <p className="mt-8 text-white text-lg font-bold tracking-wide">The pipeline is live. Try it now.</p>
-        <p className="mt-2 text-coral text-sm font-extrabold tracking-widest">flowzo.vercel.app</p>
+        <p className="mt-2 text-coral text-sm font-extrabold tracking-widest">flowzo-web.vercel.app</p>
       </div>
     ),
   },
