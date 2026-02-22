@@ -15,6 +15,67 @@ function getGreeting(): string {
   return "Good evening";
 }
 
+function demoDate(daysFromNow: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + daysFromNow);
+  return d.toISOString().split("T")[0];
+}
+
+// Demo data for calendar when no real forecasts/obligations exist
+function buildDemoForecasts() {
+  // Simulate a realistic 30-day cash flow: starts ~£1,200, salary on day 5, dips around bills
+  const baseBalances = [
+    120000, 115000, 108000, 102000, 96000,   // days 0-4: declining
+    245000, 243000, 240000, 235000, 228000,  // day 5: payday +£1,500, then spend
+    222000, 218000, 195000, 190000, 185000,  // day 12: rent -£25k
+    180000, 175000, 168000, 160000, 155000,  // steady decline
+    148000, 140000, 135000, 128000, 120000,  // getting tight
+    115000, 108000, 95000,  85000,  78000,   // day 27-29: danger zone
+  ];
+  const incomes =  [0,0,0,0,0, 150000,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0];
+  const outgoings = [0,5000,7000,6000,6000, 0,2000,3000,5000,7000, 6000,4000,25000,5000,5000, 5000,5000,7000,8000,5000, 7000,8000,5000,7000,8000, 5000,7000,13000,10000,7000];
+
+  return baseBalances.map((bal, i) => ({
+    forecast_date: demoDate(i),
+    projected_balance_pence: bal,
+    is_danger: bal < 10000,
+    confidence_low_pence: Math.round(bal * 0.85),
+    confidence_high_pence: Math.round(bal * 1.15),
+    income_expected_pence: incomes[i],
+    outgoings_expected_pence: outgoings[i],
+  }));
+}
+
+function buildDemoObligations() {
+  return [
+    { id: "demo-ob-1", name: "Netflix", amount_pence: 1599, frequency: "MONTHLY", next_expected: demoDate(2), confidence: 0.95, is_essential: false, category: "Entertainment" },
+    { id: "demo-ob-2", name: "Spotify", amount_pence: 1099, frequency: "MONTHLY", next_expected: demoDate(2), confidence: 0.9, is_essential: false, category: "Entertainment" },
+    { id: "demo-ob-3", name: "Phone Bill", amount_pence: 3500, frequency: "MONTHLY", next_expected: demoDate(4), confidence: 0.85, is_essential: true, category: "Utilities" },
+    { id: "demo-ob-4", name: "Rent", amount_pence: 95000, frequency: "MONTHLY", next_expected: demoDate(12), confidence: 0.99, is_essential: true, category: "Housing" },
+    { id: "demo-ob-5", name: "Council Tax", amount_pence: 14200, frequency: "MONTHLY", next_expected: demoDate(12), confidence: 0.95, is_essential: true, category: "Housing" },
+    { id: "demo-ob-6", name: "Energy Bill", amount_pence: 8900, frequency: "MONTHLY", next_expected: demoDate(17), confidence: 0.8, is_essential: true, category: "Utilities" },
+    { id: "demo-ob-7", name: "Water Bill", amount_pence: 4200, frequency: "MONTHLY", next_expected: demoDate(17), confidence: 0.75, is_essential: true, category: "Utilities" },
+    { id: "demo-ob-8", name: "Gym", amount_pence: 2999, frequency: "MONTHLY", next_expected: demoDate(22), confidence: 0.9, is_essential: false, category: "Health" },
+    { id: "demo-ob-9", name: "Car Insurance", amount_pence: 6500, frequency: "MONTHLY", next_expected: demoDate(27), confidence: 0.95, is_essential: true, category: "Transport" },
+    { id: "demo-ob-10", name: "Internet", amount_pence: 3200, frequency: "MONTHLY", next_expected: demoDate(27), confidence: 0.85, is_essential: true, category: "Utilities" },
+  ];
+}
+
+function buildDemoShifts() {
+  return [
+    {
+      id: "demo-shift-1", obligation_name: "Energy Bill", amount_pence: 8900, fee_pence: 71,
+      original_due_date: demoDate(-3), new_due_date: demoDate(8), shift_days: 11,
+      status: "LIVE", matched_at: demoDate(-2), live_at: demoDate(-2),
+    },
+    {
+      id: "demo-shift-2", obligation_name: "Council Tax", amount_pence: 14200, fee_pence: 142,
+      original_due_date: demoDate(-1), new_due_date: demoDate(13), shift_days: 14,
+      status: "LIVE", matched_at: demoDate(-1), live_at: demoDate(0),
+    },
+  ];
+}
+
 export default async function BorrowerHomePage() {
   const supabase = await createClient();
 
@@ -113,8 +174,14 @@ export default async function BorrowerHomePage() {
     };
   });
 
-  const dangerCount = forecasts.filter((f) => f.is_danger).length;
-  const hasData = forecasts.length > 0;
+  // Use demo data if no real data exists (for vivid calendar display)
+  const isDemo = forecasts.length === 0 && upcomingObligations.length === 0 && activeShifts.length === 0;
+  const displayForecasts = forecasts.length > 0 ? forecasts : buildDemoForecasts();
+  const displayObligations = upcomingObligations.length > 0 ? upcomingObligations : buildDemoObligations();
+  const displayShifts = activeShifts.length > 0 ? activeShifts : buildDemoShifts();
+
+  const dangerCount = displayForecasts.filter((f) => f.is_danger).length;
+  const hasData = displayForecasts.length > 0;
 
   return (
     <div className="max-w-lg sm:max-w-2xl mx-auto">
@@ -157,22 +224,27 @@ export default async function BorrowerHomePage() {
           </div>
         )}
 
+        {/* Demo data notice */}
+        {isDemo && hasData && (
+          <p className="text-xs text-text-muted text-center">Sample data -- connect your bank for real forecasts</p>
+        )}
+
         {/* Danger Summary + Calendar */}
-        {(hasData || activeShifts.length > 0) && (
+        {hasData && (
           <section>
-            <DangerSummary dangerCount={dangerCount} forecasts={forecasts} repayments={activeShifts} obligations={upcomingObligations} />
+            <DangerSummary dangerCount={dangerCount} forecasts={displayForecasts} repayments={displayShifts} obligations={displayObligations} />
           </section>
         )}
 
         {/* Active Shifts — current borrowing */}
-        {activeShifts.length > 0 && (
-          <ActiveShifts shifts={activeShifts} />
+        {displayShifts.length > 0 && (
+          <ActiveShifts shifts={displayShifts} />
         )}
 
         {/* Upcoming Transactions */}
-        {upcomingObligations.length > 0 && (
+        {displayObligations.length > 0 && (
           <section>
-            <UpcomingTransactions obligations={upcomingObligations} />
+            <UpcomingTransactions obligations={displayObligations} />
           </section>
         )}
 
