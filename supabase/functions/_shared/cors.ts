@@ -1,5 +1,8 @@
 // Restrict CORS to app domain in production, allow all in dev
-const allowedOrigin = Deno.env.get("CORS_ORIGIN") ?? "*";
+// Set CORS_ORIGIN in Supabase Edge Function secrets for production
+const allowedOrigin = Deno.env.get("CORS_ORIGIN") ??
+  Deno.env.get("SITE_URL") ??
+  (Deno.env.get("ENVIRONMENT") === "production" ? "https://flowzo.vercel.app" : "*");
 
 export const corsHeaders = {
   "Access-Control-Allow-Origin": allowedOrigin,

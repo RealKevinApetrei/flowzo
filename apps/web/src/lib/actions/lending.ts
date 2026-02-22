@@ -114,23 +114,30 @@ export async function fundTrade(tradeId: string) {
     throw new Error("Cannot fund your own trade");
   }
 
-  // Guard: check for existing allocations (prevents double-funding + race with auto-match)
-  const { data: existingAllocs } = await admin
-    .from("allocations")
-    .select("id")
-    .eq("trade_id", tradeId)
-    .in("status", ["RESERVED", "ACTIVE"])
-    .limit(1);
-
-  if (existingAllocs && existingAllocs.length > 0) {
-    throw new Error("Trade already has funding — refresh to see updated status");
-  }
-
   // Calculate 80/20 fee split (matches match-trade Edge Function logic)
   const { FEE_CONFIG } = await import("@flowzo/shared");
   const tradeFee = Number(trade.fee);
   const platformFee = Math.round(tradeFee * FEE_CONFIG.platformFeePercent * 100) / 100;
   const lenderFee = Math.round((tradeFee - platformFee) * 100) / 100;
+
+  // CAS: atomically claim the trade (prevents double-funding race condition)
+  // Only one concurrent request can win this update
+  const { data: claimed, error: claimErr } = await admin
+    .from("trades")
+    .update({
+      status: "MATCHED",
+      matched_at: new Date().toISOString(),
+      platform_fee: platformFee,
+      lender_fee: lenderFee,
+    })
+    .eq("id", tradeId)
+    .eq("status", "PENDING_MATCH")
+    .select("id")
+    .single();
+
+  if (claimErr || !claimed) {
+    throw new Error("Trade already funded — refresh to see updated status");
+  }
 
   // Create allocation with lender's fee share only
   const { data: allocation, error: allocErr } = await admin
@@ -146,6 +153,11 @@ export async function fundTrade(tradeId: string) {
     .single();
 
   if (allocErr || !allocation) {
+    // Revert trade status since allocation failed
+    await admin
+      .from("trades")
+      .update({ status: "PENDING_MATCH", matched_at: null, platform_fee: null, lender_fee: null })
+      .eq("id", tradeId);
     throw new Error(`Failed to create allocation: ${allocErr?.message}`);
   }
 
@@ -161,28 +173,14 @@ export async function fundTrade(tradeId: string) {
   });
 
   if (potErr) {
-    // Rollback allocation if pot update fails
+    // Rollback: delete allocation + revert trade status
+    await admin.from("allocations").delete().eq("id", allocation.id);
     await admin
-      .from("allocations")
-      .delete()
-      .eq("id", allocation.id);
-
+      .from("trades")
+      .update({ status: "PENDING_MATCH", matched_at: null, platform_fee: null, lender_fee: null })
+      .eq("id", tradeId);
     throw new Error(`Insufficient funds or pot error: ${potErr.message}`);
   }
-
-  // Update trade status to MATCHED with fee split
-  const { error: updateErr } = await admin
-    .from("trades")
-    .update({
-      status: "MATCHED",
-      matched_at: new Date().toISOString(),
-      platform_fee: platformFee,
-      lender_fee: lenderFee,
-    })
-    .eq("id", tradeId)
-    .eq("status", "PENDING_MATCH");
-
-  if (updateErr) throw new Error(`Failed to update trade: ${updateErr.message}`);
 }
 
 export async function topUpPot(amountPence: number) {
