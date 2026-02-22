@@ -2,6 +2,28 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { lenderPreferencesSchema } from "@/lib/validators";
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+async function logBalanceChange(
+  supabase: SupabaseClient,
+  userId: string,
+  accountId: string,
+  entryType: string,
+  amountGBP: number,
+  balanceBefore: number,
+  balanceAfter: number,
+  description?: string,
+) {
+  await supabase.from("account_balance_log").insert({
+    user_id: userId,
+    account_id: accountId,
+    entry_type: entryType,
+    amount: amountGBP,
+    balance_before: balanceBefore,
+    balance_after: balanceAfter,
+    description,
+  });
+}
 
 export async function updateLenderPreferences(formData: FormData) {
   const supabase = await createClient();
@@ -211,13 +233,16 @@ export async function topUpPot(amountPence: number) {
 
   // Deduct from Monzo card balance (both current + available)
   if (account) {
+    const newBalance = cardBalanceGBP - amountGBP;
     await supabase
       .from("accounts")
       .update({
-        balance_available: cardBalanceGBP - amountGBP,
+        balance_available: newBalance,
         balance_current: cardCurrentGBP - amountGBP,
       })
       .eq("id", account.id);
+
+    await logBalanceChange(supabase, user.id, account.id, "TOPUP_DEBIT", amountGBP, cardBalanceGBP, newBalance, `Top up lending pot £${amountGBP.toFixed(2)}`);
   }
 }
 
@@ -254,13 +279,17 @@ export async function withdrawFromPot(amountPence: number) {
     .single();
 
   if (account) {
+    const balanceBefore = Number(account.balance_available);
+    const newBalance = balanceBefore + amountGBP;
     await supabase
       .from("accounts")
       .update({
-        balance_available: Number(account.balance_available) + amountGBP,
+        balance_available: newBalance,
         balance_current: Number(account.balance_current) + amountGBP,
       })
       .eq("id", account.id);
+
+    await logBalanceChange(supabase, user.id, account.id, "WITHDRAW_CREDIT", amountGBP, balanceBefore, newBalance, `Withdraw from lending pot £${amountGBP.toFixed(2)}`);
   }
 }
 
@@ -308,13 +337,17 @@ export async function queueWithdrawal() {
       .single();
 
     if (acct) {
+      const balanceBefore = Number(acct.balance_available);
+      const newBalance = balanceBefore + amountGBP;
       await supabase
         .from("accounts")
         .update({
-          balance_available: Number(acct.balance_available) + amountGBP,
+          balance_available: newBalance,
           balance_current: Number(acct.balance_current) + amountGBP,
         })
         .eq("id", acct.id);
+
+      await logBalanceChange(supabase, user.id, acct.id, "WITHDRAW_CREDIT", amountGBP, balanceBefore, newBalance, `Immediate withdrawal (queue) £${amountGBP.toFixed(2)}`);
     }
 
     await supabase
@@ -381,13 +414,17 @@ export async function withdrawAllAvailable() {
     .single();
 
   if (account) {
+    const balanceBefore = Number(account.balance_available);
+    const newBalance = balanceBefore + amountGBP;
     await supabase
       .from("accounts")
       .update({
-        balance_available: Number(account.balance_available) + amountGBP,
+        balance_available: newBalance,
         balance_current: Number(account.balance_current) + amountGBP,
       })
       .eq("id", account.id);
+
+    await logBalanceChange(supabase, user.id, account.id, "WITHDRAW_CREDIT", amountGBP, balanceBefore, newBalance, `Withdraw all available £${amountGBP.toFixed(2)}`);
   }
 
   // Clear the withdrawal queue flag if locked is also zero
