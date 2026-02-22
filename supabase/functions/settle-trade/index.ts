@@ -290,11 +290,33 @@ serve(async (req: Request) => {
                     `Auto-withdraw failed for lender ${alloc.lender_id}:`,
                     autoWithdrawErr,
                   );
-                } else if (Number(lenderPot.locked) <= principal) {
-                  await supabase
-                    .from("lending_pots")
-                    .update({ withdrawal_queued: false })
-                    .eq("user_id", alloc.lender_id);
+                } else {
+                  // Return funds to lender's card balance
+                  const withdrawAmount = Number(lenderPot.available);
+                  const { data: lenderAcct } = await supabase
+                    .from("accounts")
+                    .select("id, balance_available, balance_current")
+                    .eq("user_id", alloc.lender_id)
+                    .order("balance_updated_at", { ascending: false })
+                    .limit(1)
+                    .single();
+
+                  if (lenderAcct) {
+                    await supabase
+                      .from("accounts")
+                      .update({
+                        balance_available: Number(lenderAcct.balance_available) + withdrawAmount,
+                        balance_current: Number(lenderAcct.balance_current) + withdrawAmount,
+                      })
+                      .eq("id", lenderAcct.id);
+                  }
+
+                  if (Number(lenderPot.locked) <= principal) {
+                    await supabase
+                      .from("lending_pots")
+                      .update({ withdrawal_queued: false })
+                      .eq("user_id", alloc.lender_id);
+                  }
                 }
               }
             }
