@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { formatCurrency } from "@flowzo/shared";
 
 // Simulated data matching the real match-trade Edge Function logic
@@ -53,10 +53,8 @@ const STEP_LABELS = [
 export function MatchingDemo() {
   const [currentStep, setCurrentStep] = useState<Step>(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [scoredLenders, setScoredLenders] = useState<ScoredLender[]>([]);
-
   // Compute scored lenders based on demo data
-  useEffect(() => {
+  const scoredLenders = useMemo(() => {
     const trade = DEMO_TRADE;
     const results: ScoredLender[] = DEMO_LENDERS.map((lender) => {
       // Eligibility check
@@ -114,15 +112,15 @@ export function MatchingDemo() {
       remaining -= canAllocate;
     }
 
-    setScoredLenders(results);
+    return results;
   }, []);
 
   // Auto-play logic
   useEffect(() => {
     if (!isPlaying) return;
     if (currentStep >= 6) {
-      setIsPlaying(false);
-      return;
+      const stop = setTimeout(() => setIsPlaying(false), 0);
+      return () => clearTimeout(stop);
     }
     const timer = setTimeout(() => {
       setCurrentStep((s) => Math.min(6, s + 1) as Step);
