@@ -25,8 +25,10 @@ interface EdaStats {
 }
 
 interface ForecastAccuracy {
-  mape: number;
-  time_series: { day: number; actual: number; predicted: number }[];
+  mape_pct: number;
+  days: string[];
+  actual: number[];
+  forecasted: number[];
 }
 
 type QuantSection = "backtest" | "returns" | "eda" | "forecast" | "stress";
@@ -371,10 +373,12 @@ function CorrelationHeatmap({
 }
 
 function ForecastSection({ data }: { data: ForecastAccuracy }) {
-  const maxVal = Math.max(
-    ...data.time_series.map((d) => Math.max(d.actual, d.predicted)),
-    1,
-  );
+  if (!data.days?.length || !data.actual?.length || !data.forecasted?.length) {
+    return <p className="text-sm text-text-secondary">No forecast data available.</p>;
+  }
+
+  const len = data.days.length;
+  const maxVal = Math.max(...data.actual, ...data.forecasted, 1);
 
   return (
     <div className="space-y-3">
@@ -382,16 +386,16 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
       <div className="grid grid-cols-2 gap-3">
         <StatCard
           label="MAPE"
-          value={`${(data.mape * 100).toFixed(1)}%`}
+          value={`${data.mape_pct.toFixed(1)}%`}
           subtitle="Mean Abs % Error"
-          variant={data.mape > 0.15 ? "warning" : "success"}
+          variant={data.mape_pct > 15 ? "warning" : "success"}
         />
         <StatCard
           label="Forecast Days"
-          value={String(data.time_series?.length ?? 0)}
+          value={String(len)}
         />
       </div>
-      {data.time_series && data.time_series.length > 0 && (
+      {len > 1 && (
         <div className="mt-2">
           <svg viewBox="0 0 300 80" className="w-full h-20" preserveAspectRatio="none">
             {/* Actual line */}
@@ -399,10 +403,10 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
               fill="none"
               stroke="#1B1B3A"
               strokeWidth="1.5"
-              points={data.time_series
+              points={data.actual
                 .map(
-                  (d, i) =>
-                    `${(i / (data.time_series.length - 1)) * 300},${80 - (d.actual / maxVal) * 70 - 5}`,
+                  (v, i) =>
+                    `${(i / (len - 1)) * 300},${80 - (v / maxVal) * 70 - 5}`,
                 )
                 .join(" ")}
             />
@@ -412,10 +416,10 @@ function ForecastSection({ data }: { data: ForecastAccuracy }) {
               stroke="#FF5A5F"
               strokeWidth="1.5"
               strokeDasharray="4 2"
-              points={data.time_series
+              points={data.forecasted
                 .map(
-                  (d, i) =>
-                    `${(i / (data.time_series.length - 1)) * 300},${80 - (d.predicted / maxVal) * 70 - 5}`,
+                  (v, i) =>
+                    `${(i / (len - 1)) * 300},${80 - (v / maxVal) * 70 - 5}`,
                 )
                 .join(" ")}
             />

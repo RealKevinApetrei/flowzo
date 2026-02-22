@@ -37,7 +37,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
     cumVolume: number;
   } | null>(null);
 
-  const { buckets, cumulativeByGrade, maxCumVolume, aprRange } = useMemo(() => {
+  const { buckets, cumulativeByGrade, maxCumVolume, aprRange, aprStats } = useMemo(() => {
     // Group trades into APR buckets by grade
     const bucketMap = new Map<string, DepthBucket>();
 
@@ -95,11 +95,29 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
       if (last && last.cumVolume > maxCum) maxCum = last.cumVolume;
     }
 
+    // Compute APR statistics from individual trades
+    const allAprs: number[] = [];
+    for (const trade of pendingTrades) {
+      if (!trade.amount || !trade.shift_days || trade.shift_days === 0) continue;
+      allAprs.push((trade.fee / trade.amount) * (365 / trade.shift_days) * 100);
+    }
+    allAprs.sort((a, b) => a - b);
+
+    const aprStats = allAprs.length > 0
+      ? {
+          median: allAprs[Math.floor(allAprs.length / 2)],
+          q1: allAprs[Math.floor(allAprs.length * 0.25)],
+          q3: allAprs[Math.floor(allAprs.length * 0.75)],
+          mean: allAprs.reduce((s, v) => s + v, 0) / allAprs.length,
+        }
+      : null;
+
     return {
       buckets: allBuckets,
       cumulativeByGrade: cumByGrade,
       maxCumVolume: maxCum || 1,
       aprRange: { min: minApr, max: maxApr },
+      aprStats,
     };
   }, [pendingTrades]);
 
@@ -114,7 +132,7 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
   // SVG dimensions
   const W = 400;
   const H = 180;
-  const PAD = { top: 10, right: 20, bottom: 30, left: 50 };
+  const PAD = { top: 10, right: 20, bottom: 38, left: 50 };
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
 
@@ -160,9 +178,13 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
   const yTicks = [0, maxCumVolume * 0.25, maxCumVolume * 0.5, maxCumVolume * 0.75, maxCumVolume];
   const fmtK = (v: number) => (v >= 1000 ? `£${(v / 1000).toFixed(0)}k` : `£${v.toFixed(0)}`);
 
-  // X-axis tick values
+  // X-axis tick values (dynamically spaced, max ~6 labels)
   const xTicks: number[] = [];
-  for (let apr = aprRange.min; apr <= aprRange.max; apr += BUCKET_WIDTH * 2) {
+  const maxTickCount = 6;
+  const aprSpan = aprRange.max - aprRange.min;
+  const rawStep = aprSpan / maxTickCount;
+  const niceStep = Math.max(BUCKET_WIDTH, Math.ceil(rawStep / BUCKET_WIDTH) * BUCKET_WIDTH);
+  for (let apr = aprRange.min; apr <= aprRange.max; apr += niceStep) {
     xTicks.push(apr);
   }
 
@@ -221,10 +243,11 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
             <text
               key={i}
               x={xScale(tick)}
-              y={H - 5}
-              textAnchor="middle"
+              y={H - 10}
+              textAnchor="end"
               className="fill-text-muted"
               fontSize="8"
+              transform={`rotate(-45 ${xScale(tick)} ${H - 10})`}
             >
               {tick}%
             </text>
@@ -240,6 +263,41 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
           >
             Implied APR
           </text>
+
+          {/* Q1-Q3 shaded band */}
+          {aprStats && (
+            <rect
+              x={xScale(aprStats.q1)}
+              y={PAD.top}
+              width={Math.max(0, xScale(aprStats.q3) - xScale(aprStats.q1))}
+              height={plotH}
+              fill="rgba(27, 27, 58, 0.06)"
+              rx="2"
+            />
+          )}
+
+          {/* Median APR line */}
+          {aprStats && (
+            <>
+              <line
+                x1={xScale(aprStats.median)}
+                y1={PAD.top}
+                x2={xScale(aprStats.median)}
+                y2={PAD.top + plotH}
+                stroke="#1B1B3A"
+                strokeWidth="1"
+                strokeDasharray="4,3"
+              />
+              <text
+                x={xScale(aprStats.median) + 3}
+                y={PAD.top + 10}
+                fontSize="7"
+                className="fill-navy"
+              >
+                Median {aprStats.median.toFixed(0)}%
+              </text>
+            </>
+          )}
 
           {/* Area fills (render C first so A is on top) */}
           {[...grades].reverse().map((grade) => {
@@ -334,6 +392,16 @@ export function DepthChart({ pendingTrades }: DepthChartProps) {
           );
         })}
       </div>
+
+      {/* APR statistics */}
+      {aprStats && (
+        <div className="flex gap-4 text-[10px] text-text-muted justify-center">
+          <span>Q1: {aprStats.q1.toFixed(0)}%</span>
+          <span>Median: {aprStats.median.toFixed(0)}%</span>
+          <span>Q3: {aprStats.q3.toFixed(0)}%</span>
+          <span>Mean: {aprStats.mean.toFixed(0)}%</span>
+        </div>
+      )}
     </div>
   );
 }

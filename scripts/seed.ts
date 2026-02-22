@@ -270,10 +270,75 @@ async function createUsers(): Promise<SeedUser[]> {
     });
   }
 
-  // Create in batches of 15 with delays
+  // Build email→id map from existing users (paginate through all pages)
+  console.log("  Checking for existing demo users...");
+  const existingMap = new Map<string, string>();
+  let page = 1;
+  while (true) {
+    const { data: { users: pageUsers } } = await supabase.auth.admin.listUsers({
+      perPage: 1000,
+      page,
+    });
+    if (!pageUsers || pageUsers.length === 0) break;
+    for (const u of pageUsers) {
+      if (u.email?.endsWith("@flowzo-demo.test")) {
+        existingMap.set(u.email, u.id);
+      }
+    }
+    if (pageUsers.length < 1000) break;
+    page++;
+  }
+  console.log(`  Found ${existingMap.size} existing demo users.`);
+
+  // Clean up existing demo data (trades, allocations, etc.) if users exist
+  if (existingMap.size > 0) {
+    console.log("  Cleaning existing demo trade data...");
+    const demoIds = Array.from(existingMap.values());
+    // Delete in dependency order using service role (bypasses RLS)
+    for (const table of [
+      "pool_ledger",
+      "trade_state_transitions",
+      "allocations",
+      "agent_proposals",
+      "agent_runs",
+      "lender_preferences",
+      "lending_pots",
+    ]) {
+      await supabase.from(table).delete().in("user_id", demoIds);
+    }
+    // Delete trades (borrower_id)
+    const { data: demoTrades } = await supabase
+      .from("trades")
+      .select("id")
+      .in("borrower_id", demoIds);
+    if (demoTrades && demoTrades.length > 0) {
+      const tradeIds = demoTrades.map((t) => t.id);
+      await supabase.from("pool_ledger").delete().in("trade_id", tradeIds);
+      await supabase.from("trade_state_transitions").delete().in("trade_id", tradeIds);
+      await supabase.from("allocations").delete().in("trade_id", tradeIds);
+      await supabase.from("trades").delete().in("id", tradeIds);
+    }
+    console.log("  Demo data cleaned.");
+  }
+
+  // Assign existing user IDs or create new ones
+  let created = 0;
+  let reused = 0;
   const BATCH_SIZE = 15;
-  for (let i = 0; i < users.length; i += BATCH_SIZE) {
-    const batch = users.slice(i, i + BATCH_SIZE);
+
+  // First pass: assign existing IDs
+  for (const u of users) {
+    const existingId = existingMap.get(u.email);
+    if (existingId) {
+      u.id = existingId;
+      reused++;
+    }
+  }
+
+  // Second pass: create missing users in batches
+  const toCreate = users.filter((u) => !u.id);
+  for (let i = 0; i < toCreate.length; i += BATCH_SIZE) {
+    const batch = toCreate.slice(i, i + BATCH_SIZE);
     const results = await Promise.all(
       batch.map((u) =>
         supabase.auth.admin.createUser({
@@ -291,20 +356,21 @@ async function createUsers(): Promise<SeedUser[]> {
         console.error(`  Failed to create ${batch[j].email}:`, error.message);
         continue;
       }
-      users[i + j].id = data.user.id;
+      batch[j].id = data.user.id;
+      created++;
     }
 
-    const progress = Math.min(i + BATCH_SIZE, users.length);
+    const progress = reused + Math.min(i + BATCH_SIZE, toCreate.length);
     process.stdout.write(
-      `\r  Created ${progress}/${users.length} users...`,
+      `\r  Processed ${progress}/${users.length} users...`,
     );
-    if (i + BATCH_SIZE < users.length) await sleep(300);
+    if (i + BATCH_SIZE < toCreate.length) await sleep(300);
   }
   console.log();
 
-  // Filter out users that failed to create
+  // Filter out users that failed
   const validUsers = users.filter((u) => u.id);
-  console.log(`  ${validUsers.length} users created successfully.`);
+  console.log(`  ${created} created, ${reused} reused. ${validUsers.length} total valid users.`);
   return validUsers;
 }
 
